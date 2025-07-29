@@ -10,7 +10,7 @@ terraform {
 
 provider "aws" {
   region  = "eu-central-1"
-  profile = "AdministratorAccess-535002848039"
+  profile = "AdministratorAccess-763695378641"
 }
 
 # Fetch current account ID (used for KMS policy interpolation)
