@@ -162,12 +162,14 @@ mkdir -p $NITRO_CLI_ARTIFACTS
 chmod 700 $NITRO_CLI_ARTIFACTS
 
 # Build the enclave Docker image and create an Enclave Image File (EIF)
-docker build -t hello-enclave:latest /enclave
-nitro-cli build-enclave --docker-uri hello-enclave:latest --output-file $NITRO_CLI_ARTIFACTS/hello.eif
+docker build -t curiosity:latest /home/ec2-user
+nitro-cli build-enclave --docker-uri curiosity:latest --output-file $NITRO_CLI_ARTIFACTS/curiosity.eif
 
-nitro-cli run-enclave --eif-path $NITRO_CLI_ARTIFACTS/hello.eif --memory 2048 --cpu-count 2 --enclave-cid 16 --debug-mode
+nitro-cli run-enclave --eif-path $NITRO_CLI_ARTIFACTS/curiosity.eif --memory 2048 --cpu-count 2 --enclave-cid 16 --debug-mode
 nitro-cli console --enclave-id "$(nitro-cli describe-enclaves | jq -r '.[0].EnclaveID')"
 
-/enclave/tcp-to-vsock.py &
-
+# /enclave/tcp-to-vsock.py &
 # sudo less /var/log/cloud-init-output.log
+# echo "- {address: nitro-enclave-hello-docdb-cluster.cluster-cjasoqwi4beb.eu-central-1.docdb.amazonaws.com, port: 27017}" | sudo tee -a /etc/nitro_enclaves/vsock-proxy.yaml
+# sudo vsock-proxy 123 nitro-enclave-hello-docdb-cluster.cluster-cjasoqwi4beb.eu-central-1.docdb.amazonaws.com 27017
+# sudo vsock-proxy 123 icanhazip.com 443

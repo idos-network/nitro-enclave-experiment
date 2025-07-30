@@ -1,0 +1,43 @@
+FROM ubuntu:latest
+
+RUN apt update -y && apt install -y \
+        curl \
+        build-essential \
+        git \
+        cmake \
+        python3 \
+	net-tools \
+	iproute2 \
+	iputils-ping \
+;
+
+RUN ( \
+  git clone https://github.com/virtualsquare/vde-2.git \
+  && cd vde-2 \
+  && sed -i 's/-Wall")/-Wall -fPIC")/' CMakeLists.txt \
+  && mkdir build \
+  && cd build \
+  && cmake .. \
+  && make \
+  && make install \
+  && cd / \
+  && rm -rf vde-2 \
+)
+
+RUN ( \
+  curl -O http://www.dest-unreach.org/socat/download/socat-1.8.0.3.tar.gz \
+  && tar -xzf socat-1.8.0.3.tar.gz \
+  && cd socat-1.8.0.3 \
+  && ./configure \
+  && make \
+  && make install \
+  && cd / \
+  && rm -rf socat-1.8.0.3* \
+)
+
+CMD ( set -x;\
+  ifconfig lo 127.0.0.1 && \
+  ip route add default dev lo src 127.0.0.1 && \
+  (socat TCP-LISTEN:1025,fork,bind=127.0.0.1 VSOCK-CONNECT:3:123 &) && \
+  curl -v --connect-to icanhazip.com:443:127.0.0.1:1025 https://icanhazip.com/ \
+)
