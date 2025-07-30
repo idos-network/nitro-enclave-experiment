@@ -35,9 +35,14 @@ RUN ( \
   && rm -rf socat-1.8.0.3* \
 )
 
+RUN (\
+  curl -O https://downloads.mongodb.com/compass/mongodb-mongosh_2.5.6_amd64.deb && \
+  dpkg -i mongodb-mongosh_2.5.6_amd64.deb \
+)
+
 CMD ( set -x;\
   ifconfig lo 127.0.0.1 && \
   ip route add default dev lo src 127.0.0.1 && \
-  (socat TCP-LISTEN:1025,fork,bind=127.0.0.1 VSOCK-CONNECT:3:123 &) && \
-  curl -v --connect-to icanhazip.com:443:127.0.0.1:1025 https://icanhazip.com/ \
+  (socat TCP-LISTEN:27017,fork,bind=127.0.0.1 VSOCK-CONNECT:3:123 &) && \
+  mongosh localhost:27017 --retryWrites=false --username root --password password \
 )
