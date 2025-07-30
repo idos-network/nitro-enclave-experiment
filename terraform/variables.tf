@@ -5,20 +5,29 @@ variable "project_name" {
   default     = "nitro-enclave-hello"
 }
 
-variable "vpc_cidr" {
-  description = "CIDR block for the VPC"
-  type        = string
-  default     = "10.0.0.0/16"
-}
-
-variable "public_subnet_cidr" {
-  description = "CIDR block for the public subnet"
-  type        = string
-  default     = "10.0.1.0/24"
-}
-
 variable "instance_type" {
   description = "EC2 instance type for the parent instance (must support Nitro Enclaves)"
   type        = string
   default     = "m6i.xlarge"
+}
+
+# DocumentDB variables
+variable "docdb_username" {
+  description = "Username for DocumentDB"
+  type        = string
+  default     = "root"
+  sensitive   = true
+}
+
+variable "docdb_password" {
+  description = "Password for DocumentDB"
+  type        = string
+  default     = "password"
+  sensitive   = true
+}
+
+variable "docdb_instance_class" {
+  description = "Instance class for DocumentDB"
+  type        = string
+  default     = "db.t3.medium"
 }

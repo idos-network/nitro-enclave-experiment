@@ -18,7 +18,7 @@ resource "aws_key_pair" "enclave_key" {
 resource "aws_instance" "enclave_instance" {
   ami                         = data.aws_ami.al2.id
   instance_type               = var.instance_type
-  subnet_id                   = aws_subnet.public.id
+  subnet_id                   = data.aws_subnets.default.ids[0]
   associate_public_ip_address = true
   security_groups             = [aws_security_group.web_sg.id]
   iam_instance_profile        = aws_iam_instance_profile.enclave_instance_profile.name
@@ -27,6 +27,11 @@ resource "aws_instance" "enclave_instance" {
     enabled = true
   }
   key_name = aws_key_pair.enclave_key.key_name
+
+  root_block_device {
+    delete_on_termination = true
+    volume_size           = 64
+  }
 
   # Cloud-init user data script to set up Nitro Enclave and Node.js server
   user_data = file("${path.module}/user_data.sh")

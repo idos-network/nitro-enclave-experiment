@@ -42,6 +42,26 @@ resource "aws_iam_role_policy" "kms_access" {
   })
 }
 
+# Policy to allow EC2 instance to access DocumentDB
+resource "aws_iam_role_policy" "docdb_access" {
+  name = "AllowDocDBAccess"
+  role = aws_iam_role.enclave_instance_role.id
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = [
+          "rds:DescribeDBClusters",
+          "rds:DescribeDBInstances",
+          "rds:ListTagsForResource"
+        ],
+        Resource = "*"
+      }
+    ]
+  })
+}
+
 # Instance profile to attach the role to the EC2 instance
 resource "aws_iam_instance_profile" "enclave_instance_profile" {
   name = "${var.project_name}-instance-profile"
