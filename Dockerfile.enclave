@@ -12,7 +12,8 @@ RUN apt update -y && apt install -y \
 ;
 
 RUN ( \
-  git clone https://github.com/virtualsquare/vde-2.git \
+  cd /tmp \
+  && git clone https://github.com/virtualsquare/vde-2.git \
   && cd vde-2 \
   && sed -i 's/-Wall")/-Wall -fPIC")/' CMakeLists.txt \
   && mkdir build \
@@ -20,24 +21,27 @@ RUN ( \
   && cmake .. \
   && make \
   && make install \
-  && cd / \
+  && cd /tmp \
   && rm -rf vde-2 \
 )
 
 RUN ( \
-  curl -O http://www.dest-unreach.org/socat/download/socat-1.8.0.3.tar.gz \
+  cd /tmp \
+  && curl -O http://www.dest-unreach.org/socat/download/socat-1.8.0.3.tar.gz \
   && tar -xzf socat-1.8.0.3.tar.gz \
   && cd socat-1.8.0.3 \
   && ./configure \
   && make \
   && make install \
-  && cd / \
+  && cd /tmp \
   && rm -rf socat-1.8.0.3* \
 )
 
 RUN (\
-  curl -O https://downloads.mongodb.com/compass/mongodb-mongosh_2.5.6_amd64.deb && \
-  dpkg -i mongodb-mongosh_2.5.6_amd64.deb \
+  cd /tmp \
+  && curl -O https://downloads.mongodb.com/compass/mongodb-mongosh_2.5.6_amd64.deb \
+  && dpkg -i mongodb-mongosh_2.5.6_amd64.deb \
+  && rm -f mongodb-mongosh_2.5.6_amd64.deb \
 )
 
 CMD ( set -x;\
