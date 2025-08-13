@@ -30,11 +30,15 @@ resource "aws_instance" "enclave_instance" {
 
   root_block_device {
     delete_on_termination = true
-    volume_size           = 64
+    volume_size           = 256
   }
 
   # Cloud-init user data script to set up Nitro Enclave and Node.js server
   user_data = file("${path.module}/user_data.sh")
+
+  lifecycle {
+    ignore_changes = [user_data]
+  }
 
   tags = {
     Name = "${var.project_name}-instance"

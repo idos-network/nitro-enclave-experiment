@@ -3,8 +3,12 @@
 
 yum update -y
 amazon-linux-extras install -y aws-nitro-enclaves-cli
-yum install -y aws-nitro-enclaves-cli-devel docker python3
+amazon-linux-extras install -y epel # TODO remove me
+yum-config-manager --enable epel # TODO remove me
+yum install -y aws-nitro-enclaves-cli-devel docker python3 \
+    git git-lfs # TODO only for dev
 
+usermod -a -G docker ec2-user
 systemctl enable --now docker
 
 sed -i 's/^memory_mib:.*/memory_mib: 2048/' /etc/nitro_enclaves/allocator.yaml
@@ -157,19 +161,46 @@ CMD ["/enclave/start.sh"]
 DOCKERFILE
 
 # Set NITRO_CLI_ARTIFACTS environment variable
-export NITRO_CLI_ARTIFACTS=/var/lib/nitro_enclaves
+echo "export NITRO_CLI_ARTIFACTS=/var/lib/nitro_enclaves" | sudo tee /etc/profile.d/nitro.sh > /dev/null
+. /etc/profile.d/nitro.sh
 mkdir -p $NITRO_CLI_ARTIFACTS
 chmod 700 $NITRO_CLI_ARTIFACTS
 
-# Build the enclave Docker image and create an Enclave Image File (EIF)
-docker build -t curiosity:latest /home/ec2-user
-nitro-cli build-enclave --docker-uri curiosity:latest --output-file $NITRO_CLI_ARTIFACTS/curiosity.eif
+sudo -u ec2-user aws s3 sync s3://idos-nitro-facetec/ ~ec2-user/custom-server/
 
-nitro-cli run-enclave --eif-path $NITRO_CLI_ARTIFACTS/curiosity.eif --memory 2048 --cpu-count 2 --enclave-cid 16 --debug-mode
-nitro-cli console --enclave-id "$(nitro-cli describe-enclaves | jq -r '.[0].EnclaveID')"
+exit 0
+# Build the enclave Docker image and create an Enclave Image File (EIF)
+#docker build -t curiosity:latest /enclave/ \
+#&& nitro-cli build-enclave --docker-uri curiosity:latest --output-file $NITRO_CLI_ARTIFACTS/curiosity.eif \
+#&& nitro-cli run-enclave --eif-path $NITRO_CLI_ARTIFACTS/curiosity.eif --memory 2048 --cpu-count 2 --enclave-cid 16 --debug-mode --attach-console
+# nitro-cli run-enclave --eif-path $NITRO_CLI_ARTIFACTS/curiosity.eif --memory 2048 --cpu-count 2 --enclave-cid 16 --debug-mode --attach-console
 
 # /enclave/tcp-to-vsock.py &
 # sudo less /var/log/cloud-init-output.log
 # echo "- {address: nitro-enclave-hello-docdb-cluster.cluster-cjasoqwi4beb.eu-central-1.docdb.amazonaws.com, port: 27017}" | sudo tee -a /etc/nitro_enclaves/vsock-proxy.yaml
 # sudo vsock-proxy 123 nitro-enclave-hello-docdb-cluster.cluster-cjasoqwi4beb.eu-central-1.docdb.amazonaws.com 27017
 # sudo vsock-proxy 123 icanhazip.com 443
+
+# docker build -t popeye ~ec2-user/popeye
+# sudo nitro-cli build-enclave --docker-uri popeye --output-file $NITRO_CLI_ARTIFACTS/popeye.eif
+# sudo nitro-cli run-enclave --eif-path $NITRO_CLI_ARTIFACTS/popeye.eif --memory 26332 --cpu-count 2 --enclave-cid 16 --debug-mode --attach-console
+nitro-cli console --enclave-id "$(nitro-cli describe-enclaves | jq -r '.[0].EnclaveID')"
+/facetec/facetec_usage_logs_server/facetec-usage-logs/usage-logs/default-instance
+
+(
+    sudo rm -rf /tmp/??????????
+    sudo rm -f $NITRO_CLI_ARTIFACTS/facetec_custom_server.eif
+
+    set -e
+    docker build -t facetec_custom_server:latest ~ec2-user/custom-server/
+
+    sudo sed -i 's/^memory_mib:.*/memory_mib: 2048/' /etc/nitro_enclaves/allocator.yaml
+    sudo systemctl restart nitro-enclaves-allocator.service
+
+    sudo nitro-cli build-enclave --docker-uri facetec_custom_server:latest --output-file $NITRO_CLI_ARTIFACTS/facetec_custom_server.eif
+
+    sudo sed -i 's/^memory_mib:.*/memory_mib: 64000/' /etc/nitro_enclaves/allocator.yaml
+    sudo systemctl restart nitro-enclaves-allocator.service
+
+    sudo nitro-cli run-enclave --eif-path $NITRO_CLI_ARTIFACTS/facetec_custom_server.eif --memory 64000 --cpu-count 2 --enclave-cid 16 --debug-mode --attach-console
+)
