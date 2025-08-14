@@ -78,3 +78,20 @@ resource "aws_docdb_cluster_instance" "docdb_instances" {
     Name = "${var.project_name}-docdb-instance-${count.index}"
   }
 }
+
+# DocumentDB outputs
+output "docdb_endpoint" {
+  description = "Endpoint of the DocumentDB cluster"
+  value       = aws_docdb_cluster.docdb.endpoint
+}
+
+output "docdb_port" {
+  description = "Port of the DocumentDB cluster"
+  value       = aws_docdb_cluster.docdb.port
+}
+
+output "docdb_connection_string" {
+  description = "Connection string for DocumentDB"
+  value       = "mongodb://${var.docdb_username}:${var.docdb_password}@${aws_docdb_cluster.docdb.endpoint}:${aws_docdb_cluster.docdb.port}/?tls=true&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false"
+  sensitive   = true
+}
