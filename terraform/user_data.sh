@@ -16,146 +16,54 @@ systemctl restart nitro-enclaves-allocator.service
 
 mkdir -p /enclave
 
-cat > /enclave/tcp-to-vsock.py << FILE
-#!/usr/bin/env python3
-import socket
-import threading
-
-TCP_PORT = 80
-VSOCK_CID = 16
-VSOCK_PORT = 5005
-
-def handle_client(client_socket):
-    print(f"New thread handler for {client_socket}")
-    vsock = socket.socket(socket.AF_VSOCK, socket.SOCK_STREAM)
-    vsock.connect((VSOCK_CID, VSOCK_PORT))
-    print(f"Connected {vsock}")
-    while True:
-        print(f"Waiting for data from client")
-        data = client_socket.recv(512)
-        if not data:
-            print(f"Got {data}. Breaking.")
-            break
-        print(f"Got {len(data)} bytes from client. Sending data to vsock")
-        vsock.sendall(data)
-        print(f"Sent to vsock. Waiting for data from vsock")
-        response = vsock.recv(512)
-        if not response:
-            print(f"Got {response}. Breaking.")
-            break
-        print(f"Got {len(response)} bytes from vsock. Sending data to client")
-        client_socket.sendall(response)
-        print(f"Data sent. Looping")
-    print(f"Loop broken. Closing sockets.")
-    client_socket.close()
-    vsock.close()
-
-def start_server():
-    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.bind(("0.0.0.0", TCP_PORT))
-    server.listen()
-    print(f"Listening on TCP port {TCP_PORT} and forwarding to VSOCK {VSOCK_CID}:{VSOCK_PORT}")
-
-    while True:
-        client_socket, addrinfo = server.accept()
-        print(f"Accepted from {addrinfo}")
-        client_handler = threading.Thread(target=handle_client, args=(client_socket,))
-        client_handler.start()
-
-if __name__ == "__main__":
-    start_server()
-FILE
-chmod +x /enclave/tcp-to-vsock.py
-
-cat > /enclave/vsock-to-tcp.py << FILE
-#!/usr/bin/env python3
-import socket
-import threading
-
-TCP_HOST = "127.0.0.1"
-TCP_PORT = 3000
-VSOCK_CID = socket.VMADDR_CID_ANY
-VSOCK_PORT = 5005
-
-def handle_client(vsock_client):
-    print(f"New thread handler for {vsock_client}")
-    tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    tcp_socket.connect((TCP_HOST, TCP_PORT))
-    print(f"Connected to TCP {TCP_HOST}:{TCP_PORT}")
-    while True:
-        print(f"Waiting for data from vsock")
-        data = vsock_client.recv(512)
-        if not data:
-            print(f"Got {data}. Breaking.")
-            break
-        print(f"Got {len(data)} bytes from vsock. Sending data to TCP")
-        tcp_socket.sendall(data)
-        print(f"Sent to TCP. Waiting for data from TCP")
-        response = tcp_socket.recv(512)
-        if not response:
-            print(f"Got {response}. Breaking.")
-            break
-        print(f"Got {len(response)} bytes from TCP. Sending data to vsock")
-        vsock_client.sendall(response)
-        print(f"Data sent. Looping")
-    print(f"Loop broken. Closing sockets.")
-    vsock_client.close()
-    tcp_socket.close()
-
-def start_server():
-    vsock_server = socket.socket(socket.AF_VSOCK, socket.SOCK_STREAM)
-    vsock_server.bind((VSOCK_CID, VSOCK_PORT))
-    vsock_server.listen()
-    print(f"Listening on VSOCK {VSOCK_CID}:{VSOCK_PORT} and forwarding to TCP {TCP_HOST}:{TCP_PORT}")
-
-    while True:
-        vsock_client, addrinfo = vsock_server.accept()
-        print(f"Accepted from {addrinfo}")
-        client_handler = threading.Thread(target=handle_client, args=(vsock_client,))
-        client_handler.start()
-
-if __name__ == "__main__":
-    start_server()
-FILE
-chmod +x /enclave/vsock-to-tcp.py
-
 # Write Node.js application (Hello World server)
-cat > /enclave/app.js << NODEAPP
-#!/usr/bin/env node
-const http = require('http');
-const port = process.env.PORT || 3000;
-const server = http.createServer((req, res) => {
-    res.writeHead(200, {'Content-Type': 'text/plain'});
-    res.end('Hello from Nitro Enclave!\n');
-});
-server.listen(port, '0.0.0.0', () => {
-    console.log("Server running on port: " + port);
-});
-server.on('error', (err) => {
-    console.error('Server error:', err);
-});
+cat > /enclave/app.ash << NODEAPP
+#!/bin/ash
+set -u
+set -e
+set -o pipefail
+
+ssh-keygen -A
+
+sed -i '/^AllowTcpForwarding/d' /etc/ssh/sshd_config
+echo "AllowTcpForwarding yes" >> /etc/ssh/sshd_config
+echo "PermitUserEnvironment yes" >> /etc/ssh/sshd_config
+echo "ClientAliveInterval 15m" >> /etc/ssh/sshd_config
+
+sed -i -e 's/^root:!:/root::/' /etc/shadow
+
+# Have ssh logins get the same env vars we have right now (which were set in various docker layers).
+env > /root/.ssh/environment
+
+echo "About to listen for root with these keys:"
+cat /root/.ssh/authorized_keys
+echo "Starting openssh"
+exec /usr/sbin/sshd -f /etc/ssh/sshd_config -e -D
 NODEAPP
-chmod +x /enclave/app.js
+chmod +x /enclave/app.ash
 
 # Write enclave startup script
 cat > /enclave/start.sh << STARTSH
 #!/bin/sh
 ifconfig lo 127.0.0.1
 ip route add default dev lo src 127.0.0.1
-/enclave/app.js &
-/enclave/vsock-to-tcp.py
+socat VSOCK-LISTEN:5005,fork TCP:127.0.0.1:22 &
+/enclave/app.ash
 STARTSH
 chmod +x /enclave/start.sh
 
 # Write Dockerfile for enclave image
 cat > /enclave/Dockerfile << DOCKERFILE
-FROM alpine:3.17
-RUN apk add --no-cache nodejs python3
-WORKDIR /enclave
+FROM alpine:latest
 
-COPY vsock-to-tcp.py .
-COPY tcp-to-vsock.py .
-COPY app.js .
+RUN apk add --no-cache nodejs python3 openssh socat
+
+RUN mkdir -p /root/.ssh && chmod 700 /root/.ssh/
+COPY authorized_keys /root/.ssh/authorized_keys
+RUN chmod 600 /root/.ssh/authorized_keys
+
+WORKDIR /enclave
+COPY app.ash .
 COPY start.sh .
 CMD ["/enclave/start.sh"]
 DOCKERFILE
@@ -167,6 +75,15 @@ mkdir -p $NITRO_CLI_ARTIFACTS
 chmod 700 $NITRO_CLI_ARTIFACTS
 
 sudo -u ec2-user aws s3 sync s3://idos-nitro-facetec/ ~ec2-user/custom-server/
+
+cp ~ec2-user/.ssh/authorized_keys /enclave/authorized_keys
+
+echo "Setup TCP to VSOCK proxy"
+sudo docker run -d -p 2222:2222 --privileged alpine/socat TCP-LISTEN:2222,fork,reuseaddr VSOCK:16:5005
+
+docker build -t curiosity:latest /enclave/ \
+&& sudo nitro-cli build-enclave --docker-uri curiosity:latest --output-file $NITRO_CLI_ARTIFACTS/curiosity.eif \
+; # && sudo nitro-cli run-enclave --eif-path $NITRO_CLI_ARTIFACTS/curiosity.eif --memory 2048 --cpu-count 2 --enclave-cid 16 --debug-mode --attach-console
 
 exit 0
 # Build the enclave Docker image and create an Enclave Image File (EIF)

@@ -30,6 +30,14 @@ resource "aws_security_group" "web_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  ingress {
+    description = "Allow SSH on 2222 from anywhere"
+    protocol    = "tcp"
+    from_port   = 2222
+    to_port     = 2222
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   egress {
     description = "Allow all outbound"
     protocol    = "-1"
