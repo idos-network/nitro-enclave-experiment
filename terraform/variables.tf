@@ -8,7 +8,7 @@ variable "project_name" {
 variable "instance_type" {
   description = "EC2 instance type for the parent instance (must support Nitro Enclaves)"
   type        = string
-  default     = "m6i.8xlarge"
+  default     = "m6i.4xlarge"
 }
 
 # DocumentDB variables

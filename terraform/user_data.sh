@@ -1,5 +1,6 @@
 #!/bin/bash
-#set -xe
+set -e
+
 
 yum update -y
 amazon-linux-extras install -y aws-nitro-enclaves-cli
@@ -86,11 +87,6 @@ docker build -t curiosity:latest /enclave/ \
 ; # && sudo nitro-cli run-enclave --eif-path $NITRO_CLI_ARTIFACTS/curiosity.eif --memory 2048 --cpu-count 2 --enclave-cid 16 --debug-mode --attach-console
 
 exit 0
-# Build the enclave Docker image and create an Enclave Image File (EIF)
-#docker build -t curiosity:latest /enclave/ \
-#&& nitro-cli build-enclave --docker-uri curiosity:latest --output-file $NITRO_CLI_ARTIFACTS/curiosity.eif \
-#&& nitro-cli run-enclave --eif-path $NITRO_CLI_ARTIFACTS/curiosity.eif --memory 2048 --cpu-count 2 --enclave-cid 16 --debug-mode --attach-console
-# nitro-cli run-enclave --eif-path $NITRO_CLI_ARTIFACTS/curiosity.eif --memory 2048 --cpu-count 2 --enclave-cid 16 --debug-mode --attach-console
 
 # /enclave/tcp-to-vsock.py &
 # sudo less /var/log/cloud-init-output.log
@@ -101,7 +97,7 @@ exit 0
 # docker build -t popeye ~ec2-user/popeye
 # sudo nitro-cli build-enclave --docker-uri popeye --output-file $NITRO_CLI_ARTIFACTS/popeye.eif
 # sudo nitro-cli run-enclave --eif-path $NITRO_CLI_ARTIFACTS/popeye.eif --memory 26332 --cpu-count 2 --enclave-cid 16 --debug-mode --attach-console
-nitro-cli console --enclave-id "$(nitro-cli describe-enclaves | jq -r '.[0].EnclaveID')"
+sudo nitro-cli console --enclave-id "$(nitro-cli describe-enclaves | jq -r '.[0].EnclaveID')"
 /facetec/facetec_usage_logs_server/facetec-usage-logs/usage-logs/default-instance
 
 (
@@ -116,8 +112,8 @@ nitro-cli console --enclave-id "$(nitro-cli describe-enclaves | jq -r '.[0].Encl
 
     sudo nitro-cli build-enclave --docker-uri facetec_custom_server:latest --output-file $NITRO_CLI_ARTIFACTS/facetec_custom_server.eif
 
-    sudo sed -i 's/^memory_mib:.*/memory_mib: 64000/' /etc/nitro_enclaves/allocator.yaml
+    sudo sed -i 's/^memory_mib:.*/memory_mib: 51000/' /etc/nitro_enclaves/allocator.yaml
     sudo systemctl restart nitro-enclaves-allocator.service
 
-    sudo nitro-cli run-enclave --eif-path $NITRO_CLI_ARTIFACTS/facetec_custom_server.eif --memory 64000 --cpu-count 2 --enclave-cid 16 --debug-mode --attach-console
+    sudo nitro-cli run-enclave --eif-path $NITRO_CLI_ARTIFACTS/facetec_custom_server.eif --memory 44000 --cpu-count 2 --enclave-cid 16 --debug-mode --attach-console
 )
