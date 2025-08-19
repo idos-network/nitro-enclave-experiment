@@ -80,7 +80,7 @@ sudo -u ec2-user aws s3 sync s3://idos-nitro-facetec/ ~ec2-user/custom-server/
 cp ~ec2-user/.ssh/authorized_keys /enclave/authorized_keys
 
 echo "Setup TCP to VSOCK proxy"
-sudo docker run -d -p 2222:2222 --privileged alpine/socat TCP-LISTEN:2222,fork,reuseaddr VSOCK:16:5005
+sudo docker run -d -p 2222:2222 --restart unless-stopped --privileged alpine/socat TCP-LISTEN:2222,fork,reuseaddr VSOCK:16:5005
 
 docker build -t curiosity:latest /enclave/ \
 && sudo nitro-cli build-enclave --docker-uri curiosity:latest --output-file $NITRO_CLI_ARTIFACTS/curiosity.eif \
@@ -101,6 +101,7 @@ sudo nitro-cli console --enclave-id "$(nitro-cli describe-enclaves | jq -r '.[0]
 /facetec/facetec_usage_logs_server/facetec-usage-logs/usage-logs/default-instance
 
 (
+    sudo nitro-cli terminate-enclave --all
     sudo rm -rf /tmp/??????????
     sudo rm -f $NITRO_CLI_ARTIFACTS/facetec_custom_server.eif
 
@@ -108,12 +109,15 @@ sudo nitro-cli console --enclave-id "$(nitro-cli describe-enclaves | jq -r '.[0]
     docker build -t facetec_custom_server:latest ~ec2-user/custom-server/
 
     sudo sed -i 's/^memory_mib:.*/memory_mib: 2048/' /etc/nitro_enclaves/allocator.yaml
+    sudo sed -i 's/^cpu_count:.*/cpu_count: 16/' /etc/nitro_enclaves/allocator.yaml
     sudo systemctl restart nitro-enclaves-allocator.service
 
     sudo nitro-cli build-enclave --docker-uri facetec_custom_server:latest --output-file $NITRO_CLI_ARTIFACTS/facetec_custom_server.eif
 
-    sudo sed -i 's/^memory_mib:.*/memory_mib: 51000/' /etc/nitro_enclaves/allocator.yaml
+    sudo sed -i 's/^memory_mib:.*/memory_mib: 64000/' /etc/nitro_enclaves/allocator.yaml
     sudo systemctl restart nitro-enclaves-allocator.service
 
-    sudo nitro-cli run-enclave --eif-path $NITRO_CLI_ARTIFACTS/facetec_custom_server.eif --memory 44000 --cpu-count 2 --enclave-cid 16 --debug-mode --attach-console
+    sudo nitro-cli run-enclave --eif-path $NITRO_CLI_ARTIFACTS/facetec_custom_server.eif --memory 60000 --cpu-count 16 --enclave-cid 16 --debug-mode --attach-console
 )
+
+#
