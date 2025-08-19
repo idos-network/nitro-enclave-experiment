@@ -82,9 +82,19 @@ cp ~ec2-user/.ssh/authorized_keys /enclave/authorized_keys
 echo "Setup TCP to VSOCK proxy"
 sudo docker run -d -p 2222:2222 --restart unless-stopped --privileged alpine/socat TCP-LISTEN:2222,fork,reuseaddr VSOCK:16:5005
 
-docker build -t curiosity:latest /enclave/ \
-&& sudo nitro-cli build-enclave --docker-uri curiosity:latest --output-file $NITRO_CLI_ARTIFACTS/curiosity.eif \
-; # && sudo nitro-cli run-enclave --eif-path $NITRO_CLI_ARTIFACTS/curiosity.eif --memory 2048 --cpu-count 2 --enclave-cid 16 --debug-mode --attach-console
+echo "Setup VSOCK to TCP proxy"
+sudo vsock-proxy 6006 mongodb.com 27017 # Change this to the real cluster name
+# TODO add real address to /etc/nitro_enclaves/vsock-proxy.yaml
+
+cat - <<EOF > /etc/yum.repos.d/mongodb-org-7.0.repo
+[mongodb-org-7.0]
+name=MongoDB Repository
+baseurl=https://repo.mongodb.org/yum/amazon/\$releasever/mongodb-org/7.0/\$basearch/
+gpgcheck=1
+enabled=1
+gpgkey=https://www.mongodb.org/static/pgp/server-7.0.asc
+EOF
+yum install -y mongodb-mongosh
 
 exit 0
 
