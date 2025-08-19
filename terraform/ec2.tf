@@ -43,4 +43,14 @@ resource "aws_instance" "enclave_instance" {
   tags = {
     Name = "${var.project_name}-instance"
   }
+
+  connection {
+    type = "ssh"
+    user = "ec2-user"
+    host = self.public_ip
+  }
+
+  provisioner "remote-exec" {
+    inline = ["sudo cloud-init status --wait"]
+  }
 }
