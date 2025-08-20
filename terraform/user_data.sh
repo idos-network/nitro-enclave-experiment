@@ -79,12 +79,17 @@ sudo -u ec2-user aws s3 sync s3://idos-nitro-facetec/ ~ec2-user/custom-server/
 
 cp ~ec2-user/.ssh/authorized_keys /enclave/authorized_keys
 
-echo "Setup TCP to VSOCK proxy"
-sudo docker run -d -p 2222:2222 --restart unless-stopped --privileged alpine/socat TCP-LISTEN:2222,fork,reuseaddr VSOCK:16:5005
+sudo docker run  -d --restart unless-stopped --privileged --name tcp-2222-vsock-16-5005 -p 2222:2222  alpine/socat TCP-LISTEN:2222,fork VSOCK-CONNECT:16:5005
 
-echo "Setup VSOCK to TCP proxy"
-sudo vsock-proxy 6006 mongodb.com 27017 # Change this to the real cluster name
-# TODO add real address to /etc/nitro_enclaves/vsock-proxy.yaml
+docker ps -qa | xargs docker rm -f
+while [[ "${MONGO_HOST:-null}" == "null" ]]; do
+    MONGO_HOST=`aws docdb describe-db-clusters --region eu-central-1 | jq -r .DBClusters[0].Endpoint`
+done
+sudo docker run  -d --restart unless-stopped --privileged --name vsock-6006-tcp-mongo-27017            alpine/socat VSOCK-LISTEN:6006 TCP:"$MONGO_HOST":27017
+sudo docker run  -d --restart unless-stopped --privileged --name tcp-27017-vsock-1-6006 -p 27017:27017 alpine/socat TCP-LISTEN:27017 VSOCK:1:6006
+docker ps -qa | xargs -n 1 docker logs -f &
+mongosh --host $MONGO_HOST --port 27017 --username root --password password <<<"quit"
+mongosh --host 127.0.0.1 --port 27018 --username root --password password <<<"quit" # This was not working.
 
 cat - <<EOF > /etc/yum.repos.d/mongodb-org-7.0.repo
 [mongodb-org-7.0]
