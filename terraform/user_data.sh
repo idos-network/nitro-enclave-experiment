@@ -1,138 +1,30 @@
 #!/bin/bash
 set -e
 
-
 yum update -y
 amazon-linux-extras install -y aws-nitro-enclaves-cli
-amazon-linux-extras install -y epel # TODO remove me
-yum-config-manager --enable epel # TODO remove me
-yum install -y aws-nitro-enclaves-cli-devel docker python3 \
-    git git-lfs # TODO only for dev
+yum install -y aws-nitro-enclaves-cli-devel docker
 
 usermod -a -G docker ec2-user
 systemctl enable --now docker
 
-sed -i 's/^memory_mib:.*/memory_mib: 2048/' /etc/nitro_enclaves/allocator.yaml
-systemctl restart nitro-enclaves-allocator.service
-
-mkdir -p /enclave
-
-# Write Node.js application (Hello World server)
-cat > /enclave/app.ash << NODEAPP
-#!/bin/ash
-set -u
-set -e
-set -o pipefail
-
-ssh-keygen -A
-
-sed -i '/^AllowTcpForwarding/d' /etc/ssh/sshd_config
-echo "AllowTcpForwarding yes" >> /etc/ssh/sshd_config
-echo "PermitUserEnvironment yes" >> /etc/ssh/sshd_config
-echo "ClientAliveInterval 15m" >> /etc/ssh/sshd_config
-
-sed -i -e 's/^root:!:/root::/' /etc/shadow
-
-# Have ssh logins get the same env vars we have right now (which were set in various docker layers).
-env > /root/.ssh/environment
-
-echo "About to listen for root with these keys:"
-cat /root/.ssh/authorized_keys
-echo "Starting openssh"
-exec /usr/sbin/sshd -f /etc/ssh/sshd_config -e -D
-NODEAPP
-chmod +x /enclave/app.ash
-
-# Write enclave startup script
-cat > /enclave/start.sh << STARTSH
-#!/bin/sh
-ifconfig lo 127.0.0.1
-ip route add default dev lo src 127.0.0.1
-socat VSOCK-LISTEN:5005,fork TCP:127.0.0.1:22 &
-/enclave/app.ash
-STARTSH
-chmod +x /enclave/start.sh
-
-# Write Dockerfile for enclave image
-cat > /enclave/Dockerfile << DOCKERFILE
-FROM alpine:latest
-
-RUN apk add --no-cache nodejs python3 openssh socat
-
-RUN mkdir -p /root/.ssh && chmod 700 /root/.ssh/
-COPY authorized_keys /root/.ssh/authorized_keys
-RUN chmod 600 /root/.ssh/authorized_keys
-
-WORKDIR /enclave
-COPY app.ash .
-COPY start.sh .
-CMD ["/enclave/start.sh"]
-DOCKERFILE
-
-# Set NITRO_CLI_ARTIFACTS environment variable
-echo "export NITRO_CLI_ARTIFACTS=/var/lib/nitro_enclaves" | sudo tee /etc/profile.d/nitro.sh > /dev/null
-. /etc/profile.d/nitro.sh
+. <(echo "export NITRO_CLI_ARTIFACTS=/var/lib/nitro_enclaves" | sudo tee /etc/profile.d/nitro.sh)
 mkdir -p $NITRO_CLI_ARTIFACTS
 chmod 700 $NITRO_CLI_ARTIFACTS
 
 sudo -u ec2-user aws s3 sync s3://idos-nitro-facetec/ ~ec2-user/custom-server/
+cp ~ec2-user/.ssh/authorized_keys ~ec2-user/custom-server/
 
-cp ~ec2-user/.ssh/authorized_keys /enclave/authorized_keys
+MONGO_HOST=`aws docdb describe-db-clusters --region eu-central-1 | jq -r .DBClusters[0].Endpoint`
+if [[ "${MONGO_HOST:-null}" == "null" ]]; then
+    echo >&2 "Couldn't determine MONGO_HOST"
+    exit 1
+fi
 
-sudo docker run  -d --restart unless-stopped --privileged --name tcp-2222-vsock-16-5005 -p 2222:2222  alpine/socat TCP-LISTEN:2222,fork VSOCK-CONNECT:16:5005
+# Incoming
+sudo docker run --net=host -d --restart unless-stopped --privileged --name tcp-2222-vsock-16-5005         alpine/socat -d -d TCP-LISTEN:2222,fork VSOCK-CONNECT:16:5005
+sudo docker run --net=host -d --restart unless-stopped --privileged --name tcp-80-vsock-16-5006           alpine/socat -d -d TCP-LISTEN:80,fork   VSOCK-CONNECT:16:5006
 
-docker ps -qa | xargs docker rm -f
-while [[ "${MONGO_HOST:-null}" == "null" ]]; do
-    MONGO_HOST=`aws docdb describe-db-clusters --region eu-central-1 | jq -r .DBClusters[0].Endpoint`
-done
-sudo docker run  -d --restart unless-stopped --privileged --name vsock-6006-tcp-mongo-27017            alpine/socat VSOCK-LISTEN:6006 TCP:"$MONGO_HOST":27017
-sudo docker run  -d --restart unless-stopped --privileged --name tcp-27017-vsock-1-6006 -p 27017:27017 alpine/socat TCP-LISTEN:27017 VSOCK:1:6006
-docker ps -qa | xargs -n 1 docker logs -f &
-mongosh --host $MONGO_HOST --port 27017 --username root --password password <<<"quit"
-mongosh --host 127.0.0.1 --port 27018 --username root --password password <<<"quit" # This was not working.
-
-cat - <<EOF > /etc/yum.repos.d/mongodb-org-7.0.repo
-[mongodb-org-7.0]
-name=MongoDB Repository
-baseurl=https://repo.mongodb.org/yum/amazon/\$releasever/mongodb-org/7.0/\$basearch/
-gpgcheck=1
-enabled=1
-gpgkey=https://www.mongodb.org/static/pgp/server-7.0.asc
-EOF
-yum install -y mongodb-mongosh
-
-exit 0
-
-# /enclave/tcp-to-vsock.py &
-# sudo less /var/log/cloud-init-output.log
-# echo "- {address: nitro-enclave-hello-docdb-cluster.cluster-cjasoqwi4beb.eu-central-1.docdb.amazonaws.com, port: 27017}" | sudo tee -a /etc/nitro_enclaves/vsock-proxy.yaml
-# sudo vsock-proxy 123 nitro-enclave-hello-docdb-cluster.cluster-cjasoqwi4beb.eu-central-1.docdb.amazonaws.com 27017
-# sudo vsock-proxy 123 icanhazip.com 443
-
-# docker build -t popeye ~ec2-user/popeye
-# sudo nitro-cli build-enclave --docker-uri popeye --output-file $NITRO_CLI_ARTIFACTS/popeye.eif
-# sudo nitro-cli run-enclave --eif-path $NITRO_CLI_ARTIFACTS/popeye.eif --memory 26332 --cpu-count 2 --enclave-cid 16 --debug-mode --attach-console
-sudo nitro-cli console --enclave-id "$(nitro-cli describe-enclaves | jq -r '.[0].EnclaveID')"
-/facetec/facetec_usage_logs_server/facetec-usage-logs/usage-logs/default-instance
-
-(
-    sudo nitro-cli terminate-enclave --all
-    sudo rm -rf /tmp/??????????
-    sudo rm -f $NITRO_CLI_ARTIFACTS/facetec_custom_server.eif
-
-    set -e
-    docker build -t facetec_custom_server:latest ~ec2-user/custom-server/
-
-    sudo sed -i 's/^memory_mib:.*/memory_mib: 2048/' /etc/nitro_enclaves/allocator.yaml
-    sudo sed -i 's/^cpu_count:.*/cpu_count: 16/' /etc/nitro_enclaves/allocator.yaml
-    sudo systemctl restart nitro-enclaves-allocator.service
-
-    sudo nitro-cli build-enclave --docker-uri facetec_custom_server:latest --output-file $NITRO_CLI_ARTIFACTS/facetec_custom_server.eif
-
-    sudo sed -i 's/^memory_mib:.*/memory_mib: 64000/' /etc/nitro_enclaves/allocator.yaml
-    sudo systemctl restart nitro-enclaves-allocator.service
-
-    sudo nitro-cli run-enclave --eif-path $NITRO_CLI_ARTIFACTS/facetec_custom_server.eif --memory 60000 --cpu-count 16 --enclave-cid 16 --debug-mode --attach-console
-)
-
-#
+# Outgoing
+sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock-6006-tcp-mongo-27017     alpine/socat -d -d VSOCK-LISTEN:6006,fork TCP:"$MONGO_HOST":27017
+sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock-6007-tcp-logs.facetec-22 alpine/socat -d -d VSOCK-LISTEN:6007,fork TCP:logs.facetec.com:22
