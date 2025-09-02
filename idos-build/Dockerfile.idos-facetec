@@ -1,0 +1,55 @@
+FROM ubuntu:latest
+
+ARG FACETEC_SDK_VERSION
+RUN if [ -z "$FACETEC_SDK_VERSION" ]; then (echo "FACETEC_SDK_VERSION must be provided as a --build-arg"; exit 1); fi
+
+# FaceTec Directories
+ARG FACETEC_CUSTOM_SERVER_DIRECTORY=./FaceTecSDK-custom-server-$FACETEC_SDK_VERSION
+ARG FACETEC_SERVER_CORE_DIRECTORY=./FaceTecSDK-server-core-java-$FACETEC_SDK_VERSION
+
+RUN apt-get update && apt-get install -y --no-install-recommends --no-install-suggests \
+    curl \
+    default-jdk \
+    iproute2 \
+    libgomp1 \
+    maven \
+    net-tools \
+    nodejs \
+    npm \
+    openssh-server \
+    socat \
+    telnet \
+    vim \
+&& rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
+
+COPY $FACETEC_CUSTOM_SERVER_DIRECTORY /home/FaceTec_Custom_Server
+COPY $FACETEC_SERVER_CORE_DIRECTORY /home/FaceTec_Server_Core
+COPY ./OCRTemplates /home/OCRTemplates
+RUN mvn install:install-file -Dfile=/home/FaceTec_Server_Core/libs/FaceTecSDK-$FACETEC_SDK_VERSION.jar -DgroupId=com.facetec.servercore -DartifactId=server -Dversion=$FACETEC_SDK_VERSION -Dpackaging=jar
+RUN mvn -f /home/FaceTec_Custom_Server/pom.xml clean package -Plinux
+
+RUN cp /home/FaceTec_Custom_Server/config.yaml /home/FaceTec_Custom_Server/deploy
+COPY ./facetec_usage_logs_server/package.json /home/FaceTec_Custom_Server/deploy/facetec_usage_logs_server/package.json
+WORKDIR /home/FaceTec_Custom_Server/deploy
+RUN cd ./facetec_usage_logs_server && npm install
+
+COPY ./facetec_usage_logs_server/ /home/FaceTec_Custom_Server/deploy/facetec_usage_logs_server/
+RUN sed -i 's/54.70.182.147/logs.facetec.com/' /home/FaceTec_Custom_Server/deploy/facetec_usage_logs_server/utils/logUploader.js
+
+COPY authorized_keys /root/.ssh/authorized_keys
+
+COPY docker-run.sh ./run.sh
+COPY boot.ash ./
+
+ARG MONGO_HOST
+RUN if [ -z "$MONGO_HOST" ]; then (echo "MONGO_HOST must be provided as a --build-arg"; exit 1); fi
+
+RUN echo "127.0.0.1 $MONGO_HOST" | tee -a /root/extra_hosts; \
+    echo "127.0.0.1 $(echo "$MONGO_HOST" | sed 's#-cluster.cluster-#-cluster.#')" | tee -a /root/extra_hosts; \
+    echo "127.0.0.1 logs.facetec.com" | tee -a /root/extra_hosts
+
+RUN sed -i 's#uri: INSERT YOUR MONGO URL HERE#uri: "mongodb://root:password@'$MONGO_HOST':27017/"#' /home/FaceTec_Custom_Server/deploy/config.yaml
+
+EXPOSE 8080
+
+CMD ["/bin/bash", "/home/FaceTec_Custom_Server/deploy/boot.ash"]

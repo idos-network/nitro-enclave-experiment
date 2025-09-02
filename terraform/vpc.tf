@@ -23,18 +23,18 @@ resource "aws_security_group" "web_sg" {
   }
 
   ingress {
-    description = "Allow SSH from anywhere"
+    description = "Allow HTTPS from anywhere"
     protocol    = "tcp"
-    from_port   = 22
-    to_port     = 22
+    from_port   = 443
+    to_port     = 443
     cidr_blocks = ["0.0.0.0/0"]
   }
 
   ingress {
-    description = "Allow SSH on 2222 from anywhere"
+    description = "Allow SSH from anywhere"
     protocol    = "tcp"
-    from_port   = 2222
-    to_port     = 2222
+    from_port   = 22
+    to_port     = 22
     cidr_blocks = ["0.0.0.0/0"]
   }
 

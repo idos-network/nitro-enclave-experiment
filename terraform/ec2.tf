@@ -45,9 +45,10 @@ resource "aws_instance" "enclave_instance" {
   }
 
   connection {
-    type = "ssh"
-    user = "ec2-user"
-    host = self.public_ip
+    type  = "ssh"
+    user  = "ec2-user"
+    host  = self.public_ip
+    agent = true
   }
 
   provisioner "remote-exec" {
