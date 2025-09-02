@@ -23,7 +23,7 @@ This should boot the enclave in debug mode and stream its stdout.
 ## Remaining TODOs
 
 ### Didn't even think about it yet
-- Revisit the code changes we did when we made Popeye work, and see if we want to forklift something.
+- Revisit the code changes we did in prior years to make Popeye work, and see if we want/need to forklift something into here.
 
 ### Annoyances
 - There's a couple of places with `#SSH#` that were left in this repo just in case we need to debug stuff inside the enclave. This is not meant to be shipped.
@@ -33,7 +33,7 @@ This should boot the enclave in debug mode and stream its stdout.
 - The image building process is very close to FaceTec's original, which has a lot of room for improvement.
 
 ### Labor needed
-- We're using hard-coded credentials for docdb. These should be gotten from secrets manager.
-- Add TLS termination inside the enclave (get a cert from ACM, use socat or equivalent).
+- We're using hard-coded credentials for docdb. These should be gotten from Secrets Manager.
+- Add TLS termination inside the enclave (get a cert from ACM and use socat or equivalent).
 - Encrypt the stuff we put on mongo with a KMS key. Use FLE: https://docs.aws.amazon.com/documentdb/latest/developerguide/field-level-encryption.html
 - Usage logs dir should be a remote mount with FUSE over vsocks that also uses a KMS key. Maybe to S3?
