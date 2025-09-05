@@ -70,7 +70,7 @@ resource "aws_docdb_cluster_parameter_group" "docdb" {
 # Create DocumentDB instance
 resource "aws_docdb_cluster_instance" "docdb_instances" {
   count              = 1
-  identifier         = "${var.project_name}-docdb-instance-${count.index}"
+  identifier         = "${var.project_name}-docdb-cluster"
   cluster_identifier = aws_docdb_cluster.docdb.id
   instance_class     = var.docdb_instance_class
 
