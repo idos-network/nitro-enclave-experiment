@@ -18,23 +18,23 @@ socat -d -d TCP4-LISTEN:443,fork,bind=127.0.0.7 VSOCK-CONNECT:3:6013 &
 mount /tmp -o remount,exec
 
 # Mount s3fs
-# S3_BUCKET="nitro-enclave-usage-logs"
-# MOUNT_POINT="/home/FaceTec_Custom_Server/deploy/facetec_usage_logs_server/facetec-usage-logs"
-# mkdir -p "$MOUNT_POINT"
-# echo "Making sure $MOUNT_POINT is un-mounted"
-# umount "$MOUNT_POINT" || true
-# echo "Mounting $MOUNT_POINT"
-# s3fs "$S3_BUCKET" "$MOUNT_POINT" -o iam_role=auto
-# echo "Done with mounting $MOUNT_POINT"
+S3_BUCKET="nitro-enclave-usage-logs"
+MOUNT_POINT="/home/FaceTec_Custom_Server/deploy/facetec_usage_logs_server/facetec-usage-logs"
+mkdir -p "$MOUNT_POINT"
+echo "Making sure $MOUNT_POINT is un-mounted"
+umount "$MOUNT_POINT" || true
+echo "Mounting $MOUNT_POINT"
+s3fs "$S3_BUCKET" "$MOUNT_POINT" -o iam_role=auto
+echo "Done with mounting $MOUNT_POINT"
 
-# S3_3D_DB_BUCKET="nitro-enclave-3d-db"
-# MOUNT_POINT_3D_DB="/home/FaceTec_Custom_Server/deploy/three_d_db"
-# mkdir -p "$MOUNT_POINT_3D_DB"
-# echo "Making sure $MOUNT_POINT_3D_DB is un-mounted"
-# umount "$MOUNT_POINT_3D_DB" || true
-# echo "Mounting $MOUNT_POINT_3D_DB"
-# s3fs "$S3_3D_DB_BUCKET" "$MOUNT_POINT_3D_DB" -o iam_role=auto
-# echo "Done with mounting $MOUNT_POINT_3D_DB"
+S3_3D_DB_BUCKET="nitro-enclave-3d-db"
+MOUNT_POINT_3D_DB="/home/FaceTec_Custom_Server/deploy/three_d_db"
+mkdir -p "$MOUNT_POINT_3D_DB"
+echo "Making sure $MOUNT_POINT_3D_DB is un-mounted"
+umount "$MOUNT_POINT_3D_DB" || true
+echo "Mounting $MOUNT_POINT_3D_DB"
+s3fs "$S3_3D_DB_BUCKET" "$MOUNT_POINT_3D_DB" -o iam_role=auto
+echo "Done with mounting $MOUNT_POINT_3D_DB"
 
 cd /home/FaceTec_Custom_Server/deploy/facetec_usage_logs_server
 npm start

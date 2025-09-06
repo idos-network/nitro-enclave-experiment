@@ -42,6 +42,9 @@ RUN echo "127.0.0.3 s3.eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
 RUN echo "127.0.0.4 nitro-enclave-usage-logs.s3.eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
 RUN echo "127.0.0.4 nitro-enclave-usage-logs.s3.amazonaws.com" | tee -a /root/extra_hosts
 RUN echo "127.0.0.5 nitro-enclave-usage-logs.s3-eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
+RUN echo "127.0.0.6 nitro-enclave-3d-db.s3.eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
+RUN echo "127.0.0.6 nitro-enclave-3d-db.s3.amazonaws.com" | tee -a /root/extra_hosts
+RUN echo "127.0.0.7 nitro-enclave-3d-db.s3-eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
 
 EXPOSE 8080
 
