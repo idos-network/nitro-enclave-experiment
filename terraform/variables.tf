@@ -29,5 +29,5 @@ variable "docdb_password" {
 variable "docdb_instance_class" {
   description = "Instance class for DocumentDB"
   type        = string
-  default     = "db.t3.medium"
+  default     = "db.t4g.medium"
 }

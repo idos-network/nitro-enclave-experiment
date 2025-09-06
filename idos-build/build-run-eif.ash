@@ -12,7 +12,7 @@ sudo rm -f "$NITRO_CLI_ARTIFACTS/$TARGET_DOCKER_IMAGE.eif"
 
 set -e
 
-MONGO_HOST="$(aws docdb describe-db-clusters --region eu-central-1 | jq -r .DBClusters[0].Endpoint)"
+MONGO_HOST="$(aws docdb describe-db-clusters --region eu-west-1 | jq -r .DBClusters[0].Endpoint)"
 if [ "${MONGO_HOST:-null}" = "null" ]; then
     echo >&2 "Couldn't determine MONGO_HOST"
     exit 1
@@ -46,10 +46,4 @@ sudo systemctl restart nitro-enclaves-allocator.service
 
 # Run the EIF
 # The CID being 16 is arbitrary.
-sudo nitro-cli run-enclave \
-    --enclave-cid 16 \
-    --cpu-count 16 \
-    --memory 60000 \
-    --eif-path "$NITRO_CLI_ARTIFACTS/$TARGET_DOCKER_IMAGE.eif" \
-    --attach-console \
-;
+sudo nitro-cli run-enclave --enclave-cid 16 --cpu-count 16 --memory 64000 --eif-path "$NITRO_CLI_ARTIFACTS/$TARGET_DOCKER_IMAGE.eif" --attach-console;
