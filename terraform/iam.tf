@@ -62,6 +62,34 @@ resource "aws_iam_role_policy" "docdb_access" {
   })
 }
 
+# Policy to allow EC2 instance full CRUD access to S3 buckets
+resource "aws_iam_role_policy" "s3_access" {
+  name = "AllowS3Access"
+  role = aws_iam_role.enclave_instance_role.id
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject",
+          "s3:ListBucket",
+          "s3:GetObjectVersion",
+          "s3:DeleteObjectVersion"
+        ],
+        Resource = [
+          aws_s3_bucket.usage_logs.arn,
+          "${aws_s3_bucket.usage_logs.arn}/*",
+          aws_s3_bucket.three_d_db.arn,
+          "${aws_s3_bucket.three_d_db.arn}/*"
+        ]
+      }
+    ]
+  })
+}
+
 # Instance profile to attach the role to the EC2 instance
 resource "aws_iam_instance_profile" "enclave_instance_profile" {
   name = "${var.project_name}-instance-profile"

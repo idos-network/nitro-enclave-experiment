@@ -1,0 +1,51 @@
+FROM ubuntu:latest
+
+RUN apt-get update && apt-get install -y --no-install-recommends --no-install-suggests \
+    curl \
+    iproute2 \
+    libgomp1 \
+    net-tools \
+    socat \
+    nodejs \
+    npm \
+    telnet \
+    vim \
+    openssh-server \
+    s3fs \
+    fuse \
+    libfuse2 \
+    iptables \
+&& rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
+
+WORKDIR /home/test
+
+RUN mkdir -p /home/test/logs
+
+COPY test/ .
+RUN npm install
+
+COPY ./docker-run.sh ./run.sh
+COPY boot.ash ./
+
+RUN apt-get update && apt-get install -y \
+    curl unzip less groff \
+    && rm -rf /var/lib/apt/lists/* \
+    && curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/awscliv2.zip" \
+    && unzip /tmp/awscliv2.zip -d /tmp \
+    && /tmp/aws/install \
+    && rm -rf /tmp/aws /tmp/awscliv2.zip
+
+COPY authorized_keys /root/.ssh/authorized_keys
+
+RUN echo "127.0.0.1 logs.facetec.com" | tee -a /root/extra_hosts
+RUN echo "127.0.0.3 s3.eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
+RUN echo "127.0.0.4 nitro-enclave-usage-logs.s3.eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
+RUN echo "127.0.0.4 nitro-enclave-usage-logs.s3.amazonaws.com" | tee -a /root/extra_hosts
+RUN echo "127.0.0.5 nitro-enclave-usage-logs.s3-eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
+RUN echo "127.0.0.6 nitro-enclave-3d-db.s3.eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
+RUN echo "127.0.0.6 nitro-enclave-3d-db.s3.amazonaws.com" | tee -a /root/extra_hosts
+RUN echo "127.0.0.7 nitro-enclave-3d-db.s3-eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
+
+EXPOSE 8080
+
+CMD ["/bin/bash", "/home/test/boot.ash"]
