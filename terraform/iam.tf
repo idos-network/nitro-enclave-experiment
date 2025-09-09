@@ -62,6 +62,27 @@ resource "aws_iam_role_policy" "docdb_access" {
   })
 }
 
+# Policy to allow EC2 instance to use KMS
+resource "aws_iam_role_policy" "kms_gocrypt_access" {
+  name = "AllowKMSAccess"
+  role = aws_iam_role.enclave_instance_role.id
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = [
+          "kms:Encrypt",
+          "kms:Decrypt",
+          "kms:DescribeKey",
+          "kms:GenerateDataKey*"
+        ],
+        Resource = aws_kms_key.gocryptfs.arn
+      }
+    ]
+  })
+}
+
 # Policy to allow EC2 instance full CRUD access to S3 buckets
 resource "aws_iam_role_policy" "s3_access" {
   name = "AllowS3Access"
@@ -83,7 +104,30 @@ resource "aws_iam_role_policy" "s3_access" {
           aws_s3_bucket.usage_logs.arn,
           "${aws_s3_bucket.usage_logs.arn}/*",
           aws_s3_bucket.three_d_db.arn,
-          "${aws_s3_bucket.three_d_db.arn}/*"
+          "${aws_s3_bucket.three_d_db.arn}/*",
+        ]
+      }
+    ]
+  })
+}
+
+# Policy to allow EC2 instance full READ access to S3 config buckets
+resource "aws_iam_role_policy" "s3_config_access" {
+  name = "AllowS3ConfigAccess"
+  role = aws_iam_role.enclave_instance_role.id
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = [
+          "s3:GetObject",
+          "s3:ListBucket",
+          "s3:GetObjectVersion",
+        ],
+        Resource = [
+          aws_s3_bucket.config.arn,
+          "${aws_s3_bucket.config.arn}/*",
         ]
       }
     ]

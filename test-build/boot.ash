@@ -25,7 +25,6 @@ if true; then #SSH#
         echo "AllowTcpForwarding yes"
         echo "PermitUserEnvironment yes"
         echo "ClientAliveInterval 15m"
-        echo "PasswordAuthentication yes"
     } >> /etc/ssh/sshd_config
 
     # Have ssh logins get the same env vars we have right now (which were set in various docker layers).
@@ -35,9 +34,6 @@ if true; then #SSH#
 
     mkdir /var/run/sshd
     chmod 0755 /var/run/sshd
-
-    # Set root password
-    echo 'root:password' | chpasswd
 
     echo "About to listen for root with these keys:"
     cat /root/.ssh/authorized_keys

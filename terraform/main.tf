@@ -17,3 +17,13 @@ provider "aws" {
 data "aws_caller_identity" "current" {}
 
 # Include other .tf files (Terraform automatically loads all *.tf files in the directory)
+
+terraform {
+  backend "s3" {
+    bucket       = "nitro-enclave-terraform-states"
+    key          = "nitro-enclave.tfstate"
+    region       = "eu-west-1"
+    profile      = "AdministratorAccess-763695378641"
+    use_lockfile = true
+  }
+}
