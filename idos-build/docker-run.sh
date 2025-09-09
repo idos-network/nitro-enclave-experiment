@@ -36,9 +36,8 @@ echo "Mounting $MOUNT_POINT_3D_DB"
 s3fs "$S3_3D_DB_BUCKET" "$MOUNT_POINT_3D_DB" -o iam_role=auto
 echo "Done with mounting $MOUNT_POINT_3D_DB"
 
-cd /home/FaceTec_Custom_Server/deploy/facetec_usage_logs_server
-npm start
-echo '# ULS done, going for java #'
+cd /home/FaceTec_Custom_Server/deploy
 
-cd ..
-java -jar FaceTec-Custom-Server.jar
+echo "Running PM2-runtime"
+export HOME=/home/FaceTec_Custom_Server
+pm2-runtime ecosystem.config.js
