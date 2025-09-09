@@ -63,7 +63,9 @@ app.post("/login", async (req, res) => {
     // Search for 3d-db duplicates
     const { results } = await searchForDuplicates(externalDatabaseRefID, key, userAgent);
 
-    if (results.length === 0) {
+    let newUser = results.length === 0;
+
+    if (newUser === 0) {
       // Brand new user, let's enroll in 3d-db#users
       await enrollUser(externalDatabaseRefID, key);
     } else if (results.length > 1) {
@@ -76,6 +78,7 @@ app.post("/login", async (req, res) => {
       success: true,
       scanResultBlob: scanResultBlob,
       faceBiometricId: externalDatabaseRefID,
+      newUser,
     });
   } catch (error) {
     console.error("Error during login process:", error);
