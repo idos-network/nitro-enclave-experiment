@@ -33,17 +33,26 @@ sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock
 # AWS s3.eu-west-1.amazonaws.com
 sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock-6009-tcp-aws-s3-eu-west-1-443 alpine/socat -d -d VSOCK-LISTEN:6009,fork TCP:"s3.eu-west-1.amazonaws.com":443
 
-# AWS nitro-enclave-usage-logs.s3.eu-west-1.amazonaws.com
-sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock-6010-tcp-aws-nitro-enclave-usage-logs-s3-eu-west-1-443 alpine/socat -d -d VSOCK-LISTEN:6010,fork TCP:"nitro-enclave-usage-logs.s3.eu-west-1.amazonaws.com":443
+# AWS nitro-enclave-hello-usage-logs.s3.eu-west-1.amazonaws.com
+sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock-6010-tcp-aws-nitro-enclave-hello-usage-logs-s3-eu-west-1-443 alpine/socat -d -d VSOCK-LISTEN:6010,fork TCP:"nitro-enclave-hello-usage-logs.s3.eu-west-1.amazonaws.com":443
 
-# AWS nitro-enclave-usage-logs.s3-eu-west-1.amazonaws.com
-sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock-6011-tcp-aws-nitro-enclave-usage-logs-s3--eu-west-1-443 alpine/socat -d -d VSOCK-LISTEN:6011,fork TCP:"nitro-enclave-usage-logs.s3-eu-west-1.amazonaws.com":443
+# AWS nitro-enclave-hello-usage-logs.s3-eu-west-1.amazonaws.com
+sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock-6011-tcp-aws-nitro-enclave-hello-usage-logs-s3--eu-west-1-443 alpine/socat -d -d VSOCK-LISTEN:6011,fork TCP:"nitro-enclave-hello-usage-logs.s3-eu-west-1.amazonaws.com":443
 
-# AWS nitro-enclave-3d-db.s3.eu-west-1.amazonaws.com
-sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock-6012-tcp-aws-nitro-enclave-3d-db-s3-eu-west-1-443 alpine/socat -d -d VSOCK-LISTEN:6012,fork TCP:"nitro-enclave-3d-db.s3.eu-west-1.amazonaws.com":443
+# AWS nitro-enclave-hello-3d-db.s3.eu-west-1.amazonaws.com
+sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock-6012-tcp-nitro-enclave-hello-3d-db-s3-eu-west-1-443 alpine/socat -d -d VSOCK-LISTEN:6012,fork TCP:"nitro-enclave-hello-3d-db.s3.eu-west-1.amazonaws.com":443
 
-# AWS nitro-enclave-3d-db.s3-eu-west-1.amazonaws.com
-sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock-6013-tcp-aws-nitro-enclave-3d-db-s3--eu-west-1-443 alpine/socat -d -d VSOCK-LISTEN:6013,fork TCP:"nitro-enclave-3d-db.s3-eu-west-1.amazonaws.com":443
+# AWS nitro-enclave-hello-3d-db.s3-eu-west-1.amazonaws.com
+sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock-6013-tcp-aws-nitro-enclave-hello-3d-db-s3--eu-west-1-443 alpine/socat -d -d VSOCK-LISTEN:6013,fork TCP:"nitro-enclave-hello-3d-db.s3-eu-west-1.amazonaws.com":443
+
+# AWS nitro-enclave-hello-config.s3.eu-west-1.amazonaws.com
+sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock-6014-tcp-aws-nitro-enclave-hello-config-s3--eu-west-1-443 alpine/socat -d -d VSOCK-LISTEN:6014,fork TCP:"nitro-enclave-hello-config.s3.eu-west-1.amazonaws.com":443
+
+# AWS nitro-enclave-hello-config.s3-eu-west-1.amazonaws.com
+sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock-6015-tcp-aws-nitro-enclave-hello-config-s3--eu-west-1-443 alpine/socat -d -d VSOCK-LISTEN:6015,fork TCP:"nitro-enclave-hello-config.s3-eu-west-1.amazonaws.com":443
+
+# AWS kms.eu-west-1.amazonaws.com
+sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock-6016-tcp-aws-kms-s3--eu-west-1-443 alpine/socat -d -d VSOCK-LISTEN:6016,fork TCP:"kms.eu-west-1.amazonaws.com":443
 
 sudo -u ec2-user mkdir -p ~ec2-user/custom-server
 cp ~ec2-user/.ssh/authorized_keys ~ec2-user/custom-server/

@@ -12,9 +12,10 @@
 3. On `facetec-sdk/facetec_usage_logs_server/config.yml`, set the `sftpConfig.privateKey` field to the right key (that needs to have been configured in FaceTec beforehand).
 4. `rsync -avz --progress ./facetec-sdk/ ec2-user@"$(cd terraform; terraform output -raw ec2_public_ip)":custom-server/`
 5. `rsync -avz --progress ./idos-build/  ec2-user@"$(cd terraform; terraform output -raw ec2_public_ip)":custom-server/`
-5. `rsync -avz --progress ./aws-nitro-kernel/blobs/  ec2-user@"$(cd terraform; terraform output -raw ec2_public_ip)":nitro-kernel-blobs/`
-7. `ssh ec2-user@"$(cd terraform; terraform output -raw ec2_public_ip)" sudo rm -rf /usr/share/nitro_enclaves/blobs && sudo mv ./nitro-kernel-blobs /usr/share/nitro_enclaves/blobs`
-7. `ssh ec2-user@"$(cd terraform; terraform output -raw ec2_public_ip)" bash custom-server/build-run-eif.ash`
+6. `rsync -avz --progress ./facesign-sdk ec2-user@"$(cd terraform; terraform output -raw ec2_public_ip)":custom-server/`
+7. `rsync -avz --progress ./aws-nitro-kernel/blobs/  ec2-user@"$(cd terraform; terraform output -raw ec2_public_ip)":nitro-kernel-blobs/`
+8. `ssh ec2-user@"$(cd terraform; terraform output -raw ec2_public_ip)" sudo rm -rf /usr/share/nitro_enclaves/blobs && sudo mv ./nitro-kernel-blobs /usr/share/nitro_enclaves/blobs`
+9. `ssh ec2-user@"$(cd terraform; terraform output -raw ec2_public_ip)" bash custom-server/build-run-eif.ash`
 
 This should boot the enclave in debug mode and stream its stdout.
 

@@ -3,7 +3,7 @@ resource "aws_instance" "enclave_instance_test" {
   instance_type               = "m6i.2xlarge"
   subnet_id                   = data.aws_subnets.default.ids[0]
   associate_public_ip_address = true
-  security_groups             = [aws_security_group.web_sg.id]
+  security_groups             = [aws_security_group.web_sg.name]
   iam_instance_profile        = aws_iam_instance_profile.enclave_instance_profile.name
 
   enclave_options {
