@@ -42,7 +42,7 @@ app.post("/login", async (req, res) => {
   try {
     // First check if liveness is proven
     const { success, wasProcessed, scanResultBlob, error, ...other } = await enrollment3d(
-      externalDatabaseRefID: faceSignId,
+      faceSignId,
       faceScan,
       auditTrailImage,
       lowQualityAuditTrailImage,
