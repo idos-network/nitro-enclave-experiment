@@ -61,13 +61,24 @@ app.post("/login", async (req, res) => {
     }
 
     // Search for 3d-db duplicates
-    const { results } = await searchForDuplicates(externalDatabaseRefID, key, userAgent);
+    let results = [];
+
+    const searchResult = await searchForDuplicates(faceSignUserId, key, userAgent);
+
+    if (searchResult.success) {
+      results = searchResult.results;
+    } else if (searchResult.error && searchResult.errorMessage.includes('groupName when that groupName does not exist')) {
+      console.log("Group does not exist, creating one by enrolling first user.")
+      results = [];
+    } else {
+      throw new Error('Failed to search for duplicates, check application logs.');
+    }
 
     let newUser = results.length === 0;
 
-    if (newUser === 0) {
+    if (newUser) {
       // Brand new user, let's enroll in 3d-db#users
-      await enrollUser(externalDatabaseRefID, key);
+      await enrollUser(faceSignUserId, key);
     } else if (results.length > 1) {
       throw new Error('Multiple users found with the same face-vector, this should never happen.');
     } else {
