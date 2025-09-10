@@ -19,8 +19,3 @@ output "enclave_iam_role" {
   value       = aws_iam_role.enclave_instance_role.name
 }
 
-output "kms_gocryptfs_key_id" {
-  description = "KMS Key ID for gocryptfs encryption"
-  value       = aws_kms_key.gocryptfs.id
-}
-
