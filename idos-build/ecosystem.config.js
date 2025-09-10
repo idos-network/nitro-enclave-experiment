@@ -14,8 +14,8 @@ module.exports = {
       maxRestarts: 0, // Dupe of 'max_restarts' that works around a PM2 bug
     },
     {
-      name: "FaceSign-SDK",
-      cwd: "/home/FaceTec_Custom_Server/deploy/facesign-sdk",
+      name: "FaceSign-server",
+      cwd: "/home/FaceTec_Custom_Server/deploy/facesign-server",
       script: "npm",
       args: "start",
     },

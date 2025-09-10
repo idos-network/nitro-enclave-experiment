@@ -4,4 +4,4 @@ terraform/terraform.tfstate
 terraform/terraform.tfstate.backup
 terraform/.terraform.lock.hcl
 facetec-sdk/
-facesign-sdk/node_modules/
+facesign-server/node_modules/

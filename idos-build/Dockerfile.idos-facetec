@@ -33,12 +33,12 @@ RUN mvn -f /home/FaceTec_Custom_Server/pom.xml clean package -Plinux
 
 RUN cp /home/FaceTec_Custom_Server/config.yaml /home/FaceTec_Custom_Server/deploy
 COPY ./facetec_usage_logs_server/package.json /home/FaceTec_Custom_Server/deploy/facetec_usage_logs_server/package.json
-COPY ./facesign-sdk/ /home/FaceTec_Custom_Server/deploy/facesign-sdk/
+COPY ./facesign-server/ /home/FaceTec_Custom_Server/deploy/facesign-server/
 COPY ./ecosystem.config.js /home/FaceTec_Custom_Server/deploy/ecosystem.config.js
 
 WORKDIR /home/FaceTec_Custom_Server/deploy
 RUN cd ./facetec_usage_logs_server && npm install
-RUN cd ./facesign-sdk && npm install
+RUN cd ./facesign-server && npm install
 
 RUN npm install -g pm2
 
