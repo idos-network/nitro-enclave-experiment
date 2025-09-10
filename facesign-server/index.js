@@ -16,7 +16,7 @@ app.use(express.json({ limit: "50mb" }));
 const PORT = process.env.PORT ?? 8080;
 
 app.get("/", (req, res) => {
-  res.json({ message: "FaceSign SDK is running" });
+  res.json({ message: "FaceSign Service is running" });
 });
 
 // Session-Token
