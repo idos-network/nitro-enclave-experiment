@@ -16,7 +16,7 @@ app.use(express.json({ limit: "50mb" }));
 const PORT = process.env.PORT ?? 8080;
 
 app.get("/", (req, res) => {
-  res.json({ message: "FaceSign SDK is running" });
+  res.json({ message: "FaceSign Service is running" });
 });
 
 // Session-Token
@@ -35,14 +35,14 @@ app.post("/session-token", async (req, res) => {
 
 // Login
 app.post("/login", async (req, res) => {
-  let externalDatabaseRefID = crypto.randomUUID();
+  let faceSignUserId = crypto.randomUUID();
 
   const { faceScan, key, userAgent, auditTrailImage, lowQualityAuditTrailImage, sessionId } = req.body;
 
   try {
     // First check if liveness is proven
     const { success, wasProcessed, scanResultBlob, error, ...other } = await enrollment3d(
-      externalDatabaseRefID,
+      faceSignUserId,
       faceScan,
       auditTrailImage,
       lowQualityAuditTrailImage,
@@ -71,14 +71,13 @@ app.post("/login", async (req, res) => {
     } else if (results.length > 1) {
       throw new Error('Multiple users found with the same face-vector, this should never happen.');
     } else {
-      externalDatabaseRefID = results[0].identifier;
+      faceSignUserId = results[0].identifier;
     }
 
     return res.status(200).json({
       success: true,
       scanResultBlob: scanResultBlob,
-      faceBiometricId: externalDatabaseRefID,
-      newUser,
+      faceSignUserId,
     });
   } catch (error) {
     console.error("Error during login process:", error);
