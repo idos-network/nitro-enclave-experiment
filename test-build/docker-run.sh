@@ -13,10 +13,9 @@ socat -d -d TCP4-LISTEN:443,fork,bind=127.0.0.4 VSOCK-CONNECT:3:6010 &
 socat -d -d TCP4-LISTEN:443,fork,bind=127.0.0.5 VSOCK-CONNECT:3:6011 &
 socat -d -d TCP4-LISTEN:443,fork,bind=127.0.0.6 VSOCK-CONNECT:3:6012 &
 socat -d -d TCP4-LISTEN:443,fork,bind=127.0.0.7 VSOCK-CONNECT:3:6013 &
-
-# Mount s3fs
-# s3fs nitro-enclave-usage-logs /home/test/logs -o iam_role=auto -o dbglevel=info -f -o curldbg > /var/log/s3fs.log 2>&1
+socat -d -d TCP4-LISTEN:443,fork,bind=127.0.0.8 VSOCK-CONNECT:3:6014 &
+socat -d -d TCP4-LISTEN:443,fork,bind=127.0.0.9 VSOCK-CONNECT:3:6015 &
+socat -d -d TCP4-LISTEN:443,fork,bind=127.0.0.10 VSOCK-CONNECT:3:6016 &
 
 cd /home/test
-
 npm start

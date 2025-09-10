@@ -18,3 +18,4 @@ output "enclave_iam_role" {
   description = "IAM role name attached to the EC2 instance"
   value       = aws_iam_role.enclave_instance_role.name
 }
+

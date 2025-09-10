@@ -22,6 +22,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends --no-install-su
     s3fs \
     libfuse2 \
     iptables \
+    gocryptfs \
 && rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
 
 COPY $FACETEC_CUSTOM_SERVER_DIRECTORY /home/FaceTec_Custom_Server
@@ -52,16 +53,28 @@ COPY boot.ash ./
 ARG MONGO_HOST
 RUN if [ -z "$MONGO_HOST" ]; then (echo "MONGO_HOST must be provided as a --build-arg"; exit 1); fi
 
+RUN curl -LO https://github.com/getsops/sops/releases/download/v3.10.2/sops-v3.10.2.linux.amd64  && \
+    mv sops-v3.10.2.linux.amd64 /usr/local/bin/sops && \
+    chmod +x /usr/local/bin/sops
+
 RUN echo "127.0.0.1 $MONGO_HOST" | tee -a /root/extra_hosts
 RUN echo "127.0.0.1 $(echo "$MONGO_HOST" | sed 's#-cluster.cluster-#-cluster.#')" | tee -a /root/extra_hosts
 RUN echo "127.0.0.1 logs.facetec.com" | tee -a /root/extra_hosts
 RUN echo "127.0.0.3 s3.eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
-RUN echo "127.0.0.4 nitro-enclave-usage-logs.s3.eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
-RUN echo "127.0.0.4 nitro-enclave-usage-logs.s3.amazonaws.com" | tee -a /root/extra_hosts
-RUN echo "127.0.0.5 nitro-enclave-usage-logs.s3-eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
-RUN echo "127.0.0.6 nitro-enclave-3d-db.s3.eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
-RUN echo "127.0.0.6 nitro-enclave-3d-db.s3.amazonaws.com" | tee -a /root/extra_hosts
-RUN echo "127.0.0.7 nitro-enclave-3d-db.s3-eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
+
+RUN echo "127.0.0.4 nitro-enclave-hello-usage-logs.s3.eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
+RUN echo "127.0.0.4 nitro-enclave-hello-usage-logs.s3.amazonaws.com" | tee -a /root/extra_hosts
+RUN echo "127.0.0.5 nitro-enclave-hello-usage-logs.s3-eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
+
+RUN echo "127.0.0.6 nitro-enclave-hello-3d-db.s3.eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
+RUN echo "127.0.0.6 nitro-enclave-hello-3d-db.s3.amazonaws.com" | tee -a /root/extra_hosts
+RUN echo "127.0.0.7 nitro-enclave-hello-3d-db.s3-eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
+
+RUN echo "127.0.0.8 nitro-enclave-hello-config.s3.eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
+RUN echo "127.0.0.8 nitro-enclave-hello-config.s3.amazonaws.com" | tee -a /root/extra_hosts
+RUN echo "127.0.0.9 nitro-enclave-hello-config.s3-eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
+
+RUN echo "127.0.0.10 kms.eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
 
 RUN sed -i 's#uri: INSERT YOUR MONGO URL HERE#uri: "mongodb://root:password@'$MONGO_HOST':27017/"#' /home/FaceTec_Custom_Server/deploy/config.yaml
 RUN sed -i 's#serverPort: 8080#serverPort: 5000#' /home/FaceTec_Custom_Server/deploy/config.yaml
