@@ -33,8 +33,14 @@ RUN mvn -f /home/FaceTec_Custom_Server/pom.xml clean package -Plinux
 
 RUN cp /home/FaceTec_Custom_Server/config.yaml /home/FaceTec_Custom_Server/deploy
 COPY ./facetec_usage_logs_server/package.json /home/FaceTec_Custom_Server/deploy/facetec_usage_logs_server/package.json
+COPY ./facesign-sdk/ /home/FaceTec_Custom_Server/deploy/facesign-sdk/
+COPY ./ecosystem.config.js /home/FaceTec_Custom_Server/deploy/ecosystem.config.js
+
 WORKDIR /home/FaceTec_Custom_Server/deploy
 RUN cd ./facetec_usage_logs_server && npm install
+RUN cd ./facesign-sdk && npm install
+
+RUN npm install -g pm2
 
 COPY ./facetec_usage_logs_server/ /home/FaceTec_Custom_Server/deploy/facetec_usage_logs_server/
 RUN sed -i 's/54.70.182.147/logs.facetec.com/' /home/FaceTec_Custom_Server/deploy/facetec_usage_logs_server/utils/logUploader.js
@@ -71,8 +77,8 @@ RUN echo "127.0.0.9 nitro-enclave-hello-config.s3-eu-west-1.amazonaws.com" | tee
 RUN echo "127.0.0.10 kms.eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
 
 RUN sed -i 's#uri: INSERT YOUR MONGO URL HERE#uri: "mongodb://root:password@'$MONGO_HOST':27017/"#' /home/FaceTec_Custom_Server/deploy/config.yaml
+RUN sed -i 's#serverPort: 8080#serverPort: 5000#' /home/FaceTec_Custom_Server/deploy/config.yaml
 RUN sed -i 's#enableSearch: false#enableSearch: true#' /home/FaceTec_Custom_Server/deploy/config.yaml
-RUN sed -i 's#enableAccountDeDuplicationSearchOnNewEnrollments: false#enableAccountDeDuplicationSearchOnNewEnrollments: true#' /home/FaceTec_Custom_Server/deploy/config.yaml
 RUN sed -i 's#search3D3DDatabaseRootDirectory: /Users/MyUserName/Desktop/MyTestFaceTec3DDB#search3D3DDatabaseRootDirectory: /home/FaceTec_Custom_Server/deploy/three_d_db#' /home/FaceTec_Custom_Server/deploy/config.yaml
 RUN sed -i 's#search3D3DDatabaseExportRootDirectory: /Users/MyUserName/Desktop/MyTestFaceTecExported3DDB#\# search3D3DDatabaseExportRootDirectory: null#' /home/FaceTec_Custom_Server/deploy/config.yaml
 RUN sed -i 's#search3D3DOneEyeCoveredDatabaseRootDirectory: /Users/MyUserName/Desktop/MyTestFaceTec3D3DOneEyeCoveredDB#\# search3D3DOneEyeCoveredDatabaseRootDirectory:#' /home/FaceTec_Custom_Server/deploy/config.yaml
