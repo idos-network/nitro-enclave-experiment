@@ -25,8 +25,14 @@ Modify the kernel configuration file to enable FUSE support:
 
 **Change:**
 ```diff
-- # CONFIG_FUSE_FS is not set
-+ CONFIG_FUSE_FS=y
+- # CONFIG_BLK_DEV_NBD is not set
++ CONFIG_DAX=y
++ CONFIG_PNFS_BLOCK=y
++ CONFIG_MD=y
++ CONFIG_BLK_DEV_DM_BUILTIN=y
++ CONFIG_BLK_DEV_DM=y
++ CONFIG_DM_CRYPT=y
++ CONFIG_BLK_DEV_NBD=y
 ```
 
 **Location:** Line 2901-2902
@@ -43,7 +49,7 @@ docker build -t kernel_builder --build-arg BUILD_ARCH=x86_64 .
 
 ```
 docker create --name extract_blobs kernel_builder
-docker cp extract_blobs:/blobs ./blobs
+docker cp extract_blobs:/build/blobs ./blobs
 docker rm extract_blobs
 ```
 

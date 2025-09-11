@@ -3,7 +3,7 @@ set -e
 
 yum update -y
 amazon-linux-extras install -y aws-nitro-enclaves-cli
-yum install -y aws-nitro-enclaves-cli-devel docker
+yum install -y aws-nitro-enclaves-cli-devel qemu-img libvirt
 
 usermod -a -G docker ec2-user
 systemctl enable --now docker
@@ -30,21 +30,6 @@ sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock
 # AWS metadata
 sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock-6008-tcp-aws-metadata-80 alpine/socat -d -d VSOCK-LISTEN:6008,fork TCP:169.254.169.254:80
 
-# AWS s3.eu-west-1.amazonaws.com
-sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock-6009-tcp-aws-s3-eu-west-1-443 alpine/socat -d -d VSOCK-LISTEN:6009,fork TCP:"s3.eu-west-1.amazonaws.com":443
-
-# AWS nitro-enclave-hello-usage-logs.s3.eu-west-1.amazonaws.com
-sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock-6010-tcp-aws-nitro-enclave-hello-usage-logs-s3-eu-west-1-443 alpine/socat -d -d VSOCK-LISTEN:6010,fork TCP:"nitro-enclave-hello-usage-logs.s3.eu-west-1.amazonaws.com":443
-
-# AWS nitro-enclave-hello-usage-logs.s3-eu-west-1.amazonaws.com
-sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock-6011-tcp-aws-nitro-enclave-hello-usage-logs-s3--eu-west-1-443 alpine/socat -d -d VSOCK-LISTEN:6011,fork TCP:"nitro-enclave-hello-usage-logs.s3-eu-west-1.amazonaws.com":443
-
-# AWS nitro-enclave-hello-3d-db.s3.eu-west-1.amazonaws.com
-sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock-6012-tcp-nitro-enclave-hello-3d-db-s3-eu-west-1-443 alpine/socat -d -d VSOCK-LISTEN:6012,fork TCP:"nitro-enclave-hello-3d-db.s3.eu-west-1.amazonaws.com":443
-
-# AWS nitro-enclave-hello-3d-db.s3-eu-west-1.amazonaws.com
-sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock-6013-tcp-aws-nitro-enclave-hello-3d-db-s3--eu-west-1-443 alpine/socat -d -d VSOCK-LISTEN:6013,fork TCP:"nitro-enclave-hello-3d-db.s3-eu-west-1.amazonaws.com":443
-
 # AWS nitro-enclave-hello-config.s3.eu-west-1.amazonaws.com
 sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock-6014-tcp-aws-nitro-enclave-hello-config-s3--eu-west-1-443 alpine/socat -d -d VSOCK-LISTEN:6014,fork TCP:"nitro-enclave-hello-config.s3.eu-west-1.amazonaws.com":443
 
@@ -53,6 +38,21 @@ sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock
 
 # AWS kms.eu-west-1.amazonaws.com
 sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock-6016-tcp-aws-kms-s3--eu-west-1-443 alpine/socat -d -d VSOCK-LISTEN:6016,fork TCP:"kms.eu-west-1.amazonaws.com":443
+
+cd ~
+wget https://download.libguestfs.org/nbdkit/1.44-stable/nbdkit-1.44.3.tar.gz
+tar -xvf nbdkit-1.44.3.tar.gz
+cd nbdkit-1.44.3
+./configure --disable-python
+make
+sudo make install
+cd ~
+rm -rf ./nbdkit-1.44.3
+rm -f ./nbdkit-1.44.3.tar.gz
+
+sudo mkdir -p /var/lib/nbd
+sudo qemu-img create -f raw /var/lib/nbd/nitro.img 10G
+sudo nbdkit --foreground --vsock --port=10809 file /var/lib/nbd/nitro.img
 
 sudo -u ec2-user mkdir -p ~ec2-user/custom-server
 cp ~ec2-user/.ssh/authorized_keys ~ec2-user/custom-server/
