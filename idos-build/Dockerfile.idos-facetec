@@ -18,11 +18,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends --no-install-su
     npm \
     openssh-server \
     socat \
-    fuse \
-    s3fs \
-    libfuse2 \
-    iptables \
-    gocryptfs \
+    libnbd-bin \
+    nbd-client \
+    cryptsetup \
 && rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
 
 COPY $FACETEC_CUSTOM_SERVER_DIRECTORY /home/FaceTec_Custom_Server
@@ -60,26 +58,16 @@ RUN curl -LO https://github.com/getsops/sops/releases/download/v3.10.2/sops-v3.1
 RUN echo "127.0.0.1 $MONGO_HOST" | tee -a /root/extra_hosts
 RUN echo "127.0.0.1 $(echo "$MONGO_HOST" | sed 's#-cluster.cluster-#-cluster.#')" | tee -a /root/extra_hosts
 RUN echo "127.0.0.1 logs.facetec.com" | tee -a /root/extra_hosts
-RUN echo "127.0.0.3 s3.eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
 
-RUN echo "127.0.0.4 nitro-enclave-hello-usage-logs.s3.eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
-RUN echo "127.0.0.4 nitro-enclave-hello-usage-logs.s3.amazonaws.com" | tee -a /root/extra_hosts
-RUN echo "127.0.0.5 nitro-enclave-hello-usage-logs.s3-eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
-
-RUN echo "127.0.0.6 nitro-enclave-hello-3d-db.s3.eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
-RUN echo "127.0.0.6 nitro-enclave-hello-3d-db.s3.amazonaws.com" | tee -a /root/extra_hosts
-RUN echo "127.0.0.7 nitro-enclave-hello-3d-db.s3-eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
-
-RUN echo "127.0.0.8 nitro-enclave-hello-config.s3.eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
-RUN echo "127.0.0.8 nitro-enclave-hello-config.s3.amazonaws.com" | tee -a /root/extra_hosts
-RUN echo "127.0.0.9 nitro-enclave-hello-config.s3-eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
-
-RUN echo "127.0.0.10 kms.eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
+# AWS kms (AWS identity are on ip tables forwarded to 127.0.0.2!)
+RUN echo "127.0.0.3 kms.eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
 
 RUN sed -i 's#uri: INSERT YOUR MONGO URL HERE#uri: "mongodb://root:password@'$MONGO_HOST':27017/"#' /home/FaceTec_Custom_Server/deploy/config.yaml
 RUN sed -i 's#serverPort: 8080#serverPort: 5000#' /home/FaceTec_Custom_Server/deploy/config.yaml
 RUN sed -i 's#enableSearch: false#enableSearch: true#' /home/FaceTec_Custom_Server/deploy/config.yaml
-RUN sed -i 's#search3D3DDatabaseRootDirectory: /Users/MyUserName/Desktop/MyTestFaceTec3DDB#search3D3DDatabaseRootDirectory: /home/FaceTec_Custom_Server/deploy/three_d_db#' /home/FaceTec_Custom_Server/deploy/config.yaml
+
+# TODO: How we can solve facetec usage logs server... @pkoch
+RUN sed -i 's#search3D3DDatabaseRootDirectory: /Users/MyUserName/Desktop/MyTestFaceTec3DDB#search3D3DDatabaseRootDirectory: /mnt/encrypted/three_d_db#' /home/FaceTec_Custom_Server/deploy/config.yaml
 RUN sed -i 's#search3D3DDatabaseExportRootDirectory: /Users/MyUserName/Desktop/MyTestFaceTecExported3DDB#\# search3D3DDatabaseExportRootDirectory: null#' /home/FaceTec_Custom_Server/deploy/config.yaml
 RUN sed -i 's#search3D3DOneEyeCoveredDatabaseRootDirectory: /Users/MyUserName/Desktop/MyTestFaceTec3D3DOneEyeCoveredDB#\# search3D3DOneEyeCoveredDatabaseRootDirectory:#' /home/FaceTec_Custom_Server/deploy/config.yaml
 RUN sed -i 's#search3D2DFacePortraitDatabaseRootDirectory: /Users/MyUserName/Desktop/MyTestFaceTec3D2DFacePortraitDB#\# search3D3DDatabaseRootDirectory:#' /home/FaceTec_Custom_Server/deploy/config.yaml

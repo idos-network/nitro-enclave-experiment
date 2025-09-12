@@ -11,11 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends --no-install-su
     telnet \
     vim \
     openssh-server \
-    s3fs \
-    fuse \
-    libfuse2 \
     iptables \
-    gocryptfs \
     libnbd-bin \
     nbd-client \
     cryptsetup \
@@ -29,18 +25,11 @@ WORKDIR /home/test
 RUN mkdir -p /home/test/logs
 
 COPY test/ .
+COPY fs.key.enc .
 RUN npm install
 
 COPY ./docker-run.sh ./run.sh
 COPY boot.ash ./
-
-RUN apt-get update && apt-get install -y \
-    curl unzip less groff \
-    && rm -rf /var/lib/apt/lists/* \
-    && curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/awscliv2.zip" \
-    && unzip /tmp/awscliv2.zip -d /tmp \
-    && /tmp/aws/install \
-    && rm -rf /tmp/aws /tmp/awscliv2.zip
 
 COPY authorized_keys /root/.ssh/authorized_keys
 
@@ -49,21 +38,9 @@ RUN curl -LO https://github.com/getsops/sops/releases/download/v3.10.2/sops-v3.1
     chmod +x /usr/local/bin/sops
 
 RUN echo "127.0.0.1 logs.facetec.com" | tee -a /root/extra_hosts
-RUN echo "127.0.0.3 s3.eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
 
-RUN echo "127.0.0.4 nitro-enclave-hello-usage-logs.s3.eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
-RUN echo "127.0.0.4 nitro-enclave-hello-usage-logs.s3.amazonaws.com" | tee -a /root/extra_hosts
-RUN echo "127.0.0.5 nitro-enclave-hello-usage-logs.s3-eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
-
-RUN echo "127.0.0.6 nitro-enclave-hello-3d-db.s3.eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
-RUN echo "127.0.0.6 nitro-enclave-hello-3d-db.s3.amazonaws.com" | tee -a /root/extra_hosts
-RUN echo "127.0.0.7 nitro-enclave-hello-3d-db.s3-eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
-
-RUN echo "127.0.0.8 nitro-enclave-hello-config.s3.eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
-RUN echo "127.0.0.8 nitro-enclave-hello-config.s3.amazonaws.com" | tee -a /root/extra_hosts
-RUN echo "127.0.0.9 nitro-enclave-hello-config.s3-eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
-
-RUN echo "127.0.0.10 kms.eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
+# AWS kms (AWS identity are on ip tables forwarded to 127.0.0.2!)
+RUN echo "127.0.0.3 kms.eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
 
 EXPOSE 8080
 

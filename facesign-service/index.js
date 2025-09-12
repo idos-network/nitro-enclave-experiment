@@ -68,6 +68,8 @@ app.post("/login", async (req, res) => {
     if (searchResult.success) {
       results = searchResult.results;
     } else if (searchResult.error && searchResult.errorMessage.includes('groupName when that groupName does not exist')) {
+      // TODO: First, we need to check our DB, if they are records... we clearly have started with a corrupted DB
+      // and this should never happen in a real world scenario.
       console.log("Group does not exist, creating one by enrolling first user.")
       results = [];
     } else {
@@ -79,6 +81,8 @@ app.post("/login", async (req, res) => {
     if (newUser) {
       // Brand new user, let's enroll in 3d-db#users
       await enrollUser(faceSignUserId, key);
+      // TODO: Add to our own DB as well, so we can reconstruct this later
+      // Mongo.db.enrollments.insertO....(key)
     } else if (results.length > 1) {
       throw new Error('Multiple users found with the same face-vector, this should never happen.');
     } else {
