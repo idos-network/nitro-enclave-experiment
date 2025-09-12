@@ -1,5 +1,4 @@
-const GROUP_NAME = "facesign-users";
-const FACETEC_SERVER = process.env.FACETEC_SERVER ?? "http://127.0.0.1:5000/";
+import { FACETEC_SERVER } from "./env.js";
 
 export async function getSessionToken(key, deviceIdentifier) {
   const response = await fetch(`${FACETEC_SERVER}session-token`, {
@@ -47,7 +46,7 @@ export async function enrollment3d(externalDatabaseRefID, faceScan, auditTrailIm
   return enrollmentResponse.json();
 }
 
-export async function searchForDuplicates(externalDatabaseRefID, key, deviceIdentifier) {
+export async function searchForDuplicates(externalDatabaseRefID, key, groupName, deviceIdentifier) {
   const response = await fetch(`${FACETEC_SERVER}3d-db/search`, {
     method: 'POST',
     headers: {
@@ -57,7 +56,7 @@ export async function searchForDuplicates(externalDatabaseRefID, key, deviceIden
     },
     body: JSON.stringify({
       externalDatabaseRefID,
-      groupName: GROUP_NAME,
+      groupName,
       minMatchLevel: 10, // Adjust as needed
     }),
   });
@@ -72,7 +71,7 @@ export async function searchForDuplicates(externalDatabaseRefID, key, deviceIden
   return response.json();
 }
 
-export async function enrollUser(externalDatabaseRefID, key) {
+export async function enrollUser(externalDatabaseRefID, groupName, key) {
   const response = await fetch(`${FACETEC_SERVER}3d-db/enroll`, {
     method: 'POST',
     headers: {
@@ -81,7 +80,7 @@ export async function enrollUser(externalDatabaseRefID, key) {
     },
     body: JSON.stringify({
       externalDatabaseRefID,
-      groupName: GROUP_NAME,
+      groupName,
     }),
   });
 

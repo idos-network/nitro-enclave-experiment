@@ -1,27 +1,4 @@
-resource "aws_s3_bucket" "usage_logs" {
-  bucket = "${var.project_name}-usage-logs"
-}
-
-resource "aws_s3_bucket_versioning" "usage_logs_versioning" {
-  bucket = aws_s3_bucket.usage_logs.id
-
-  versioning_configuration {
-    status = "Enabled"
-  }
-}
-
-resource "aws_s3_bucket" "three_d_db" {
-  bucket = "${var.project_name}-3d-db"
-}
-
-resource "aws_s3_bucket_versioning" "three_d_db_versioning" {
-  bucket = aws_s3_bucket.three_d_db.id
-
-  versioning_configuration {
-    status = "Enabled"
-  }
-}
-
+// TODO: I am keeping the config, since we will need them... it really depens on how we get the password for luks
 resource "aws_s3_bucket" "config" {
   bucket = "${var.project_name}-config"
 }
