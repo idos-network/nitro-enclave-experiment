@@ -3,7 +3,7 @@ set -e
 
 yum update -y
 amazon-linux-extras install -y aws-nitro-enclaves-cli
-yum install -y aws-nitro-enclaves-cli-devel qemu-img libvirt
+yum install -y aws-nitro-enclaves-cli-devel qemu-img libvirt libvirt-devel make gcc
 
 usermod -a -G docker ec2-user
 systemctl enable --now docker
@@ -40,16 +40,34 @@ wget https://download.libguestfs.org/nbdkit/1.44-stable/nbdkit-1.44.3.tar.gz
 tar -xvf nbdkit-1.44.3.tar.gz
 cd nbdkit-1.44.3
 ./configure --disable-python
-make
-sudo make install
+make -j 4
+make install
 cd ~
 rm -rf ./nbdkit-1.44.3
 rm -f ./nbdkit-1.44.3.tar.gz
 
-sudo mkdir -p /var/lib/nbd
+mkdir -p /var/lib/nbd
 # TODO: @pkoch is 10G enough?
-sudo qemu-img create -f raw /var/lib/nbd/nitro2.img 10G
-sudo /usr/local/sbin/nbdkit --vsock --port=10809 file /var/lib/nbd/nitro2.img
+qemu-img create -f raw /var/lib/nbd/nitro.img 10G
+
+# Prepare systemd daemon for nbdkit
+cat <<'EOF' | sudo tee /etc/systemd/system/nbdkit.service
+[Unit]
+Description=NBDKit vsock server
+After=network.target
+
+[Service]
+ExecStart=/usr/local/sbin/nbdkit --vsock --port=10809 --foreground file /var/lib/nbd/nitro.img
+Restart=always
+User=root
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable nbdkit.service
+systemctl start nbdkit.service
 
 sudo -u ec2-user mkdir -p ~ec2-user/custom-server
 cp ~ec2-user/.ssh/authorized_keys ~ec2-user/custom-server/
