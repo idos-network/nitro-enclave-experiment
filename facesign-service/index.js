@@ -5,6 +5,8 @@ import morgan from "morgan";
 import crypto from "node:crypto";
 
 import { enrollment3d, enrollUser, getSessionToken, searchForDuplicates } from "./api.js";
+import { insertMember, countMembersInGroup } from "./db.js";
+import { GROUP_NAME } from "./env.js";
 
 const app = express();
 
@@ -63,13 +65,17 @@ app.post("/login", async (req, res) => {
     // Search for 3d-db duplicates
     let results = [];
 
-    const searchResult = await searchForDuplicates(faceSignUserId, key, userAgent);
+    const searchResult = await searchForDuplicates(faceSignUserId, key, GROUP_NAME, userAgent);
 
     if (searchResult.success) {
       results = searchResult.results;
     } else if (searchResult.error && searchResult.errorMessage.includes('groupName when that groupName does not exist')) {
-      // TODO: First, we need to check our DB, if they are records... we clearly have started with a corrupted DB
-      // and this should never happen in a real world scenario.
+      // Check if group exists in DB, if yes, we have a problem (most likely recovery from corrupted FS)
+      const memberCount = await countMembersInGroup(GROUP_NAME);
+      if (memberCount > 0) {
+        throw new Error('Group exists in our DB, but not in 3d-db, this should never happen.');
+      }
+
       console.log("Group does not exist, creating one by enrolling first user.")
       results = [];
     } else {
@@ -80,9 +86,8 @@ app.post("/login", async (req, res) => {
 
     if (newUser) {
       // Brand new user, let's enroll in 3d-db#users
-      await enrollUser(faceSignUserId, key);
-      // TODO: Add to our own DB as well, so we can reconstruct this later
-      // Mongo.db.enrollments.insertO....(key)
+      await enrollUser(faceSignUserId, GROUP_NAME, key);
+      await insertMember(GROUP_NAME, faceSignUserId);
     } else if (results.length > 1) {
       throw new Error('Multiple users found with the same face-vector, this should never happen.');
     } else {
@@ -101,7 +106,7 @@ app.post("/login", async (req, res) => {
       success: false,
       wasProcessed: false,
       error: true,
-      errorMessage: 'Login process failed, check server logs.'
+      errorMessage: `Login process failed, check server logs ${error.message}.`
     });
   }
 });
