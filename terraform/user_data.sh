@@ -48,8 +48,8 @@ rm -f ./nbdkit-1.44.3.tar.gz
 
 sudo mkdir -p /var/lib/nbd
 # TODO: @pkoch is 10G enough?
-sudo qemu-img create -f raw /var/lib/nbd/nitro.img 10G
-sudo /usr/local/sbin/nbdkit --background --vsock --port=10809 file /var/lib/nbd/nitro.img
+sudo qemu-img create -f raw /var/lib/nbd/nitro2.img 10G
+sudo /usr/local/sbin/nbdkit --vsock --port=10809 file /var/lib/nbd/nitro2.img
 
 sudo -u ec2-user mkdir -p ~ec2-user/custom-server
 cp ~ec2-user/.ssh/authorized_keys ~ec2-user/custom-server/

@@ -47,6 +47,7 @@ COPY authorized_keys /root/.ssh/authorized_keys
 
 COPY docker-run.sh ./run.sh
 COPY boot.ash ./
+COPY fs.key.enc ./
 
 ARG MONGO_HOST
 RUN if [ -z "$MONGO_HOST" ]; then (echo "MONGO_HOST must be provided as a --build-arg"; exit 1); fi

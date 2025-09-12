@@ -20,25 +20,34 @@ socat TCP4-LISTEN:80,fork,bind=127.0.0.2 VSOCK-CONNECT:3:6008 &
 socat TCP4-LISTEN:443,fork,bind=127.0.0.3 VSOCK-CONNECT:3:6009 &
 
 # Mount nbd0 drive
+sleep 2
 nbd-client localhost 10809 /dev/nbd0 &
 
 # Wait for nbd0 to be ready (for some reason the luksOpen immediatelly complains)
 while [ "$(cat /sys/block/nbd0/size)" -eq 0 ]; do
+  echo "Waiting for /dev/nbd0 to be ready..."
   sleep 0.5
 done
 
-# Optionally format (first time)
-# TODO: How we can do this @pkoch
-# cryptsetup luksFormat /dev/nbd0
-
 cd /home/test
+
+if cryptsetup isLuks /dev/nbd0; then
+  echo "/dev/nbd0 is luks already, continuing..."
+else
+  echo "/dev/nbd0 is not luks, formatting..."
+  sops -d fs.key.enc | cryptsetup luksFormat --batch-mode /dev/nbd0 --key-file -
+fi
 
 # Decrypt with password
 # TODO: How should we do this @pkoch
-sops -d fs.key.enc | cryptsetup luksOpen /dev/nbd0 encrypted_disk -
+sops -d fs.key.enc | cryptsetup luksOpen /dev/nbd0 encrypted_disk --key-file -
 
-# Optionally format (first time)
-# mkfs.ext4 /dev/mapper/encrypted_disk
+if ! blkid /dev/mapper/encrypted_disk > /dev/null 2>&1; then
+  echo "Formatting /dev/mapper/encrypted_disk with ext4 filesystem..."
+  mkfs.ext4 /dev/mapper/encrypted_disk
+else
+  echo "/dev/mapper/encrypted_disk already has a filesystem, continuing..."
+fi
 
 # Mount
 mkdir /mnt/encrypted
