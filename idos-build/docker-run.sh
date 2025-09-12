@@ -56,6 +56,20 @@ fi
 mkdir /mnt/encrypted
 mount /dev/mapper/encrypted_disk /mnt/encrypted
 
+# Ensure there are 3d-db and logs directories
+if [ ! -d /mnt/encrypted/3d-db ]; then
+  echo "Creating /mnt/encrypted/3d-db directory..."
+  mkdir -p /mnt/encrypted/3d-db
+
+  # Running repopulate?!
+  # node facesign-service/repopulate.js
+fi
+
+if [ ! -d /mnt/encrypted/logs ]; then
+  echo "Creating /mnt/encrypted/logs directory..."  
+  mkdir -p /mnt/encrypted/logs
+fi
+
 echo "Running PM2-runtime"
 export HOME=/home/FaceTec_Custom_Server
 pm2-runtime ecosystem.config.js
