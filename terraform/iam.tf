@@ -15,12 +15,6 @@ resource "aws_iam_role" "enclave_instance_role" {
   })
 }
 
-# Attach AWS managed policy for SSM (Session Manager) access
-resource "aws_iam_role_policy_attachment" "ssm" {
-  role       = aws_iam_role.enclave_instance_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
-}
-
 # Inline policy to allow the instance role to use the KMS key (defined in kms.tf)
 resource "aws_iam_role_policy" "kms_access" {
   name = "AllowKMSUsage"
