@@ -30,7 +30,7 @@ resource "aws_iam_role_policy" "kms_access" {
           "kms:ReEncrypt*",
           "kms:GenerateDataKey*"
         ],
-        Resource = aws_kms_key.enclave_key.arn
+        Resource = aws_kms_key.enclave_instance_root_volume.arn
       }
     ]
   })
@@ -56,26 +56,25 @@ resource "aws_iam_role_policy" "docdb_access" {
   })
 }
 
-# Policy to allow EC2 instance to use KMS
-resource "aws_iam_role_policy" "kms_gocrypt_access" {
-  name = "AllowKMSAccess"
-  role = aws_iam_role.enclave_instance_role.id
-  policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [
-      {
-        Effect = "Allow",
-        Action = [
-          "kms:Encrypt",
-          "kms:Decrypt",
-          "kms:DescribeKey",
-          "kms:GenerateDataKey*"
-        ],
-        Resource = aws_kms_key.gocryptfs.arn
-      }
-    ]
-  })
-}
+# resource "aws_iam_role_policy" "kms_gocrypt_access" {
+#   name = "AllowKMSAccess"
+#   role = aws_iam_role.enclave_instance_role.id
+#   policy = jsonencode({
+#     Version = "2012-10-17",
+#     Statement = [
+#       {
+#         Effect = "Allow",
+#         Action = [
+#           "kms:Encrypt",
+#           "kms:Decrypt",
+#           "kms:DescribeKey",
+#           "kms:GenerateDataKey*"
+#         ],
+#         Resource = aws_kms_key.gocryptfs.arn
+#       }
+#     ]
+#   })
+# }
 
 # Instance profile to attach the role to the EC2 instance
 resource "aws_iam_instance_profile" "enclave_instance_profile" {

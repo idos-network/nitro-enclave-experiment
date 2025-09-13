@@ -12,4 +12,10 @@ sudo systemctl restart nitro-enclaves-allocator.service
 
 # Run the EIF
 # The CID being 16 is arbitrary.
-sudo nitro-cli run-enclave --enclave-cid 16 --cpu-count 16 --memory 64000 --eif-path "$NITRO_CLI_ARTIFACTS/$TARGET_DOCKER_IMAGE.eif" --attach-console;
+sudo nitro-cli run-enclave \
+    --enclave-cid 16 \
+    --cpu-count 16 \
+    --memory 64000 \
+    --eif-path "$NITRO_CLI_ARTIFACTS/$TARGET_DOCKER_IMAGE.eif" \
+    --attach-console \
+;

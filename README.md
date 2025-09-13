@@ -8,9 +8,13 @@
         - No debug logging
         - SFTP usage logs
         - No postman init
+2. On `facetec-sdk/facetec_usage_logs_server/config.yml`, set the `sftpConfig.privateKey` field to the right key (that needs to have been configured in FaceTec beforehand).
+2. Add your ssh key to `terraform/terraform.tfvars`.
 2. Apply the terraform in the `terraform` folder. You'll need to `aws configure sso` and choose the `nitro-enclave` account.
-3. Run `bash sync_instance.sh` form root dir.
-4. `ssh ec2-user@"$(cd terraform; terraform output -raw ec2_public_ip)" bash custom-server/build-run-eif.ash`
+3. Run `bash sync_instance.sh` from root dir.
+4. `ssh ec2-user@"$(cd terraform; terraform output -raw ec2_public_ip)" bash custom-server/build.ash`
+4. `ssh ec2-user@"$(cd terraform; terraform output -raw ec2_public_ip)" sudo reboot`
+4. `ssh ec2-user@"$(cd terraform; terraform output -raw ec2_public_ip)" bash custom-server/run.ash`
 
 This should boot the enclave in debug mode and stream its stdout.
 

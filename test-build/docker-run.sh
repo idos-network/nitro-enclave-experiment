@@ -39,7 +39,6 @@ else
   echo "buttbutt" | cryptsetup luksFormat --batch-mode /dev/nbd0 --key-file -
 fi
 
-# Decrypt with password
 # TODO(pkoch): sops -d fs.key.enc | cryptsetup luksOpen /dev/nbd0 encrypted_disk --key-file -
 echo "buttbutt" | cryptsetup luksOpen /dev/nbd0 encrypted_disk --key-file -
 

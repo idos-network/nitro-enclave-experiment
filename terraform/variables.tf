@@ -31,3 +31,8 @@ variable "docdb_instance_class" {
   type        = string
   default     = "db.t4g.medium"
 }
+
+variable "ssh_key" {
+  description = "SSH key for accessing the instance"
+  type        = string
+}
