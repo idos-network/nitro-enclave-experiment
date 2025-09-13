@@ -66,7 +66,7 @@ if [ ! -d /mnt/encrypted/3d-db ]; then
 fi
 
 if [ ! -d /mnt/encrypted/logs ]; then
-  echo "Creating /mnt/encrypted/logs directory..."  
+  echo "Creating /mnt/encrypted/logs directory..."
   mkdir -p /mnt/encrypted/logs
 fi
 
