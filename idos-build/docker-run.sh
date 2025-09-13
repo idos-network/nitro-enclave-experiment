@@ -38,12 +38,12 @@ if cryptsetup isLuks /dev/nbd0; then
   echo "/dev/nbd0 is luks already, continuing..."
 else
   echo "/dev/nbd0 is not luks, formatting..."
-  sops -d fs.key.enc | cryptsetup luksFormat --batch-mode /dev/nbd0 --key-file -
+  # TODO(pkoch): sops -d fs.key.enc | cryptsetup luksFormat --batch-mode /dev/nbd0 --key-file -
+  echo "buttbutt" | cryptsetup luksFormat --batch-mode /dev/nbd0 --key-file -
 fi
 
-# Decrypt with password
-# TODO: How should we do this @pkoch
-sops -d fs.key.enc | cryptsetup luksOpen /dev/nbd0 encrypted_disk --key-file -
+# TODO(pkoch): sops -d fs.key.enc | cryptsetup luksOpen /dev/nbd0 encrypted_disk --key-file -
+echo "buttbutt" | cryptsetup luksOpen /dev/nbd0 encrypted_disk --key-file -
 
 if ! blkid /dev/mapper/encrypted_disk > /dev/null 2>&1; then
   echo "Formatting /dev/mapper/encrypted_disk with ext4 filesystem..."

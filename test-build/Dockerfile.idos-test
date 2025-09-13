@@ -25,7 +25,6 @@ WORKDIR /home/test
 RUN mkdir -p /home/test/logs
 
 COPY test/ .
-COPY fs.key.enc .
 RUN npm install
 
 COPY ./docker-run.sh ./run.sh

@@ -21,6 +21,10 @@ fi
 # Get the FaceTec SDK version
 FACETEC_SDK_VERSION="$(find ~ec2-user/custom-server/ -name 'FaceTecSDK-custom-server-*' | sed -E 's#.*/FaceTecSDK-custom-server-([[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+)#\1#')"
 
+# TODO(pkoch): Add the fs.key.enc file here. How?
+sudo cp ~ec2-user/.ssh/authorized_keys ~ec2-user/custom-server/
+sudo chown ec2-user:ec2-user ~ec2-user/custom-server/authorized_keys
+
 # Build origin Docker image
 docker build \
     --build-arg MONGO_HOST="$MONGO_HOST" \
