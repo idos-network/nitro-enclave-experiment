@@ -38,4 +38,3 @@ This should boot the enclave in debug mode and stream its stdout.
 - We're using hard-coded credentials for docdb. These should be gotten from Secrets Manager.
 - Add TLS termination inside the enclave (get a cert from ACM and use socat or equivalent).
 - Encrypt the stuff we put on mongo with a KMS key. Use FLE: https://docs.aws.amazon.com/documentdb/latest/developerguide/field-level-encryption.html
-- Usage logs dir should be a remote mount with FUSE over vsocks that also uses a KMS key. Maybe to S3?
