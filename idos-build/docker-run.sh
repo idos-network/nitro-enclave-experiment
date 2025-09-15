@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -ueo pipefail
 
 # Incoming
 socat VSOCK-LISTEN:5006,fork TCP4-CONNECT:127.0.0.1:8080 &
