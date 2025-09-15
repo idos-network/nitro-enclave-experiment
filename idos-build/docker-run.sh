@@ -43,7 +43,13 @@ AWS_KMS_KEY_ID="$(cat ./secrets_key.arn)"
 ENC_FILE=luks_password.enc
 PLAIN_FILE=luks_password.txt
 
-aws s3 cp "s3://nitro-enclave-hello-secrets/$ENC_FILE" "$ENC_FILE" --region eu-west-1 || true
+aws s3 cp "s3://nitro-enclave-hello-secrets/$ENC_FILE" "$ENC_FILE" --region eu-west-1 2>aws_s3_cp_error.log || true
+if ! grep -q ': Key "'"$ENC_FILE"'" does not exist$' aws_s3_cp_error.log; then
+  cat aws_s3_cp_error.log
+  exit 1
+fi
+rm -f aws_s3_cp_error.log
+
 if [ ! -f "$ENC_FILE" ]; then
   echo "Couldn't download luks_password.enc from S3, generating a new one"
   aws kms encrypt --key-id "$AWS_KMS_KEY_ID" --plaintext "$(openssl rand -hex 64)" --output text --query CiphertextBlob --region eu-west-1 > "$ENC_FILE"
