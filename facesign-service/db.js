@@ -11,7 +11,7 @@ let db;
 export async function connectDB() {
   if (!db) {
     await client.connect();
-    db = client.db("mydatabase");
+    db = client.db("face-sign-data");
 
     // Create a member group members with unique users
     await db.collection(DB_COLLECTION_NAME).createIndex(

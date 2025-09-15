@@ -46,10 +46,6 @@ cd ~
 rm -rf ./nbdkit-1.44.3
 rm -f ./nbdkit-1.44.3.tar.gz
 
-mkdir -p /var/lib/nbd
-# TODO: @pkoch is 10G enough?
-qemu-img create -f raw /var/lib/nbd/nitro.img 10G
-
 # Prepare systemd daemon for nbdkit
 cat <<'EOF' | sudo tee /etc/systemd/system/nbdkit.service
 [Unit]
@@ -57,7 +53,7 @@ Description=NBDKit vsock server
 After=network.target
 
 [Service]
-ExecStart=/usr/local/sbin/nbdkit --vsock --port=10809 --foreground file /var/lib/nbd/nitro.img
+ExecStart=/usr/local/sbin/nbdkit --vsock --port=10809 --foreground file /dev/sdh
 Restart=always
 User=root
 
