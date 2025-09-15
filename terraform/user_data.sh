@@ -70,4 +70,3 @@ systemctl enable nbdkit.service
 systemctl start nbdkit.service
 
 sudo -u ec2-user mkdir -p ~ec2-user/custom-server
-cp ~ec2-user/.ssh/authorized_keys ~ec2-user/custom-server/

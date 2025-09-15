@@ -12,6 +12,10 @@ sudo rm -f "$NITRO_CLI_ARTIFACTS/$TARGET_DOCKER_IMAGE.eif"
 
 set -e
 
+# TODO(pkoch): Add the fs.key.enc file here. How?
+sudo cp ~ec2-user/.ssh/authorized_keys ~ec2-user/test-build/
+sudo chown ec2-user:ec2-user ~ec2-user/test-build/authorized_keys
+
 # Build origin Docker image
 docker build \
     -t "$TARGET_DOCKER_IMAGE" \
@@ -20,7 +24,7 @@ docker build \
 ;
 
 # Free up memory for build-enclave
-sudo sed -i 's/^memory_mib:.*/memory_mib: 4096/' /etc/nitro_enclaves/allocator.yaml
+sudo sed -i 's/^memory_mib:.*/memory_mib: 2048/' /etc/nitro_enclaves/allocator.yaml
 sudo systemctl restart nitro-enclaves-allocator.service
 
 sudo nitro-cli build-enclave \
