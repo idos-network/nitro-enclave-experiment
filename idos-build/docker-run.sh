@@ -19,6 +19,10 @@ socat TCP4-LISTEN:80,fork,bind=127.0.0.2 VSOCK-CONNECT:3:6008 &
 # Outgoing (AWS kms)
 socat TCP4-LISTEN:443,fork,bind=127.0.0.3 VSOCK-CONNECT:3:6009 &
 
+# Outgoing (AWS s3 for secrets)
+socat TCP4-LISTEN:443,fork,bind=127.0.0.4 VSOCK-CONNECT:3:6010 &
+socat TCP4-LISTEN:443,fork,bind=127.0.0.5 VSOCK-CONNECT:3:6011 &
+
 # So that the FaceTec .so file can load some stuff on /tmp.
 mount /tmp -o remount,exec
 
@@ -34,16 +38,36 @@ done
 
 cd /home/FaceTec_Custom_Server/deploy
 
+# Ensure the key
+AWS_KMS_KEY_ID="$(cat ./secrets_key.arn)"
+ENC_FILE=luks_password.enc
+PLAIN_FILE=luks_password.txt
+
+aws s3 cp "s3://nitro-enclave-hello-secrets/$ENC_FILE" "$ENC_FILE" --region eu-west-1 2>aws_s3_cp_error.log || true
+if ! grep -q ': Key "'"$ENC_FILE"'" does not exist$' aws_s3_cp_error.log; then
+  cat aws_s3_cp_error.log
+  exit 1
+fi
+rm -f aws_s3_cp_error.log
+
+if [ ! -f "$ENC_FILE" ]; then
+  echo "Couldn't download luks_password.enc from S3, generating a new one"
+  aws kms encrypt --key-id "$AWS_KMS_KEY_ID" --plaintext "$(openssl rand -hex 64)" --output text --query CiphertextBlob --region eu-west-1 > "$ENC_FILE"
+  aws s3 cp "$ENC_FILE" "s3://nitro-enclave-hello-secrets/$ENC_FILE" --region eu-west-1
+fi
+
+# Decrypt the key
+aws kms decrypt --ciphertext-blob "$(cat $ENC_FILE)" --output text --query Plaintext --region eu-west-1 > "$PLAIN_FILE"
+
 if cryptsetup isLuks /dev/nbd0; then
   echo "/dev/nbd0 is luks already, continuing..."
 else
   echo "/dev/nbd0 is not luks, formatting..."
-  # TODO(pkoch): sops -d fs.key.enc | cryptsetup luksFormat --batch-mode /dev/nbd0 --key-file -
-  echo "buttbutt" | cryptsetup luksFormat --batch-mode /dev/nbd0 --key-file -
+  cat $PLAIN_FILE | cryptsetup luksFormat --batch-mode /dev/nbd0 --key-file -
 fi
 
-# TODO(pkoch): sops -d fs.key.enc | cryptsetup luksOpen /dev/nbd0 encrypted_disk --key-file -
-echo "buttbutt" | cryptsetup luksOpen /dev/nbd0 encrypted_disk --key-file -
+cat $PLAIN_FILE | cryptsetup luksOpen /dev/nbd0 encrypted_disk --key-file -
+rm -f $PLAIN_FILE
 
 if ! blkid /dev/mapper/encrypted_disk > /dev/null 2>&1; then
   echo "Formatting /dev/mapper/encrypted_disk with ext4 filesystem..."

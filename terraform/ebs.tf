@@ -6,11 +6,11 @@ resource "aws_ebs_volume" "enclave_instance_ebs" {
   kms_key_id        = aws_kms_key.enclave_instance_ebs_volume.arn
 
   tags = {
-    Name = "${var.project_name}-ebs"
+    Name = "${var.project_name}-encrypted"
   }
 }
 
-resource "aws_volume_attachment" "ebs_att" {
+resource "aws_volume_attachment" "ebs_attachment" {
   device_name = "/dev/sdh"
   volume_id   = aws_ebs_volume.enclave_instance_ebs.id
   instance_id = aws_instance.enclave_instance.id
