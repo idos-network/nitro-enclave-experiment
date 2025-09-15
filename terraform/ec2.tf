@@ -31,7 +31,7 @@ resource "aws_instance" "enclave_instance" {
     encrypted             = true
     kms_key_id            = aws_kms_key.enclave_instance_root_volume.arn
     delete_on_termination = true
-    volume_size           = 256
+    volume_size           = 96
   }
 
   # Cloud-init user data script to set up Nitro Enclave and Node.js server

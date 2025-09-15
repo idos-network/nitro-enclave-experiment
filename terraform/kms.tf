@@ -1,6 +1,15 @@
 # KMS key for use with Nitro Enclaves (e.g., for attestation and secret decryption)
 resource "aws_kms_key" "enclave_instance_root_volume" {
   description = "Key for Nitro Enclave attestation demo"
+}
+
+resource "aws_kms_key" "enclave_instance_ebs_volume" {
+  description = "Key for Nitro Enclave EBS volume"
+}
+
+resource "aws_kms_key_policy" "enclave_instance_ebs_policy" {
+  key_id = aws_kms_key.enclave_instance_ebs_volume.key_id
+
   policy = jsonencode({
     Version = "2012-10-17",
     Id      = "enclave-kms-key-policy",
@@ -13,12 +22,21 @@ resource "aws_kms_key" "enclave_instance_root_volume" {
         Resource  = "*"
       },
       {
-        Sid       = "AllowInstanceRoleUse",
+        Sid       = "AllowInstanceRoleUseForSpecificEBS",
         Effect    = "Allow",
         Principal = { AWS = aws_iam_role.enclave_instance_role.arn },
-        Action    = ["kms:Decrypt", "kms:Encrypt", "kms:ReEncrypt*", "kms:GenerateDataKey*"],
-        Resource  = "*"
-        # In a real scenario, add conditions here (e.g., kms:RecipientAttestation:ImageSha384) to restrict usage to a specific enclave measurement.
+        Action = [
+          "kms:Decrypt",
+          "kms:Encrypt",
+          "kms:ReEncrypt*",
+          "kms:GenerateDataKey*"
+        ],
+        Resource = "*",
+        Condition = {
+          StringEquals = {
+            "kms:EncryptionContext:aws:ebs:id" = aws_ebs_volume.enclave_instance_ebs.id
+          }
+        }
       }
     ]
   })
