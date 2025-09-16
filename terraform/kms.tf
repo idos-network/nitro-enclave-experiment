@@ -105,6 +105,6 @@ resource "aws_kms_key" "secrets_encryption" {
 }
 
 resource "aws_kms_alias" "secrets_encryption" {
-  name          = "alias/secrets_encryption"
+  name          = "alias/secretsEncryption"
   target_key_id = aws_kms_key.secrets_encryption.key_id
 }
