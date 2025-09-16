@@ -15,6 +15,49 @@ resource "aws_iam_role" "enclave_instance_role" {
   })
 }
 
+# Associate the IAM role with the ACM certificate
+resource "awscc_ec2_enclave_certificate_iam_role_association" "enclave_instance" {
+  depends_on      = [aws_acm_certificate.apex, aws_acm_certificate_validation.apex]
+  certificate_arn = aws_acm_certificate.apex.arn
+  role_arn        = aws_iam_role.enclave_instance_role.arn
+}
+
+# Grant permissions to read the ACM certificate
+resource "aws_iam_role_policy" "certificate_s3_read" {
+  name = "AllowACMCertificateRead"
+  role = aws_iam_role.enclave_instance_role.id
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = [
+          "s3:GetObject",
+        ],
+        Resource = "${awscc_ec2_enclave_certificate_iam_role_association.enclave_instance.certificate_s3_bucket_name}/*"
+      }
+    ]
+  })
+}
+
+# Grant permissions to decrypt ACM certificates
+resource "aws_iam_role_policy" "certificate_kms_decrypt" {
+  name = "AllowACMCertificateDecrypt"
+  role = aws_iam_role.enclave_instance_role.id
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = [
+          "kms:Decrypt",
+        ],
+        Resource = awscc_ec2_enclave_certificate_iam_role_association.enclave_instance.encryption_kms_key_id
+      }
+    ]
+  })
+}
+
 # Inline policy to allow the instance role to use the KMS key (defined in kms.tf)
 resource "aws_iam_role_policy" "kms_access" {
   name = "AllowKMSUsage"

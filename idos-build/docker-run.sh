@@ -94,6 +94,16 @@ if [ ! -d /mnt/encrypted/logs ]; then
   mkdir -p /mnt/encrypted/logs
 fi
 
+# Prepare caddy (Caddyfile)
+# TODO: Download and decrypt certs from S3
+# https://docs.aws.amazon.com/enclaves/latest/user/install-acm.html#create-cert
+cat <<'EOF' | tee /home/FaceTec_Custom_Server/Caddyfile
+https://enclave.idos.network {
+    tls /etc/certs/fullchain.pem /etc/certs/privkey.pem
+    reverse_proxy localhost:8080
+}
+EOF
+
 echo "Running PM2-runtime"
 export HOME=/home/FaceTec_Custom_Server
 pm2-runtime ecosystem.config.js

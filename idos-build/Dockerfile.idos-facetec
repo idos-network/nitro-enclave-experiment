@@ -7,6 +7,7 @@ RUN if [ -z "$FACETEC_SDK_VERSION" ]; then (echo "FACETEC_SDK_VERSION must be pr
 ARG FACETEC_CUSTOM_SERVER_DIRECTORY=./FaceTecSDK-custom-server-$FACETEC_SDK_VERSION
 ARG FACETEC_SERVER_CORE_DIRECTORY=./FaceTecSDK-server-core-java-$FACETEC_SDK_VERSION
 
+# Install dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends --no-install-suggests \
     curl \
     default-jdk \
@@ -24,6 +25,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends --no-install-su
     cryptsetup \
 && rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
 
+# Install AWS CLI v2
 RUN apt-get update && apt-get install -y \
     curl unzip less groff \
     && rm -rf /var/lib/apt/lists/* \
@@ -31,6 +33,15 @@ RUN apt-get update && apt-get install -y \
     && unzip /tmp/awscliv2.zip -d /tmp \
     && /tmp/aws/install \
     && rm -rf /tmp/aws /tmp/awscliv2.zip
+
+# Install Caddy
+RUN apt-get update && apt-get install -y \
+    debian-keyring debian-archive-keyring apt-transport-https curl gnupg \
+    && curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | tee /etc/apt/trusted.gpg.d/caddy-stable.asc \
+    && curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list \
+    && apt-get update \
+    && apt-get install -y caddy \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY $FACETEC_CUSTOM_SERVER_DIRECTORY /home/FaceTec_Custom_Server
 COPY $FACETEC_SERVER_CORE_DIRECTORY /home/FaceTec_Server_Core

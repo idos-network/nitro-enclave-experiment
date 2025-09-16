@@ -5,10 +5,20 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 6.0"
     }
+
+    awscc = {
+      source  = "hashicorp/awscc"
+      version = "~> 1.0"
+    }
   }
 }
 
 provider "aws" {
+  region  = "eu-west-1"
+  profile = "AdministratorAccess-763695378641"
+}
+
+provider "awscc" {
   region  = "eu-west-1"
   profile = "AdministratorAccess-763695378641"
 }
