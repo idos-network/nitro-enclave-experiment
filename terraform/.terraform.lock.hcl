@@ -30,6 +30,7 @@ provider "registry.terraform.io/hashicorp/awscc" {
   constraints = "~> 1.0"
   hashes = [
     "h1:+muRzpjozYMIfIqXJ98Wll1CXFVV2jHBGzYuw6RhX6U=",
+    "h1:dVLWHLSlDTf9MMI4Ev7p9y1DJ1vGlr0QvtnHKZG3RyU=",
     "zh:01975380db4ffe3f02f8e63213a91caf8f8d175348c5bf90756863bc424bfa24",
     "zh:1f7d8b1e8117802d431974749432e21d86ed8ad49bdc0344e8841a65a5f99ace",
     "zh:321ceb27b96eb29ef3e8bcbeaa0f642ab3dccc09fa51aa714eb1991d95d6994a",
