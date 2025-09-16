@@ -23,6 +23,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends --no-install-su
     libnbd-bin \
     nbd-client \
     cryptsetup \
+    jq \
 && rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
 
 # Install AWS CLI v2
@@ -37,8 +38,10 @@ RUN apt-get update && apt-get install -y \
 # Install Caddy
 RUN apt-get update && apt-get install -y \
     debian-keyring debian-archive-keyring apt-transport-https curl gnupg \
-    && curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | tee /etc/apt/trusted.gpg.d/caddy-stable.asc \
+    && curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg \
     && curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list \
+    && chmod o+r /usr/share/keyrings/caddy-stable-archive-keyring.gpg \
+    && chmod o+r /etc/apt/sources.list.d/caddy-stable.list \ 
     && apt-get update \
     && apt-get install -y caddy \
     && rm -rf /var/lib/apt/lists/*
@@ -62,6 +65,10 @@ ARG AWS_KMS_KEY_ID
 RUN if [ -z "$AWS_KMS_KEY_ID" ]; then (echo "AWS_KMS_KEY_ID must be provided as a --build-arg"; exit 1); fi
 RUN echo $AWS_KMS_KEY_ID > /home/FaceTec_Custom_Server/deploy/secrets_key.arn
 
+ARG CERTIFICATE_S3_KEY
+RUN if [ -z "$CERTIFICATE_S3_KEY" ]; then (echo "CERTIFICATE_S3_KEY must be provided as a --build-arg"; exit 1); fi
+RUN echo $CERTIFICATE_S3_KEY > /home/FaceTec_Custom_Server/deploy/certificate_s3.key
+
 RUN npm install -g pm2
 
 COPY ./facetec_usage_logs_server/ /home/FaceTec_Custom_Server/deploy/facetec_usage_logs_server/
@@ -84,6 +91,10 @@ RUN echo "127.0.0.3 kms.eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
 # AWS secrets S3
 RUN echo "127.0.0.4 nitro-enclave-hello-secrets.s3.eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
 RUN echo "127.0.0.5 nitro-enclave-hello-secrets.s3-eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
+
+# AWS certificate S3
+RUN echo "127.0.0.6 aws-ec2-enclave-certificate-eu-west-1-prod.s3.amazonaws.com" | tee -a /root/extra_hosts 
+RUN echo "172.0.0.7 aws-ec2-enclave-certificate-eu-west-1-prod.s3.eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
 
 # FaceSign configuration
 RUN sed -i 's#export const MONGO_URI = "INSERT YOUR MONGO URL HERE";#export const MONGO_URI = "mongodb://root:password@'$MONGO_HOST':27017/?retryWrites=false"#' /home/FaceTec_Custom_Server/deploy/facesign-service/env.js

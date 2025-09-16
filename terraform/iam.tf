@@ -58,6 +58,24 @@ resource "aws_iam_role_policy" "certificate_kms_decrypt" {
   })
 }
 
+# Get iAM role 
+resource "aws_iam_role_policy" "iam_role" {
+  name = "AllowGetRole"
+  role = aws_iam_role.enclave_instance_role.id
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = [
+          "iam:GetRole",
+        ],
+        Resource = aws_iam_role.enclave_instance_role.arn
+      }
+    ]
+  })
+}
+
 # Inline policy to allow the instance role to use the KMS key (defined in kms.tf)
 resource "aws_iam_role_policy" "kms_access" {
   name = "AllowKMSUsage"
@@ -91,7 +109,7 @@ resource "aws_iam_role_policy" "docdb_access" {
         Action = [
           "rds:DescribeDBClusters",
           "rds:DescribeDBInstances",
-          "rds:ListTagsForResource"
+          "rds:ListTagsForResource",
         ],
         Resource = "*"
       }
@@ -123,6 +141,24 @@ resource "aws_iam_role_policy" "s3_access" {
           aws_s3_bucket.secrets.arn,
           "${aws_s3_bucket.secrets.arn}/*",
         ]
+      }
+    ]
+  })
+}
+
+# Policy to list available certificates
+resource "aws_iam_role_policy" "list_certificates" {
+  name = "AllowListCertificates"
+  role = aws_iam_role.enclave_instance_role.id
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = [
+          "acm:ListCertificates",
+        ],
+        Resource = "*"
       }
     ]
   })

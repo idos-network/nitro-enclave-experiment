@@ -23,6 +23,10 @@ socat TCP4-LISTEN:443,fork,bind=127.0.0.3 VSOCK-CONNECT:3:6009 &
 socat TCP4-LISTEN:443,fork,bind=127.0.0.4 VSOCK-CONNECT:3:6010 &
 socat TCP4-LISTEN:443,fork,bind=127.0.0.5 VSOCK-CONNECT:3:6011 &
 
+# Outgoing (AWS s3 for certificate)
+socat TCP4-LISTEN:443,fork,bind=127.0.0.6 VSOCK-CONNECT:3:6013 &
+socat TCP4-LISTEN:443,fork,bind=172.0.0.7 VSOCK-CONNECT:3:6014 &
+
 # So that the FaceTec .so file can load some stuff on /tmp.
 mount /tmp -o remount,exec
 
@@ -95,7 +99,19 @@ if [ ! -d /mnt/encrypted/logs ]; then
 fi
 
 # Prepare caddy (Caddyfile)
-# TODO: Download and decrypt certs from S3
+CERTIFICATE_S3_KEY="$(cat ./certificate_s3.key)"
+aws s3 cp "$CERTIFICATE_S3_KEY" ./cert.json --region eu-west-1
+
+# Extract certs and full chain from cert.json
+jq -r '.certificate' ./cert.json | sed 's/\\n/\n/g' > /etc/certs/fullchain.pem
+jq -r '.certificateChain' ./cert.json | sed 's/\\n/\n/g' >> /etc/certs/chain.pem
+
+# Extract private key & decrypt if needed
+jq -r '.encryptedPrivateKey' ./cert.json > /etc/certs/privkey.pem.enc
+# TODO: Decrypt the file
+# aws decrypt --ciphertext-blob fileb:///etc/certs/privkey.pem.enc --output text --query Plaintext --region eu-west-1 | base64 --decode > /etc/certs/privkey.pem
+# But this does not work
+
 # https://docs.aws.amazon.com/enclaves/latest/user/install-acm.html#create-cert
 cat <<'EOF' | tee /home/FaceTec_Custom_Server/Caddyfile
 https://enclave.idos.network {
