@@ -39,10 +39,6 @@ sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock
 sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock-6010-tcp-aws-nitro-enclave-hello-secrets-s3-eu-west-1-443 alpine/socat -d -d VSOCK-LISTEN:6010,fork TCP:"nitro-enclave-hello-secrets.s3.eu-west-1.amazonaws.com":443
 sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock-6011-tcp-aws-nitro-enclave-hello-secrets-s3-eu-west-1-443 alpine/socat -d -d VSOCK-LISTEN:6011,fork TCP:"nitro-enclave-hello-secrets.s3-eu-west-1.amazonaws.com":443
 
-# AWS s3 for certificates (outgoing)
-sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock-6013-tcp-aws-ec2-enclave-certificate-eu-west-1-prod-s3-1-443 alpine/socat -d -d VSOCK-LISTEN:6013,fork TCP:"aws-ec2-enclave-certificate-eu-west-1-prod.s3.amazonaws.com":443
-sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock-6014-tcp-aws-ec2-enclave-certificate-eu-west-1-prod-s3-2-443 alpine/socat -d -d VSOCK-LISTEN:6011,fork TCP:"aws-ec2-enclave-certificate-eu-west-1-prod.s3.eu-west-1.amazonaws.com":443
-
 cd ~
 wget https://download.libguestfs.org/nbdkit/1.44-stable/nbdkit-1.44.3.tar.gz
 tar -xvf nbdkit-1.44.3.tar.gz

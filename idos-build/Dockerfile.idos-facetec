@@ -23,7 +23,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends --no-install-su
     libnbd-bin \
     nbd-client \
     cryptsetup \
-    jq \
 && rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
 
 # Install AWS CLI v2
@@ -91,10 +90,6 @@ RUN echo "127.0.0.3 kms.eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
 # AWS secrets S3
 RUN echo "127.0.0.4 nitro-enclave-hello-secrets.s3.eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
 RUN echo "127.0.0.5 nitro-enclave-hello-secrets.s3-eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
-
-# AWS certificate S3
-RUN echo "127.0.0.6 aws-ec2-enclave-certificate-eu-west-1-prod.s3.amazonaws.com" | tee -a /root/extra_hosts 
-RUN echo "172.0.0.7 aws-ec2-enclave-certificate-eu-west-1-prod.s3.eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
 
 # FaceSign configuration
 RUN sed -i 's#export const MONGO_URI = "INSERT YOUR MONGO URL HERE";#export const MONGO_URI = "mongodb://root:password@'$MONGO_HOST':27017/?retryWrites=false"#' /home/FaceTec_Custom_Server/deploy/facesign-service/env.js
