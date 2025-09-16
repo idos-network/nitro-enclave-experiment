@@ -53,8 +53,7 @@ resource "aws_iam_role_policy" "certificate_kms_decrypt" {
         Action = [
           "kms:Decrypt",
         ],
-        // TODO: We have to send this AMS key to the enclave...
-        Resource = awscc_ec2_enclave_certificate_iam_role_association.enclave_instance.encryption_kms_key_id
+        Resource = "arn:aws:kms:${data.aws_region.current.region}:*:key/${awscc_ec2_enclave_certificate_iam_role_association.enclave_instance.encryption_kms_key_id}"
       }
     ]
   })

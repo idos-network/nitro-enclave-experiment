@@ -25,6 +25,7 @@ provider "awscc" {
 
 # Fetch current account ID (used for KMS policy interpolation)
 data "aws_caller_identity" "current" {}
+data "aws_region" "current" {}
 
 # Include other .tf files (Terraform automatically loads all *.tf files in the directory)
 
