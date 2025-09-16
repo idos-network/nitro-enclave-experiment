@@ -34,8 +34,7 @@ resource "aws_iam_role_policy" "certificate_s3_read" {
         Action = [
           "s3:GetObject",
         ],
-        // TODO: We have to send this bucket to the enclave...
-        Resource = "${awscc_ec2_enclave_certificate_iam_role_association.enclave_instance.certificate_s3_bucket_name}/*"
+        Resource = "arn:aws:s3:::${awscc_ec2_enclave_certificate_iam_role_association.enclave_instance.certificate_s3_bucket_name}/*"
       }
     ]
   })
