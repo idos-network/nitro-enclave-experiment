@@ -24,6 +24,9 @@ socat TCP4-LISTEN:443,fork,bind=127.0.0.3 VSOCK-CONNECT:3:6009 &
 socat TCP4-LISTEN:443,fork,bind=127.0.0.4 VSOCK-CONNECT:3:6010 &
 socat TCP4-LISTEN:443,fork,bind=127.0.0.5 VSOCK-CONNECT:3:6011 &
 
+# Outgoing (let's encrypt acme lookup)
+socat TCP4-LISTEN:443,fork,bind=127.0.0.6 VSOCK-CONNECT:3:6012 &
+
 # So that the FaceTec .so file can load some stuff on /tmp.
 mount /tmp -o remount,exec
 
@@ -45,11 +48,6 @@ ENC_FILE=luks_password.enc
 PLAIN_FILE=luks_password.txt
 
 aws s3 cp "s3://nitro-enclave-hello-secrets/$ENC_FILE" "$ENC_FILE" --region eu-west-1 2>aws_s3_cp_error.log || true
-if ! grep -q ': Key "'"$ENC_FILE"'" does not exist$' aws_s3_cp_error.log; then
-  cat aws_s3_cp_error.log
-  exit 1
-fi
-rm -f aws_s3_cp_error.log
 
 if [ ! -f "$ENC_FILE" ]; then
   echo "Couldn't download luks_password.enc from S3, generating a new one"
@@ -95,18 +93,8 @@ if [ ! -d /mnt/encrypted/logs ]; then
   mkdir -p /mnt/encrypted/logs
 fi
 
-echo "Setting up Caddyfile..."
+echo "Ensure folder exists for caddy"
 mkdir -p /mnt/encrypted/caddy
-cat <<'EOF' | tee /home/FaceTec_Custom_Server/Caddyfile
-{
-    storage file_system /mnt/encrypted/caddy
-}
-
-https://enclave.idos.network {
-    encode gzip
-    reverse_proxy 127.0.0.1:7000
-}
-EOF
 
 echo "Running PM2-runtime"
 export HOME=/home/FaceTec_Custom_Server

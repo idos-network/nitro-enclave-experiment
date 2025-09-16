@@ -40,6 +40,9 @@ sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock
 sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock-6010-tcp-aws-nitro-enclave-hello-secrets-s3-eu-west-1-443 alpine/socat -d -d VSOCK-LISTEN:6010,fork TCP:"nitro-enclave-hello-secrets.s3.eu-west-1.amazonaws.com":443
 sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock-6011-tcp-aws-nitro-enclave-hello-secrets-s3-eu-west-1-443 alpine/socat -d -d VSOCK-LISTEN:6011,fork TCP:"nitro-enclave-hello-secrets.s3-eu-west-1.amazonaws.com":443
 
+# Let's encrypt acme lookup (outgoing)
+sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock-6012-tcp-acme-v02-api-lets-encrypt-org-443 alpine/socat -d -d VSOCK-LISTEN:6012,fork TCP:"acme-v02.api.letsencrypt.org":443
+
 cd ~
 wget https://download.libguestfs.org/nbdkit/1.44-stable/nbdkit-1.44.3.tar.gz
 tar -xvf nbdkit-1.44.3.tar.gz

@@ -72,6 +72,7 @@ RUN sed -i 's/54.70.182.147/logs.facetec.com/' /home/FaceTec_Custom_Server/deplo
 COPY authorized_keys /root/.ssh/authorized_keys
 COPY docker-run.sh ./run.sh
 COPY boot.ash ./
+COPY Caddyfile ./
 
 ARG MONGO_HOST
 RUN if [ -z "$MONGO_HOST" ]; then (echo "MONGO_HOST must be provided as a --build-arg"; exit 1); fi
@@ -86,6 +87,9 @@ RUN echo "127.0.0.3 kms.eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
 # AWS secrets S3
 RUN echo "127.0.0.4 nitro-enclave-hello-secrets.s3.eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
 RUN echo "127.0.0.5 nitro-enclave-hello-secrets.s3-eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
+
+# Let's encrypt acme lookup
+RUN echo "127.0.0.6 acme-v02.api.letsencrypt.org" | tee -a /root/extra_hosts
 
 # FaceSign configuration
 RUN sed -i 's#export const MONGO_URI = "INSERT YOUR MONGO URL HERE";#export const MONGO_URI = "mongodb://root:password@'$MONGO_HOST':27017/?retryWrites=false"#' /home/FaceTec_Custom_Server/deploy/facesign-service/env.js
