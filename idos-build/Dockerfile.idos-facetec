@@ -64,10 +64,6 @@ ARG AWS_KMS_KEY_ID
 RUN if [ -z "$AWS_KMS_KEY_ID" ]; then (echo "AWS_KMS_KEY_ID must be provided as a --build-arg"; exit 1); fi
 RUN echo $AWS_KMS_KEY_ID > /home/FaceTec_Custom_Server/deploy/secrets_key.arn
 
-ARG CERTIFICATE_S3_KEY
-RUN if [ -z "$CERTIFICATE_S3_KEY" ]; then (echo "CERTIFICATE_S3_KEY must be provided as a --build-arg"; exit 1); fi
-RUN echo $CERTIFICATE_S3_KEY > /home/FaceTec_Custom_Server/deploy/certificate_s3.key
-
 RUN npm install -g pm2
 
 COPY ./facetec_usage_logs_server/ /home/FaceTec_Custom_Server/deploy/facetec_usage_logs_server/

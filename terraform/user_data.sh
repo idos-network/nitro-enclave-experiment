@@ -23,7 +23,8 @@ fi
 sudo docker run --net=host -d --restart unless-stopped --privileged --name tcp-2222-vsock-16-5005         alpine/socat -d -d TCP-LISTEN:2222,fork VSOCK-CONNECT:16:5005
 
 # Incoming (app)
-sudo docker run --net=host -d --restart unless-stopped --privileged --name tcp-8080-vsock-16-5006         alpine/socat -d -d TCP-LISTEN:8080,fork VSOCK-CONNECT:16:5006
+sudo docker run --net=host -d --restart unless-stopped --privileged --name tcp-80-vsock-16-5006          alpine/socat -d -d TCP-LISTEN:80,fork VSOCK-CONNECT:16:5006
+sudo docker run --net=host -d --restart unless-stopped --privileged --name tcp-443-vsock-16-5007         alpine/socat -d -d TCP-LISTEN:443,fork VSOCK-CONNECT:16:5007
 
 # Outgoing
 sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock-6006-tcp-mongo-27017     alpine/socat -d -d VSOCK-LISTEN:6006,fork TCP:"$MONGO_HOST":27017

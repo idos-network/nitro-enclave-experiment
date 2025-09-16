@@ -15,6 +15,14 @@ resource "aws_security_group" "web_sg" {
   vpc_id      = data.aws_vpc.default.id
 
   ingress {
+    description = "Allow HTTP from anywhere"
+    protocol    = "tcp"
+    from_port   = 80
+    to_port     = 80
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
     description = "Allow HTTPS from anywhere"
     protocol    = "tcp"
     from_port   = 443

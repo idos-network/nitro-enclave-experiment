@@ -2,7 +2,8 @@
 set -ueo pipefail
 
 # Incoming
-socat VSOCK-LISTEN:5006,fork TCP4-CONNECT:127.0.0.1:8080 &
+socat VSOCK-LISTEN:5006,fork TCP4-CONNECT:127.0.0.1:80 &
+socat VSOCK-LISTEN:5007,fork TCP4-CONNECT:127.0.0.1:443 &
 
 # Outgoing (nbd)
 socat TCP4-LISTEN:10809,fork,bind=127.0.0.1 VSOCK-CONNECT:3:10809 &
@@ -94,11 +95,16 @@ if [ ! -d /mnt/encrypted/logs ]; then
   mkdir -p /mnt/encrypted/logs
 fi
 
-# https://docs.aws.amazon.com/enclaves/latest/user/install-acm.html#create-cert
+echo "Setting up Caddyfile..."
+mkdir -p /mnt/encrypted/caddy
 cat <<'EOF' | tee /home/FaceTec_Custom_Server/Caddyfile
+{
+    storage file_system /mnt/encrypted/caddy
+}
+
 https://enclave.idos.network {
-    tls /etc/certs/fullchain.pem /etc/certs/privkey.pem
-    reverse_proxy localhost:8080
+    encode gzip
+    reverse_proxy 127.0.0.1:7000
 }
 EOF
 
