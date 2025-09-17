@@ -27,5 +27,13 @@ module.exports = {
       wait_ready: true,
       autorestart: true,
     },
+    {
+      name: "Caddy",
+      cwd: "/home/FaceTec_Custom_Server",
+      script: "caddy",
+      args: "run --config /home/FaceTec_Custom_Server/deploy/Caddyfile --adapter caddyfile",
+      wait_ready: true,
+      autorestart: true,
+    }
   ],
 };

@@ -48,7 +48,7 @@ resource "aws_iam_role_policy" "docdb_access" {
         Action = [
           "rds:DescribeDBClusters",
           "rds:DescribeDBInstances",
-          "rds:ListTagsForResource"
+          "rds:ListTagsForResource",
         ],
         Resource = "*"
       }

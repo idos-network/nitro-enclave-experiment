@@ -7,6 +7,7 @@ RUN if [ -z "$FACETEC_SDK_VERSION" ]; then (echo "FACETEC_SDK_VERSION must be pr
 ARG FACETEC_CUSTOM_SERVER_DIRECTORY=./FaceTecSDK-custom-server-$FACETEC_SDK_VERSION
 ARG FACETEC_SERVER_CORE_DIRECTORY=./FaceTecSDK-server-core-java-$FACETEC_SDK_VERSION
 
+# Install dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends --no-install-suggests \
     curl \
     default-jdk \
@@ -24,6 +25,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends --no-install-su
     cryptsetup \
 && rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
 
+# Install AWS CLI v2
 RUN apt-get update && apt-get install -y \
     curl unzip less groff \
     && rm -rf /var/lib/apt/lists/* \
@@ -31,6 +33,17 @@ RUN apt-get update && apt-get install -y \
     && unzip /tmp/awscliv2.zip -d /tmp \
     && /tmp/aws/install \
     && rm -rf /tmp/aws /tmp/awscliv2.zip
+
+# Install Caddy
+RUN apt-get update && apt-get install -y \
+    debian-keyring debian-archive-keyring apt-transport-https curl gnupg \
+    && curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg \
+    && curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list \
+    && chmod o+r /usr/share/keyrings/caddy-stable-archive-keyring.gpg \
+    && chmod o+r /etc/apt/sources.list.d/caddy-stable.list \ 
+    && apt-get update \
+    && apt-get install -y caddy \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY $FACETEC_CUSTOM_SERVER_DIRECTORY /home/FaceTec_Custom_Server
 COPY $FACETEC_SERVER_CORE_DIRECTORY /home/FaceTec_Server_Core
@@ -59,6 +72,7 @@ RUN sed -i 's/54.70.182.147/logs.facetec.com/' /home/FaceTec_Custom_Server/deplo
 COPY authorized_keys /root/.ssh/authorized_keys
 COPY docker-run.sh ./run.sh
 COPY boot.ash ./
+COPY Caddyfile ./
 
 ARG MONGO_HOST
 RUN if [ -z "$MONGO_HOST" ]; then (echo "MONGO_HOST must be provided as a --build-arg"; exit 1); fi
@@ -73,6 +87,9 @@ RUN echo "127.0.0.3 kms.eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
 # AWS secrets S3
 RUN echo "127.0.0.4 nitro-enclave-hello-secrets.s3.eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
 RUN echo "127.0.0.5 nitro-enclave-hello-secrets.s3-eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
+
+# Let's encrypt acme lookup
+RUN echo "127.0.0.6 acme-v02.api.letsencrypt.org" | tee -a /root/extra_hosts
 
 # FaceSign configuration
 RUN sed -i 's#export const MONGO_URI = "INSERT YOUR MONGO URL HERE";#export const MONGO_URI = "mongodb://root:password@'$MONGO_HOST':27017/?retryWrites=false"#' /home/FaceTec_Custom_Server/deploy/facesign-service/env.js

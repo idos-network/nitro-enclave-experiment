@@ -23,7 +23,8 @@ fi
 sudo docker run --net=host -d --restart unless-stopped --privileged --name tcp-2222-vsock-16-5005         alpine/socat -d -d TCP-LISTEN:2222,fork VSOCK-CONNECT:16:5005
 
 # Incoming (app)
-sudo docker run --net=host -d --restart unless-stopped --privileged --name tcp-8080-vsock-16-5006         alpine/socat -d -d TCP-LISTEN:8080,fork VSOCK-CONNECT:16:5006
+sudo docker run --net=host -d --restart unless-stopped --privileged --name tcp-80-vsock-16-5006          alpine/socat -d -d TCP-LISTEN:80,fork VSOCK-CONNECT:16:5006
+sudo docker run --net=host -d --restart unless-stopped --privileged --name tcp-443-vsock-16-5007         alpine/socat -d -d TCP-LISTEN:443,fork VSOCK-CONNECT:16:5007
 
 # Outgoing
 sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock-6006-tcp-mongo-27017     alpine/socat -d -d VSOCK-LISTEN:6006,fork TCP:"$MONGO_HOST":27017
@@ -38,6 +39,9 @@ sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock
 # AWS s3 for secrets (outgoing)
 sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock-6010-tcp-aws-nitro-enclave-hello-secrets-s3-eu-west-1-443 alpine/socat -d -d VSOCK-LISTEN:6010,fork TCP:"nitro-enclave-hello-secrets.s3.eu-west-1.amazonaws.com":443
 sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock-6011-tcp-aws-nitro-enclave-hello-secrets-s3-eu-west-1-443 alpine/socat -d -d VSOCK-LISTEN:6011,fork TCP:"nitro-enclave-hello-secrets.s3-eu-west-1.amazonaws.com":443
+
+# Let's encrypt acme lookup (outgoing)
+sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock-6012-tcp-acme-v02-api-lets-encrypt-org-443 alpine/socat -d -d VSOCK-LISTEN:6012,fork TCP:"acme-v02.api.letsencrypt.org":443
 
 cd ~
 wget https://download.libguestfs.org/nbdkit/1.44-stable/nbdkit-1.44.3.tar.gz

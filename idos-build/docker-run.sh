@@ -2,7 +2,8 @@
 set -ueo pipefail
 
 # Incoming
-socat VSOCK-LISTEN:5006,fork TCP4-CONNECT:127.0.0.1:8080 &
+socat VSOCK-LISTEN:5006,fork TCP4-CONNECT:127.0.0.1:80 &
+socat VSOCK-LISTEN:5007,fork TCP4-CONNECT:127.0.0.1:443 &
 
 # Outgoing (nbd)
 socat TCP4-LISTEN:10809,fork,bind=127.0.0.1 VSOCK-CONNECT:3:10809 &
@@ -22,6 +23,9 @@ socat TCP4-LISTEN:443,fork,bind=127.0.0.3 VSOCK-CONNECT:3:6009 &
 # Outgoing (AWS s3 for secrets)
 socat TCP4-LISTEN:443,fork,bind=127.0.0.4 VSOCK-CONNECT:3:6010 &
 socat TCP4-LISTEN:443,fork,bind=127.0.0.5 VSOCK-CONNECT:3:6011 &
+
+# Outgoing (let's encrypt acme lookup)
+socat TCP4-LISTEN:443,fork,bind=127.0.0.6 VSOCK-CONNECT:3:6012 &
 
 # So that the FaceTec .so file can load some stuff on /tmp.
 mount /tmp -o remount,exec
@@ -44,11 +48,6 @@ ENC_FILE=luks_password.enc
 PLAIN_FILE=luks_password.txt
 
 aws s3 cp "s3://nitro-enclave-hello-secrets/$ENC_FILE" "$ENC_FILE" --region eu-west-1 2>aws_s3_cp_error.log || true
-if ! grep -q ': Key "'"$ENC_FILE"'" does not exist$' aws_s3_cp_error.log; then
-  cat aws_s3_cp_error.log
-  exit 1
-fi
-rm -f aws_s3_cp_error.log
 
 if [ ! -f "$ENC_FILE" ]; then
   echo "Couldn't download luks_password.enc from S3, generating a new one"
@@ -93,6 +92,9 @@ if [ ! -d /mnt/encrypted/logs ]; then
   echo "Creating /mnt/encrypted/logs directory..."
   mkdir -p /mnt/encrypted/logs
 fi
+
+echo "Ensure folder exists for caddy"
+mkdir -p /mnt/encrypted/caddy
 
 echo "Running PM2-runtime"
 export HOME=/home/FaceTec_Custom_Server

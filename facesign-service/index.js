@@ -15,7 +15,7 @@ app.use(cors());
 app.use(morgan("dev"));
 app.use(express.json({ limit: "50mb" }));
 
-const PORT = process.env.PORT ?? 8080;
+const PORT = process.env.PORT ?? 7000;
 
 app.get("/", (req, res) => {
   res.json({ message: "FaceSign Service is running" });

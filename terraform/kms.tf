@@ -71,6 +71,7 @@ resource "aws_kms_key" "secrets_encryption" {
           "kms:EnableKey",
           "kms:EnableKeyRotation",
           "kms:CreateAlias",
+          "kms:UpdateAlias",
           // We have to set this otherwise we cannot create a policy
           // for this key:
           // AWS operation error KMS: PutKeyPolicy, https response error StatusCode: 400, RequestID: 87120d0e-2a77-40ad-86cd-e1a750f9d6e5, MalformedPolicyDocumentException: The new key policy will not allow you to update the key policy in the future.
@@ -104,6 +105,6 @@ resource "aws_kms_key" "secrets_encryption" {
 }
 
 resource "aws_kms_alias" "secrets_encryption" {
-  name          = "alias/secrets_encryption"
+  name          = "alias/secretsEncryption"
   target_key_id = aws_kms_key.secrets_encryption.key_id
 }
