@@ -3,10 +3,11 @@ import express from "express";
 import helmet from "helmet";
 import morgan from "morgan";
 import crypto from "node:crypto";
+import fs from "node:fs";
 
 import { enrollment3d, enrollUser, getSessionToken, searchForDuplicates } from "./api.js";
 import { insertMember, countMembersInGroup } from "./db.js";
-import { GROUP_NAME } from "./env.js";
+import { FACETEC_PUBLIC_KEY_PATH, GROUP_NAME } from "./env.js";
 
 const app = express();
 
@@ -109,6 +110,11 @@ app.post("/login", async (req, res) => {
       errorMessage: `Login process failed, check server logs ${error.message}.`
     });
   }
+});
+
+app.get("/sdk/public-key", (req, res) => {
+  const publicKey = fs.readFileSync(FACETEC_PUBLIC_KEY_PATH, "utf-8");
+  res.status(200).send(publicKey);
 });
 
 const server = app.listen(PORT, () => {

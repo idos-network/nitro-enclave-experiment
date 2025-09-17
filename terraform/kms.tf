@@ -108,3 +108,67 @@ resource "aws_kms_alias" "secrets_encryption" {
   name          = "alias/secretsEncryption"
   target_key_id = aws_kms_key.secrets_encryption.key_id
 }
+
+resource "aws_kms_key" "secrets_facetec_encryption" {
+  description             = "Key for Facetec private key encryption"
+  deletion_window_in_days = 7
+  enable_key_rotation     = true
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Id      = "secrets-encryption-key-policy"
+    Statement = [
+      # --- ADMIN: root can only delete the key, but not use it ---
+      {
+        Sid    = "AllowRootAdminOnly"
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+        }
+        Action = [
+          "kms:DescribeKey",
+          "kms:List*",
+          "kms:GetKeyPolicy",
+          "kms:GetKeyRotationStatus",
+          "kms:DisableKey",
+          "kms:EnableKey",
+          "kms:EnableKeyRotation",
+          "kms:CreateAlias",
+          "kms:UpdateAlias",
+          "kms:UpdateKeyDescription",
+          // We have to set this otherwise we cannot create a policy
+          // for this key:
+          // AWS operation error KMS: PutKeyPolicy, https response error StatusCode: 400, RequestID: 87120d0e-2a77-40ad-86cd-e1a750f9d6e5, MalformedPolicyDocumentException: The new key policy will not allow you to update the key policy in the future.
+          "kms:PutKeyPolicy",
+
+          // We should be warned by AWS Config about this, or just remove this permission
+          "kms:ScheduleKeyDeletion",
+          "kms:CancelKeyDeletion"
+        ]
+        Resource = "*"
+      },
+
+      # --- USAGE: only EC2 instance role ---
+      {
+        Sid    = "AllowEC2InstanceRoleUseOfKey"
+        Effect = "Allow"
+        Principal = {
+          AWS = "${aws_iam_role.enclave_instance_role.arn}"
+        }
+        Action = [
+          "kms:Encrypt",
+          "kms:DescribeKey",
+          "kms:Decrypt",
+          "kms:ReEncrypt*",
+          "kms:GenerateDataKey*"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+resource "aws_kms_alias" "secrets_facetec_encryption" {
+  name          = "alias/secretsFacetecEncryption"
+  target_key_id = aws_kms_key.secrets_facetec_encryption.key_id
+}
