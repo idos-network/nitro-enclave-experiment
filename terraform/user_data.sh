@@ -2,8 +2,7 @@
 set -e
 
 yum update -y
-amazon-linux-extras install -y aws-nitro-enclaves-cli
-yum install -y aws-nitro-enclaves-cli-devel qemu-img libvirt libvirt-devel make gcc
+yum install -y aws-nitro-enclaves-cli aws-nitro-enclaves-cli-devel make gcc
 
 usermod -a -G docker ec2-user
 systemctl enable --now docker

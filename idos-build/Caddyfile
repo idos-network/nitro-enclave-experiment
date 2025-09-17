@@ -1,5 +1,6 @@
 {
 	storage file_system /mnt/encrypted/caddy
+	email info@idos.network
 }
 
 nitro.idos.network {
