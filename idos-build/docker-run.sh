@@ -81,7 +81,7 @@ fi
 echo "Decrypting facetec private key"
 aws kms decrypt --ciphertext-blob "$(cat $FACETEC_PRIVATE_ENC_FILE)" --output text --query Plaintext --region eu-west-1 | base64 -d > "$FACETEC_PRIVATE_PLAIN_FILE"
 
-# Public facetec sdk key is stored unencrypted in the repo
+# Public facetec sdk key is stored unencrypted in the bucket
 aws s3 cp "s3://nitro-enclave-hello-secrets/$FACETEC_PUBLIC_FILE" "/home/FaceTec_Custom_Server/deploy/facesign-service/$FACETEC_PUBLIC_FILE" --region eu-west-1
 
 # Replace facetec encryption private key in facetec service
