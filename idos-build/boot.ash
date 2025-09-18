@@ -42,4 +42,4 @@ if true; then #SSH#
     /usr/sbin/sshd -f /etc/ssh/sshd_config -e -D &
 fi
 
-exec bash /home/FaceTec_Custom_Server/deploy/run.sh
+exec bash /home/FaceTec_Server/deploy/run.sh

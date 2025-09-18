@@ -2,10 +2,10 @@ module.exports = {
   apps: [
     {
       name: "ULS",
-      cwd: "/home/FaceTec_Custom_Server/deploy/facetec_usage_logs_server",
+      cwd: "/home/FaceTec_Server/deploy/usage_logs_server",
       script: "index.js",
       args: "start",
-      log_file: '/home/FaceTec_Custom_Server/deploy/facetec_usage_logs_server/server/logs.txt',
+      log_file: '/home/FaceTec_Server/deploy/usage_logs_server/server/logs.txt',
       time: true, // Add timestamps to logs
       wait_ready: true, // Wait for "ready" signal before considering
       listen_timeout: 15000, // Wait 15 seconds for "ready" signal
@@ -15,23 +15,23 @@ module.exports = {
     },
     {
       name: "FaceSign-service",
-      cwd: "/home/FaceTec_Custom_Server/deploy/facesign-service",
+      cwd: "/home/FaceTec_Server/deploy/facesign_service",
       script: "npm",
       args: "start",
     },
     {
       name: "FaceTec-Custom-Server",
-      cwd: "/home/FaceTec_Custom_Server/deploy",
+      cwd: "/home/FaceTec_Server/deploy",
       script: "bash",
-      args: "-c 'sleep 5 && java -jar FaceTec-Custom-Server.jar'",
+      args: "-c 'sleep 5 && facetec_run.ash'",
       wait_ready: true,
       autorestart: true,
     },
     {
       name: "Caddy",
-      cwd: "/home/FaceTec_Custom_Server",
+      cwd: "/home/FaceTec_Server",
       script: "caddy",
-      args: "run --config /home/FaceTec_Custom_Server/deploy/Caddyfile --adapter caddyfile",
+      args: "run --config /home/FaceTec_Server/deploy/Caddyfile --adapter caddyfile",
       wait_ready: true,
       autorestart: true,
     }

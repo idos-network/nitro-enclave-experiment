@@ -1,19 +1,61 @@
+# ---------- Build stage ----------
+FROM ubuntu:latest AS builder
+
+ARG FACETEC_SDK_VERSION
+RUN if [ -z "$FACETEC_SDK_VERSION" ]; then (echo "FACETEC_SDK_VERSION must be provided as a --build-arg"; exit 1); fi
+
+# FaceTec Directories
+ARG FACETEC_CUSTOM_SERVER_DIRECTORY=./FaceTec-Server-Webservice/FaceTec-Server-Webservice-$FACETEC_SDK_VERSION
+ARG FACETEC_SERVER_CORE_DIRECTORY=./FaceTec-Server-Webservice/FaceTecSDK-Server-Core-$FACETEC_SDK_VERSION
+ARG FACETEC_OCR_TEMPLATES=./FaceTec-Server-Webservice/FaceTec-Server-Webservice-$FACETEC_SDK_VERSION/OCRTemplates
+ARG FACETEC_USAGE_LOGS_DIRECTORY=./FaceTec-Usage-Log-Server
+
+# Install build dependencies (Java + Maven + Node.js + libs)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    default-jdk \
+    libgomp1 \
+    maven \
+    libavcodec-dev libavutil-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY $FACETEC_SERVER_CORE_DIRECTORY /home/FaceTec_Server_Core
+RUN mvn install:install-file -Dfile=/home/FaceTec_Server_Core/libs/FaceTecSDK-Server-Core-$FACETEC_SDK_VERSION.jar -DgroupId=com.facetec.servercore -DartifactId=server -Dversion=$FACETEC_SDK_VERSION -Dpackaging=jar
+
+# Setup & build FaceTec Custom Server
+COPY ./$FACETEC_CUSTOM_SERVER_DIRECTORY/deploy /home/FaceTec_Server/deploy
+COPY ./$FACETEC_CUSTOM_SERVER_DIRECTORY/src /home/FaceTec_Server/src
+COPY ./$FACETEC_CUSTOM_SERVER_DIRECTORY/pom.xml /home/FaceTec_Server/pom.xml
+COPY ./$FACETEC_CUSTOM_SERVER_DIRECTORY/generate-compile-command.sh /home/FaceTec_Server/deploy/generate-compile-command.sh
+COPY ./$FACETEC_CUSTOM_SERVER_DIRECTORY/config.yaml /home/FaceTec_Server/deploy/config.yaml
+
+# Disable storing audit trail images to reduce storage requirements
+RUN sed -i 's#faceScanRequest.auditTrailImage.getBase64()#""#' /home/FaceTec_Server/src/main/java/com/facetec/facetecserver/database/MongoDatabase.java
+RUN sed -i 's#faceScanRequest.lowQualityAuditTrailImage.getBase64()#""#' /home/FaceTec_Server/src/main/java/com/facetec/facetecserver/database/MongoDatabase.java
+
+WORKDIR /home/FaceTec_Server/deploy
+RUN bash generate-compile-command.sh
+RUN bash compile.sh
+RUN printf "#!/bin/bash\njava -cp /home/FaceTec_Server_Core/libs/FaceTecSDK-Server-Core-$FACETEC_SDK_VERSION.jar:FaceTec-Server-Webservice.jar com.facetec.facetecserver.app.App" > facetec_run.ash
+
+# ---------- Runtime stage ----------
 FROM ubuntu:latest
 
 ARG FACETEC_SDK_VERSION
 RUN if [ -z "$FACETEC_SDK_VERSION" ]; then (echo "FACETEC_SDK_VERSION must be provided as a --build-arg"; exit 1); fi
 
 # FaceTec Directories
-ARG FACETEC_CUSTOM_SERVER_DIRECTORY=./FaceTecSDK-custom-server-$FACETEC_SDK_VERSION
-ARG FACETEC_SERVER_CORE_DIRECTORY=./FaceTecSDK-server-core-java-$FACETEC_SDK_VERSION
+ARG FACETEC_CUSTOM_SERVER_DIRECTORY=./FaceTec-Server-Webservice/FaceTec-Server-Webservice-$FACETEC_SDK_VERSION
+ARG FACETEC_SERVER_CORE_DIRECTORY=./FaceTec-Server-Webservice/FaceTecSDK-Server-Core-$FACETEC_SDK_VERSION
+ARG FACETEC_OCR_TEMPLATES=./FaceTec-Server-Webservice/FaceTec-Server-Webservice-$FACETEC_SDK_VERSION/OCRTemplates
+ARG FACETEC_USAGE_LOGS_DIRECTORY=./FaceTec-Usage-Log-Server
 
 # Install dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends --no-install-suggests \
     curl \
-    default-jdk \
     iproute2 \
+    default-jdk \
     libgomp1 \
-    maven \
+    libavcodec-dev libavutil-dev \
     net-tools \
     nodejs \
     npm \
@@ -45,38 +87,37 @@ RUN apt-get update && apt-get install -y \
     && apt-get install -y caddy \
     && rm -rf /var/lib/apt/lists/*
 
-COPY $FACETEC_CUSTOM_SERVER_DIRECTORY /home/FaceTec_Custom_Server
-COPY $FACETEC_SERVER_CORE_DIRECTORY /home/FaceTec_Server_Core
-COPY ./OCRTemplates /home/OCRTemplates
+# Setup & build FaceTec Server Core
+COPY $FACETEC_OCR_TEMPLATES /home/OCRTemplates
+COPY --from=builder /home/FaceTec_Server/deploy /home/FaceTec_Server/deploy
+COPY --from=builder /home/FaceTec_Server_Core /home/FaceTec_Server_Core
 
-# FaceTec mongo storage modifications (don't store face images, just empty strings)
-RUN sed -i 's#faceScanRequest.auditTrailImage.getBase64()#""#' /home/FaceTec_Custom_Server/src/main/java/com/facetec/customserver/database/MongoDatabase.java
-RUN sed -i 's#faceScanRequest.lowQualityAuditTrailImage.getBase64()#""#' /home/FaceTec_Custom_Server/src/main/java/com/facetec/customserver/database/MongoDatabase.java
+WORKDIR /home/FaceTec_Server/deploy
 
-RUN mvn install:install-file -Dfile=/home/FaceTec_Server_Core/libs/FaceTecSDK-$FACETEC_SDK_VERSION.jar -DgroupId=com.facetec.servercore -DartifactId=server -Dversion=$FACETEC_SDK_VERSION -Dpackaging=jar
-RUN mvn -f /home/FaceTec_Custom_Server/pom.xml clean package -Plinux
+# Usage logs nodejs service
+COPY $FACETEC_USAGE_LOGS_DIRECTORY ./usage_logs_server
+RUN cd ./usage_logs_server && npm install
 
-RUN cp /home/FaceTec_Custom_Server/config.yaml /home/FaceTec_Custom_Server/deploy
-COPY ./facetec_usage_logs_server/package.json /home/FaceTec_Custom_Server/deploy/facetec_usage_logs_server/package.json
-COPY ./facesign-service/ /home/FaceTec_Custom_Server/deploy/facesign-service/
-COPY ./ecosystem.config.js /home/FaceTec_Custom_Server/deploy/ecosystem.config.js
+# Replace IP address for logs.facetec.com so we can resolve it via /etc/hosts
+RUN sed -i 's/54.70.182.147/logs.facetec.com/' ./usage_logs_server/utils/logUploader.js
 
-WORKDIR /home/FaceTec_Custom_Server/deploy
-RUN cd ./facetec_usage_logs_server && npm install
-RUN cd ./facesign-service && npm install
+# FaceSign nodejs service
+COPY ./facesign-service ./facesign_service
+RUN cd ./facesign_service && npm install
+
+# FaceSign configuration
+RUN sed -i 's#export const MONGO_URI = "INSERT YOUR MONGO URL HERE";#export const MONGO_URI = "mongodb://root:password@'$MONGO_HOST':27017/?retryWrites=false"#' ./facesign_service/env.js
+
+COPY ./ecosystem.config.js ./
+RUN npm install -g pm2
 
 ARG AWS_KMS_SECRETS_KEY_ID
 RUN if [ -z "$AWS_KMS_SECRETS_KEY_ID" ]; then (echo "AWS_KMS_SECRETS_KEY_ID must be provided as a --build-arg"; exit 1); fi
-RUN echo $AWS_KMS_SECRETS_KEY_ID > /home/FaceTec_Custom_Server/deploy/secrets_key.arn
+RUN echo $AWS_KMS_SECRETS_KEY_ID > ./secrets_key.arn
 
 ARG AWS_KMS_SECRETS_FACETEC_KEY_ID
 RUN if [ -z "$AWS_KMS_SECRETS_FACETEC_KEY_ID" ]; then (echo "AWS_KMS_SECRETS_FACETEC_KEY_ID must be provided as a --build-arg"; exit 1); fi
-RUN echo $AWS_KMS_SECRETS_FACETEC_KEY_ID > /home/FaceTec_Custom_Server/deploy/secrets_facetec_key.arn
-
-RUN npm install -g pm2
-
-COPY ./facetec_usage_logs_server/ /home/FaceTec_Custom_Server/deploy/facetec_usage_logs_server/
-RUN sed -i 's/54.70.182.147/logs.facetec.com/' /home/FaceTec_Custom_Server/deploy/facetec_usage_logs_server/utils/logUploader.js
+RUN echo $AWS_KMS_SECRETS_FACETEC_KEY_ID > ./secrets_facetec_key.arn
 
 COPY authorized_keys /root/.ssh/authorized_keys
 COPY docker-run.sh ./run.sh
@@ -100,23 +141,23 @@ RUN echo "127.0.0.5 nitro-enclave-hello-secrets.s3-eu-west-1.amazonaws.com" | te
 # Let's encrypt acme lookup
 RUN echo "127.0.0.6 acme-v02.api.letsencrypt.org" | tee -a /root/extra_hosts
 
-# FaceSign configuration
-RUN sed -i 's#export const MONGO_URI = "INSERT YOUR MONGO URL HERE";#export const MONGO_URI = "mongodb://root:password@'$MONGO_HOST':27017/?retryWrites=false"#' /home/FaceTec_Custom_Server/deploy/facesign-service/env.js
-
 # FaceTec Server configuration
-RUN sed -i 's#uri: INSERT YOUR MONGO URL HERE#uri: "mongodb://root:password@'$MONGO_HOST':27017/"#' /home/FaceTec_Custom_Server/deploy/config.yaml
-RUN sed -i 's#serverPort: 8080#serverPort: 5000#' /home/FaceTec_Custom_Server/deploy/config.yaml
-RUN sed -i 's#enableSearch: false#enableSearch: true#' /home/FaceTec_Custom_Server/deploy/config.yaml
-RUN sed -i 's#search3D3DDatabaseRootDirectory: .*#search3D3DDatabaseRootDirectory: /mnt/encrypted/facetec/3d-db#' /home/FaceTec_Custom_Server/deploy/config.yaml
-RUN sed -i 's#search3D3DDatabaseExportRootDirectory: .*#search3D3DDatabaseExportRootDirectory: /mnt/encrypted/facetec/3d-db-export#' /home/FaceTec_Custom_Server/deploy/config.yaml
-RUN sed -i 's#search3D3DOneEyeCoveredDatabaseRootDirectory: .*#search3D3DOneEyeCoveredDatabaseRootDirectory: /mnt/encryped/facetec/3d-db-eye-covered' /home/FaceTec_Custom_Server/deploy/config.yaml
-RUN sed -i 's#search3D2DFacePortraitDatabaseRootDirectory: .*#search3D3DDatabaseRootDirectory: /mnt/encrypted/facetec/3d-db-face-portrait#' /home/FaceTec_Custom_Server/deploy/config.yaml
-RUN sed -i 's#search3D2DKioskPOSDatabaseRootDirectory: .*#search3D3DDatabaseRootDirectory: /mnt/encrypted/facetec/3d-2d-kiosk#' /home/FaceTec_Custom_Server/deploy/config.yaml
-RUN sed -i 's#search2D2DIDScanPhotoDatabaseRootDirectory: .*#search3D3DDatabaseRootDirectory: /mnt/encrypted/facetec/2d-2d-id-scan#' /home/FaceTec_Custom_Server/deploy/config.yaml
+RUN sed -i 's#uri: INSERT YOUR MONGO URL HERE#uri: "mongodb://root:password@'$MONGO_HOST':27017/"#' ./config.yaml
+RUN sed -i 's#serverPort: 8080#serverPort: 5000#' ./config.yaml
+RUN sed -i 's#usageLogServerUri: .*#usageLogServerUri: "http://127.0.0.1:3000"#' ./config.yaml
+RUN sed -i 's#enableSearch: false#enableSearch: true#' ./config.yaml
+RUN sed -i 's#search3D3DDatabaseRootDirectory: .*#search3D3DDatabaseRootDirectory: /mnt/encrypted/facetec/search-3d-3d-database#' ./config.yaml
+RUN sed -i 's#search3D3DDatabaseExportRootDirectory: .*#search3D3DDatabaseExportRootDirectory: /mnt/encrypted/facetec/search-3d-3d-database-export#' ./config.yaml
+RUN sed -i 's#search3D3DOneEyeCoveredDatabaseRootDirectory: .*#search3D3DOneEyeCoveredDatabaseRootDirectory: /mnt/encrypted/facetec/search-3d-3d-eye-covered#' ./config.yaml
+RUN sed -i 's#search3D2DFacePortraitDatabaseRootDirectory: .*#search3D2DFacePortraitDatabaseRootDirectory: /mnt/encrypted/facetec/search-3d-2d-face-portrait#' ./config.yaml
+RUN sed -i 's#search3D2DKioskPOSDatabaseRootDirectory: .*#search3D2DKioskPOSDatabaseRootDirectory: /mnt/encrypted/facetec/search-3d-2d-kiosk#' ./config.yaml
+RUN sed -i 's#search2D2DIDScanPhotoDatabaseRootDirectory: .*#search2D2DIDScanPhotoDatabaseRootDirectory: /mnt/encrypted/facetec/search-2d-2d-id-scan#' ./config.yaml
+RUN sed -i 's#search2D2DProfilePicDatabaseRootDirectory: .*#search2D2DProfilePicDatabaseRootDirectory: /mnt/encrypted/facetec/search-2d-2d-profile#' ./config.yaml
+RUN sed -i 's#search2D2DFacePortraitDatabaseRootDirectory: .*#search2D2DFacePortraitDatabaseRootDirectory: /mnt/encrypted/facetec/search-2d-2d-face-portrait#' ./config.yaml
 
 # FaceTec Usage Logs configuration
-RUN echo "usageLogsDirectory: /mnt/encrypted/usage-logs" >> /home/FaceTec_Custom_Server/deploy/facetec_usage_logs_server/config.yml
+RUN sed -i "s#usageLogsDirectory: .*#usageLogsDirectory: /mnt/encrypted/usage-logs#" ./usage_logs_server/config.yml
 
 EXPOSE 8080
 
-CMD ["/bin/bash", "/home/FaceTec_Custom_Server/deploy/boot.ash"]
+CMD ["/bin/bash", "/home/FaceTec_Server/deploy/boot.ash"]

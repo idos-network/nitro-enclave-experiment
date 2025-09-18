@@ -19,7 +19,7 @@ if [ "${MONGO_HOST:-null}" = "null" ]; then
 fi
 
 # Get the FaceTec SDK version
-FACETEC_SDK_VERSION="$(find ~ec2-user/custom-server/ -name 'FaceTecSDK-custom-server-*' | sed -E 's#.*/FaceTecSDK-custom-server-([[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+)#\1#')"
+FACETEC_SDK_VERSION="$(find ~ec2-user/custom-server/ -name 'FaceTecSDK-Server-Core-*.jar' | sed -E 's#.*/FaceTecSDK-Server-Core-([[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+).jar#\1#')"
 AWS_KMS_SECRETS_KEY_ID="$(aws kms describe-key --key-id alias/secretsEncryption --query 'KeyMetadata.Arn' --output text --region eu-west-1)"
 AWS_KMS_SECRETS_FACETEC_KEY_ID="$(aws kms describe-key --key-id alias/secretsFacetecEncryption --query 'KeyMetadata.Arn' --output text --region eu-west-1)"
 

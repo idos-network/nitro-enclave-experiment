@@ -8,7 +8,7 @@
         - No debug logging
         - SFTP usage logs
         - No postman init
-2. On `facetec-sdk/facetec_usage_logs_server/config.yml`, set the `sftpConfig.privateKey` field to the right key (that needs to have been configured in FaceTec beforehand).
+2. On `facetec-sdk/FaceTec-Usage-Log-Server/config.yml`, set the `sftpConfig.privateKey` field to the right key (that needs to have been configured in FaceTec beforehand).
 2. Add your ssh key to `terraform/terraform.tfvars`.
 2. Apply the terraform in the `terraform` folder. You'll need to `aws configure sso` and choose the `nitro-enclave` account.
 3. Run `bash sync_instance.sh` from root dir.
