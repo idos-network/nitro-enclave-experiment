@@ -37,7 +37,7 @@ resource "aws_security_group" "docdb_sg" {
 resource "random_password" "docdb_password" {
   length           = 32
   special          = true
-  override_special = "!#$%&*()-_=+[]{}<>:?" # Only allowed special characters in DocumentDB
+  override_special = "_-"
 }
 
 resource "random_string" "docdb_username" {
@@ -95,7 +95,7 @@ resource "aws_docdb_cluster_instance" "docdb_instances" {
 resource "aws_s3_object" "docdb_connection_string" {
   bucket                 = aws_s3_bucket.secrets.id
   key                    = "mongodb_uri.txt"
-  content                = "mongodb://${random_string.docdb_username.result}:${random_password.docdb_password.result}@${aws_docdb_cluster.docdb.endpoint}:${aws_docdb_cluster.docdb.port}/?tls=true&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false"
+  content                = "mongodb://${random_string.docdb_username.result}:${random_password.docdb_password.result}@${aws_docdb_cluster.docdb.endpoint}:${aws_docdb_cluster.docdb.port}/?retryWrites=false"
   server_side_encryption = "AES256"
 
   tags = {
