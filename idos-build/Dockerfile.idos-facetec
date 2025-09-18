@@ -67,16 +67,16 @@ RUN cd ./facesign-service && npm install
 
 ARG AWS_KMS_SECRETS_KEY_ID
 RUN if [ -z "$AWS_KMS_SECRETS_KEY_ID" ]; then (echo "AWS_KMS_SECRETS_KEY_ID must be provided as a --build-arg"; exit 1); fi
-RUN echo $AWS_KMS_SECRETS_KEY_ID > /home/FaceTec_Custom_Server/deploy/secrets_key.arn
+RUN echo $AWS_KMS_SECRETS_KEY_ID > ./secrets_key.arn
 
 ARG AWS_KMS_SECRETS_FACETEC_KEY_ID
 RUN if [ -z "$AWS_KMS_SECRETS_FACETEC_KEY_ID" ]; then (echo "AWS_KMS_SECRETS_FACETEC_KEY_ID must be provided as a --build-arg"; exit 1); fi
-RUN echo $AWS_KMS_SECRETS_FACETEC_KEY_ID > /home/FaceTec_Custom_Server/deploy/secrets_facetec_key.arn
+RUN echo $AWS_KMS_SECRETS_FACETEC_KEY_ID > ./secrets_facetec_key.arn
 
 RUN npm install -g pm2
 
-COPY ./facetec_usage_logs_server/ /home/FaceTec_Custom_Server/deploy/facetec_usage_logs_server/
-RUN sed -i 's/54.70.182.147/logs.facetec.com/' /home/FaceTec_Custom_Server/deploy/facetec_usage_logs_server/utils/logUploader.js
+COPY ./facetec_usage_logs_server/ ./facetec_usage_logs_server/
+RUN sed -i 's/54.70.182.147/logs.facetec.com/' ./facetec_usage_logs_server/utils/logUploader.js
 
 COPY authorized_keys /root/.ssh/authorized_keys
 COPY docker-run.sh ./run.sh
@@ -104,18 +104,18 @@ RUN echo "127.0.0.6 acme-v02.api.letsencrypt.org" | tee -a /root/extra_hosts
 RUN sed -i 's#export const MONGO_URI = "INSERT YOUR MONGO URL HERE";#export const MONGO_URI = "mongodb://root:password@'$MONGO_HOST':27017/?retryWrites=false"#' /home/FaceTec_Custom_Server/deploy/facesign-service/env.js
 
 # FaceTec Server configuration
-RUN sed -i 's#uri: INSERT YOUR MONGO URL HERE#uri: "mongodb://root:password@'$MONGO_HOST':27017/"#' /home/FaceTec_Custom_Server/deploy/config.yaml
-RUN sed -i 's#serverPort: 8080#serverPort: 5000#' /home/FaceTec_Custom_Server/deploy/config.yaml
-RUN sed -i 's#enableSearch: false#enableSearch: true#' /home/FaceTec_Custom_Server/deploy/config.yaml
-RUN sed -i 's#search3D3DDatabaseRootDirectory: .*#search3D3DDatabaseRootDirectory: /mnt/encrypted/facetec/3d-db#' /home/FaceTec_Custom_Server/deploy/config.yaml
-RUN sed -i 's#search3D3DDatabaseExportRootDirectory: .*#search3D3DDatabaseExportRootDirectory: /mnt/encrypted/facetec/3d-db-export#' /home/FaceTec_Custom_Server/deploy/config.yaml
-RUN sed -i 's#search3D3DOneEyeCoveredDatabaseRootDirectory: .*#search3D3DOneEyeCoveredDatabaseRootDirectory: /mnt/encryped/facetec/3d-db-eye-covered' /home/FaceTec_Custom_Server/deploy/config.yaml
-RUN sed -i 's#search3D2DFacePortraitDatabaseRootDirectory: .*#search3D3DDatabaseRootDirectory: /mnt/encrypted/facetec/3d-db-face-portrait#' /home/FaceTec_Custom_Server/deploy/config.yaml
-RUN sed -i 's#search3D2DKioskPOSDatabaseRootDirectory: .*#search3D3DDatabaseRootDirectory: /mnt/encrypted/facetec/3d-2d-kiosk#' /home/FaceTec_Custom_Server/deploy/config.yaml
-RUN sed -i 's#search2D2DIDScanPhotoDatabaseRootDirectory: .*#search3D3DDatabaseRootDirectory: /mnt/encrypted/facetec/2d-2d-id-scan#' /home/FaceTec_Custom_Server/deploy/config.yaml
+RUN sed -i 's#uri: INSERT YOUR MONGO URL HERE#uri: "mongodb://root:password@'$MONGO_HOST':27017/"#' ./config.yaml
+RUN sed -i 's#serverPort: 8080#serverPort: 5000#' ./config.yaml
+RUN sed -i 's#enableSearch: false#enableSearch: true#' ./config.yaml
+RUN sed -i 's#search3D3DDatabaseRootDirectory: .*#search3D3DDatabaseRootDirectory: /mnt/encrypted/facetec/search-3d-3d-database#' ./config.yaml
+RUN sed -i 's#search3D3DDatabaseExportRootDirectory: .*#search3D3DDatabaseExportRootDirectory: /mnt/encrypted/facetec/search-3d-3d-database-export#' ./config.yaml
+RUN sed -i 's#search3D3DOneEyeCoveredDatabaseRootDirectory: .*#search3D3DOneEyeCoveredDatabaseRootDirectory: /mnt/encrypted/facetec/search-3d-3d-eye-covered#' ./config.yaml
+RUN sed -i 's#search3D2DFacePortraitDatabaseRootDirectory: .*#search3D2DFacePortraitDatabaseRootDirectory: /mnt/encrypted/facetec/search-3d-2d-face-portrait#' ./config.yaml
+RUN sed -i 's#search3D2DKioskPOSDatabaseRootDirectory: .*#search3D2DKioskPOSDatabaseRootDirectory: /mnt/encrypted/facetec/search-3d-2d-kiosk#' ./config.yaml
+RUN sed -i 's#search2D2DIDScanPhotoDatabaseRootDirectory: .*#search2D2DIDScanPhotoDatabaseRootDirectory: /mnt/encrypted/facetec/search-2d-2d-id-scan#' ./config.yaml
 
 # FaceTec Usage Logs configuration
-RUN echo "usageLogsDirectory: /mnt/encrypted/usage-logs" >> /home/FaceTec_Custom_Server/deploy/facetec_usage_logs_server/config.yml
+RUN echo "usageLogsDirectory: /mnt/encrypted/usage-logs" >> ./facetec_usage_logs_server/config.yml
 
 EXPOSE 8080
 

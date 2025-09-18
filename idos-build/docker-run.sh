@@ -109,14 +109,15 @@ mkdir /mnt/encrypted
 mount /dev/mapper/encrypted_disk /mnt/encrypted
 
 # Ensure there are 3d-db and logs directories
-if [ ! -d /mnt/encrypted/facetec/3d-db ]; then
+if [ ! -d /mnt/encrypted/facetec/search-3d-3d-database ]; then
   echo "Creating /mnt/encrypted/facetec directories..."
-  mkdir -p /mnt/encrypted/facetec/3d-db
-  mkdir -p /mnt/encrypted/facetec/3d-db-export
-  mkdir -p /mnt/encryped/facetec/3d-db-eye-covered
-  mkdir -p /mnt/encrypted/facetec/3d-db-face-portrait
-  mkdir -p /mnt/encrypted/facetec/3d-2d-kiosk
-  mkdir -p /mnt/encrypted/facetec/2d-2d-id-scan
+  mkdir -p \
+      /mnt/encrypted/facetec/search-3d-3d-database \
+      /mnt/encrypted/facetec/search-3d-3d-database-export \
+      /mnt/encrypted/facetec/search-3d-3d-eye-covered \
+      /mnt/encrypted/facetec/search-3d-2d-face-portrait \
+      /mnt/encrypted/facetec/search-3d-2d-kiosk \
+      /mnt/encrypted/facetec/search-2d-2d-id-scan
 
   # Running repopulate?!
   # node facesign-service/repopulate.js
