@@ -20,7 +20,8 @@ fi
 
 # Get the FaceTec SDK version
 FACETEC_SDK_VERSION="$(find ~ec2-user/custom-server/ -name 'FaceTecSDK-custom-server-*' | sed -E 's#.*/FaceTecSDK-custom-server-([[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+)#\1#')"
-AWS_KMS_KEY_ID="$(aws kms describe-key --key-id alias/secretsEncryption --query 'KeyMetadata.Arn' --output text --region eu-west-1)"
+AWS_KMS_SECRETS_KEY_ID="$(aws kms describe-key --key-id alias/secretsEncryption --query 'KeyMetadata.Arn' --output text --region eu-west-1)"
+AWS_KMS_SECRETS_FACETEC_KEY_ID="$(aws kms describe-key --key-id alias/secretsFacetecEncryption --query 'KeyMetadata.Arn' --output text --region eu-west-1)"
 
 sudo cp ~ec2-user/.ssh/authorized_keys ~ec2-user/custom-server/
 sudo chown ec2-user:ec2-user ~ec2-user/custom-server/authorized_keys
@@ -29,7 +30,8 @@ sudo chown ec2-user:ec2-user ~ec2-user/custom-server/authorized_keys
 docker build \
     --build-arg MONGO_HOST="$MONGO_HOST" \
     --build-arg FACETEC_SDK_VERSION="$FACETEC_SDK_VERSION" \
-    --build-arg AWS_KMS_KEY_ID="$AWS_KMS_KEY_ID" \
+    --build-arg AWS_KMS_SECRETS_KEY_ID="$AWS_KMS_SECRETS_KEY_ID" \
+    --build-arg AWS_KMS_SECRETS_FACETEC_KEY_ID="$AWS_KMS_SECRETS_FACETEC_KEY_ID" \
     -t "$TARGET_DOCKER_IMAGE" \
     -f ~ec2-user/custom-server/Dockerfile."$TARGET_DOCKER_IMAGE" \
     ~ec2-user/custom-server/ \

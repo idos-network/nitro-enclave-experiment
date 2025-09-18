@@ -42,8 +42,8 @@ done
 
 cd /home/FaceTec_Custom_Server/deploy
 
-# Ensure the key
-AWS_KMS_KEY_ID="$(cat ./secrets_key.arn)"
+echo "Fetching AWS luks password key from S3"
+AWS_KMS_SECRETS_KEY_ID="$(cat ./secrets_key.arn)"
 ENC_FILE=luks_password.enc
 PLAIN_FILE=luks_password.txt
 
@@ -51,12 +51,41 @@ aws s3 cp "s3://nitro-enclave-hello-secrets/$ENC_FILE" "$ENC_FILE" --region eu-w
 
 if [ ! -f "$ENC_FILE" ]; then
   echo "Couldn't download luks_password.enc from S3, generating a new one"
-  aws kms encrypt --key-id "$AWS_KMS_KEY_ID" --plaintext "$(openssl rand -hex 64)" --output text --query CiphertextBlob --region eu-west-1 > "$ENC_FILE"
+  aws kms encrypt --key-id "$AWS_KMS_SECRETS_KEY_ID" --plaintext "$(openssl rand -hex 64)" --output text --query CiphertextBlob --region eu-west-1 > "$ENC_FILE"
   aws s3 cp "$ENC_FILE" "s3://nitro-enclave-hello-secrets/$ENC_FILE" --region eu-west-1
 fi
 
-# Decrypt the key
+echo "Decrypting AWS luks password key"
 aws kms decrypt --ciphertext-blob "$(cat $ENC_FILE)" --output text --query Plaintext --region eu-west-1 > "$PLAIN_FILE"
+
+echo "Fetching facetec private key from S3"
+AWS_KMS_SECRETS_FACETEC_KEY_ID="$(cat ./secrets_facetec_key.arn)"
+FACETEC_PRIVATE_ENC_FILE=facetec_private_key.pem.enc
+FACETEC_PRIVATE_PLAIN_FILE=facetec_private_key.pem
+FACETEC_PUBLIC_FILE=facetec_public_key.pem
+
+aws s3 cp "s3://nitro-enclave-hello-secrets/$FACETEC_PRIVATE_ENC_FILE" "$FACETEC_PRIVATE_ENC_FILE" --region eu-west-1 2>aws_s3_cp_error.log || true
+if [ ! -f "$FACETEC_PRIVATE_ENC_FILE" ]; then
+  echo "Couldn't download facetec_private_key.pem.enc from S3, creating a new one"
+  openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 | openssl pkcs8 -topk8 -nocrypt &> "$FACETEC_PRIVATE_PLAIN_FILE"
+  openssl pkey -in "$FACETEC_PRIVATE_PLAIN_FILE" -pubout -out "$FACETEC_PUBLIC_FILE"
+
+  echo "Encrypting them with AWS KMS"
+  aws kms encrypt --key-id "$AWS_KMS_SECRETS_FACETEC_KEY_ID" --plaintext fileb://$FACETEC_PRIVATE_PLAIN_FILE --output text --query CiphertextBlob --region eu-west-1 > "$FACETEC_PRIVATE_ENC_FILE"
+  aws s3 cp "$FACETEC_PRIVATE_ENC_FILE" "s3://nitro-enclave-hello-secrets/$FACETEC_PRIVATE_ENC_FILE" --region eu-west-1
+  aws s3 cp "$FACETEC_PUBLIC_FILE" "s3://nitro-enclave-hello-secrets/$FACETEC_PUBLIC_FILE" --region eu-west-1
+  rm $FACETEC_PRIVATE_PLAIN_FILE
+  rm $FACETEC_PUBLIC_FILE
+fi
+
+echo "Decrypting facetec private key"
+aws kms decrypt --ciphertext-blob "$(cat $FACETEC_PRIVATE_ENC_FILE)" --output text --query Plaintext --region eu-west-1 | base64 -d > "$FACETEC_PRIVATE_PLAIN_FILE"
+
+# Public facetec sdk key is stored unencrypted in the bucket
+aws s3 cp "s3://nitro-enclave-hello-secrets/$FACETEC_PUBLIC_FILE" "/home/FaceTec_Custom_Server/deploy/facesign-service/$FACETEC_PUBLIC_FILE" --region eu-west-1
+
+# Replace facetec encryption private key in facetec service
+sed -i "s|^faceMapEncryptionKey:.*|faceMapEncryptionKey: \"$(tr -d '\n' < "$FACETEC_PRIVATE_PLAIN_FILE")\"|" /home/FaceTec_Custom_Server/deploy/config.yaml
 
 if cryptsetup isLuks /dev/nbd0; then
   echo "/dev/nbd0 is luks already, continuing..."
@@ -95,6 +124,7 @@ fi
 
 echo "Ensure folder exists for caddy"
 mkdir -p /mnt/encrypted/caddy
+mkdir -p  /mnt/encrypted/caddy/acme/acme-staging-v02.api.letsencrypt.org-directory/users/deployers@idos.network/
 
 echo "Running PM2-runtime"
 export HOME=/home/FaceTec_Custom_Server

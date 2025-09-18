@@ -60,9 +60,13 @@ WORKDIR /home/FaceTec_Custom_Server/deploy
 RUN cd ./facetec_usage_logs_server && npm install
 RUN cd ./facesign-service && npm install
 
-ARG AWS_KMS_KEY_ID
-RUN if [ -z "$AWS_KMS_KEY_ID" ]; then (echo "AWS_KMS_KEY_ID must be provided as a --build-arg"; exit 1); fi
-RUN echo $AWS_KMS_KEY_ID > /home/FaceTec_Custom_Server/deploy/secrets_key.arn
+ARG AWS_KMS_SECRETS_KEY_ID
+RUN if [ -z "$AWS_KMS_SECRETS_KEY_ID" ]; then (echo "AWS_KMS_SECRETS_KEY_ID must be provided as a --build-arg"; exit 1); fi
+RUN echo $AWS_KMS_SECRETS_KEY_ID > /home/FaceTec_Custom_Server/deploy/secrets_key.arn
+
+ARG AWS_KMS_SECRETS_FACETEC_KEY_ID
+RUN if [ -z "$AWS_KMS_SECRETS_FACETEC_KEY_ID" ]; then (echo "AWS_KMS_SECRETS_FACETEC_KEY_ID must be provided as a --build-arg"; exit 1); fi
+RUN echo $AWS_KMS_SECRETS_FACETEC_KEY_ID > /home/FaceTec_Custom_Server/deploy/secrets_facetec_key.arn
 
 RUN npm install -g pm2
 
