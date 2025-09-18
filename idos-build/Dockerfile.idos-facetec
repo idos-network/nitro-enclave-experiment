@@ -55,7 +55,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends --no-install-su
     iproute2 \
     default-jdk \
     libgomp1 \
-    libavcodec-dev libavutil-dev \
+    libavcodec-dev \
+    libavutil-dev \
+    maven \
     net-tools \
     nodejs \
     npm \
