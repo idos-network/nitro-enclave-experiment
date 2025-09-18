@@ -40,7 +40,7 @@ while [ "$(cat /sys/block/nbd0/size)" -eq 0 ]; do
   sleep 0.5
 done
 
-cd /home/FaceTec_Custom_Server/deploy
+cd /home/FaceTec_Server/deploy
 
 echo "Fetching AWS luks password key from S3"
 AWS_KMS_SECRETS_KEY_ID="$(cat ./secrets_key.arn)"
@@ -82,10 +82,10 @@ echo "Decrypting facetec private key"
 aws kms decrypt --ciphertext-blob "$(cat $FACETEC_PRIVATE_ENC_FILE)" --output text --query Plaintext --region eu-west-1 | base64 -d > "$FACETEC_PRIVATE_PLAIN_FILE"
 
 # Public facetec sdk key is stored unencrypted in the bucket
-aws s3 cp "s3://nitro-enclave-hello-secrets/$FACETEC_PUBLIC_FILE" "/home/FaceTec_Custom_Server/deploy/facesign-service/$FACETEC_PUBLIC_FILE" --region eu-west-1
+aws s3 cp "s3://nitro-enclave-hello-secrets/$FACETEC_PUBLIC_FILE" "/home/FaceTec_Server/deploy/facesign_service/$FACETEC_PUBLIC_FILE" --region eu-west-1
 
 # Replace facetec encryption private key in facetec service
-sed -i "s|^faceMapEncryptionKey:.*|faceMapEncryptionKey: \"$(tr -d '\n' < "$FACETEC_PRIVATE_PLAIN_FILE")\"|" /home/FaceTec_Custom_Server/deploy/config.yaml
+sed -i "s|^faceMapEncryptionKey:.*|faceMapEncryptionKey: \"$(tr -d '\n' < "$FACETEC_PRIVATE_PLAIN_FILE")\"|" /home/FaceTec_Server/deploy/config.yaml
 
 if cryptsetup isLuks /dev/nbd0; then
   echo "/dev/nbd0 is luks already, continuing..."
@@ -109,14 +109,17 @@ mkdir /mnt/encrypted
 mount /dev/mapper/encrypted_disk /mnt/encrypted
 
 # Ensure there are 3d-db and logs directories
-if [ ! -d /mnt/encrypted/facetec/3d-db ]; then
+if [ ! -d /mnt/encrypted/facetec/search-3d-3d-database ]; then
   echo "Creating /mnt/encrypted/facetec directories..."
-  mkdir -p /mnt/encrypted/facetec/3d-db
-  mkdir -p /mnt/encrypted/facetec/3d-db-export
-  mkdir -p /mnt/encryped/facetec/3d-db-eye-covered
-  mkdir -p /mnt/encrypted/facetec/3d-db-face-portrait
-  mkdir -p /mnt/encrypted/facetec/3d-2d-kiosk
-  mkdir -p /mnt/encrypted/facetec/2d-2d-id-scan
+  mkdir -p \
+      /mnt/encrypted/facetec/search-3d-3d-database \
+      /mnt/encrypted/facetec/search-3d-3d-database-export \
+      /mnt/encrypted/facetec/search-3d-3d-eye-covered \
+      /mnt/encrypted/facetec/search-3d-2d-face-portrait \
+      /mnt/encrypted/facetec/search-3d-2d-kiosk \
+      /mnt/encrypted/facetec/search-2d-2d-id-scan \
+      /mnt/encrypted/facetec/search-2d-2d-profile \
+      /mnt/encrypted/facetec/search-2d-2d-face-portrait
 
   # Running repopulate?!
   # node facesign-service/repopulate.js
@@ -132,5 +135,5 @@ mkdir -p /mnt/encrypted/caddy
 mkdir -p  /mnt/encrypted/caddy/acme/acme-staging-v02.api.letsencrypt.org-directory/users/deployers@idos.network/
 
 echo "Running PM2-runtime"
-export HOME=/home/FaceTec_Custom_Server
+export HOME=/home/FaceTec_Server/deploy/
 pm2-runtime ecosystem.config.js
