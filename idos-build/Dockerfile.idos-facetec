@@ -100,11 +100,7 @@ RUN echo "127.0.0.5 nitro-enclave-hello-secrets.s3-eu-west-1.amazonaws.com" | te
 # Let's encrypt acme lookup
 RUN echo "127.0.0.6 acme-v02.api.letsencrypt.org" | tee -a /root/extra_hosts
 
-# FaceSign configuration
-RUN sed -i 's#export const MONGO_URI = "INSERT YOUR MONGO URL HERE";#export const MONGO_URI = "mongodb://root:password@'$MONGO_HOST':27017/?retryWrites=false"#' /home/FaceTec_Custom_Server/deploy/facesign-service/env.js
-
 # FaceTec Server configuration
-RUN sed -i 's#uri: INSERT YOUR MONGO URL HERE#uri: "mongodb://root:password@'$MONGO_HOST':27017/"#' ./config.yaml
 RUN sed -i 's#serverPort: 8080#serverPort: 5000#' ./config.yaml
 RUN sed -i 's#enableSearch: false#enableSearch: true#' ./config.yaml
 RUN sed -i 's#search3D3DDatabaseRootDirectory: .*#search3D3DDatabaseRootDirectory: /mnt/encrypted/facetec/search-3d-3d-database#' ./config.yaml

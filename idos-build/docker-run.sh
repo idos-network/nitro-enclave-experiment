@@ -42,6 +42,17 @@ done
 
 cd /home/FaceTec_Custom_Server/deploy
 
+echo "Fetching mongo connection string from secrets"
+aws s3 cp "s3://nitro-enclave-hello-secrets/mongodb_uri.txt" ./mongodb_uri.txt --region eu-west-1
+if [ ! -f ./mongodb_uri.txt ]; then
+  echo "Couldn't download mongodb_uri.txt from S3, exiting"
+  exit 1
+fi
+
+MONGO_URI="$(cat ./mongodb_uri.txt)"
+sed -i "s#export const MONGO_URI = \"INSERT YOUR MONGO URL HERE\";#export const MONGO_URI = \"${MONGO_URI//&/\\&}\";#" ./facesign-service/env.js
+sed -i "s#uri: INSERT YOUR MONGO URL HERE#uri: \"${MONGO_URI//&/\\&}\"#" ./config.yaml
+
 echo "Fetching AWS luks password key from S3"
 AWS_KMS_SECRETS_KEY_ID="$(cat ./secrets_key.arn)"
 ENC_FILE=luks_password.enc

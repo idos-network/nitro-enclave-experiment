@@ -34,12 +34,25 @@ resource "aws_security_group" "docdb_sg" {
   }
 }
 
+resource "random_password" "docdb_password" {
+  length           = 32
+  special          = true
+  override_special = "!#$%&*()-_=+[]{}<>:?" # Only allowed special characters in DocumentDB
+}
+
+resource "random_string" "docdb_username" {
+  length  = 12
+  upper   = true
+  lower   = true
+  special = false
+}
+
 # Create DocumentDB cluster
 resource "aws_docdb_cluster" "docdb" {
   cluster_identifier              = "${var.project_name}-docdb-cluster"
   engine                          = "docdb"
-  master_username                 = var.docdb_username
-  master_password                 = var.docdb_password
+  master_username                 = random_string.docdb_username.result
+  master_password                 = random_password.docdb_password.result
   db_subnet_group_name            = aws_docdb_subnet_group.docdb.name
   vpc_security_group_ids          = [aws_security_group.docdb_sg.id]
   db_cluster_parameter_group_name = aws_docdb_cluster_parameter_group.docdb.name
@@ -79,19 +92,13 @@ resource "aws_docdb_cluster_instance" "docdb_instances" {
   }
 }
 
-# DocumentDB outputs
-output "docdb_endpoint" {
-  description = "Endpoint of the DocumentDB cluster"
-  value       = aws_docdb_cluster.docdb.endpoint
-}
+resource "aws_s3_object" "docdb_connection_string" {
+  bucket                 = aws_s3_bucket.secrets.id
+  key                    = "mongodb_uri.txt"
+  content                = "mongodb://${random_string.docdb_username.result}:${random_password.docdb_password.result}@${aws_docdb_cluster.docdb.endpoint}:${aws_docdb_cluster.docdb.port}/?tls=true&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false"
+  server_side_encryption = "AES256"
 
-output "docdb_port" {
-  description = "Port of the DocumentDB cluster"
-  value       = aws_docdb_cluster.docdb.port
-}
-
-output "docdb_connection_string" {
-  description = "Connection string for DocumentDB"
-  value       = "mongodb://${var.docdb_username}:${var.docdb_password}@${aws_docdb_cluster.docdb.endpoint}:${aws_docdb_cluster.docdb.port}/?tls=true&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false"
-  sensitive   = true
+  tags = {
+    Name = "${var.project_name}-docdb-connection-string"
+  }
 }
