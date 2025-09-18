@@ -48,6 +48,11 @@ RUN apt-get update && apt-get install -y \
 COPY $FACETEC_CUSTOM_SERVER_DIRECTORY /home/FaceTec_Custom_Server
 COPY $FACETEC_SERVER_CORE_DIRECTORY /home/FaceTec_Server_Core
 COPY ./OCRTemplates /home/OCRTemplates
+
+# FaceTec mongo storage modifications (don't store face images, just empty strings)
+RUN sed -i 's#faceScanRequest.auditTrailImage.getBase64()#""#' /home/FaceTec_Custom_Server/src/main/java/com/facetec/customserver/database/MongoDatabase.java
+RUN sed -i 's#faceScanRequest.lowQualityAuditTrailImage.getBase64()#""#' /home/FaceTec_Custom_Server/src/main/java/com/facetec/customserver/database/MongoDatabase.java
+
 RUN mvn install:install-file -Dfile=/home/FaceTec_Server_Core/libs/FaceTecSDK-$FACETEC_SDK_VERSION.jar -DgroupId=com.facetec.servercore -DartifactId=server -Dversion=$FACETEC_SDK_VERSION -Dpackaging=jar
 RUN mvn -f /home/FaceTec_Custom_Server/pom.xml clean package -Plinux
 
@@ -102,12 +107,12 @@ RUN sed -i 's#export const MONGO_URI = "INSERT YOUR MONGO URL HERE";#export cons
 RUN sed -i 's#uri: INSERT YOUR MONGO URL HERE#uri: "mongodb://root:password@'$MONGO_HOST':27017/"#' /home/FaceTec_Custom_Server/deploy/config.yaml
 RUN sed -i 's#serverPort: 8080#serverPort: 5000#' /home/FaceTec_Custom_Server/deploy/config.yaml
 RUN sed -i 's#enableSearch: false#enableSearch: true#' /home/FaceTec_Custom_Server/deploy/config.yaml
-RUN sed -i 's#search3D3DDatabaseRootDirectory: /Users/MyUserName/Desktop/MyTestFaceTec3DDB#search3D3DDatabaseRootDirectory: /mnt/encrypted/3d-db#' /home/FaceTec_Custom_Server/deploy/config.yaml
-RUN sed -i 's#search3D3DDatabaseExportRootDirectory: /Users/MyUserName/Desktop/MyTestFaceTecExported3DDB#\# search3D3DDatabaseExportRootDirectory: null#' /home/FaceTec_Custom_Server/deploy/config.yaml
-RUN sed -i 's#search3D3DOneEyeCoveredDatabaseRootDirectory: /Users/MyUserName/Desktop/MyTestFaceTec3D3DOneEyeCoveredDB#\# search3D3DOneEyeCoveredDatabaseRootDirectory:#' /home/FaceTec_Custom_Server/deploy/config.yaml
-RUN sed -i 's#search3D2DFacePortraitDatabaseRootDirectory: /Users/MyUserName/Desktop/MyTestFaceTec3D2DFacePortraitDB#\# search3D3DDatabaseRootDirectory:#' /home/FaceTec_Custom_Server/deploy/config.yaml
-RUN sed -i 's#search3D2DKioskPOSDatabaseRootDirectory: /Users/MyUserName/Desktop/MyTestFaceTec3D2DKioskPOSDB#\# search3D3DDatabaseRootDirectory:#' /home/FaceTec_Custom_Server/deploy/config.yaml
-RUN sed -i 's#search2D2DIDScanPhotoDatabaseRootDirectory: /Users/MyUserName/Desktop/MyTestFaceTec2D2DIDScanPhotoDB#\# search3D3DDatabaseRootDirectory:#' /home/FaceTec_Custom_Server/deploy/config.yaml
+RUN sed -i 's#search3D3DDatabaseRootDirectory: .*#search3D3DDatabaseRootDirectory: /mnt/encrypted/facetec/3d-db#' /home/FaceTec_Custom_Server/deploy/config.yaml
+RUN sed -i 's#search3D3DDatabaseExportRootDirectory: .*#search3D3DDatabaseExportRootDirectory: /mnt/encrypted/facetec/3d-db-export#' /home/FaceTec_Custom_Server/deploy/config.yaml
+RUN sed -i 's#search3D3DOneEyeCoveredDatabaseRootDirectory: .*#search3D3DOneEyeCoveredDatabaseRootDirectory: /mnt/encryped/facetec/3d-db-eye-covered' /home/FaceTec_Custom_Server/deploy/config.yaml
+RUN sed -i 's#search3D2DFacePortraitDatabaseRootDirectory: .*#search3D3DDatabaseRootDirectory: /mnt/encrypted/facetec/3d-db-face-portrait#' /home/FaceTec_Custom_Server/deploy/config.yaml
+RUN sed -i 's#search3D2DKioskPOSDatabaseRootDirectory: .*#search3D3DDatabaseRootDirectory: /mnt/encrypted/facetec/3d-2d-kiosk#' /home/FaceTec_Custom_Server/deploy/config.yaml
+RUN sed -i 's#search2D2DIDScanPhotoDatabaseRootDirectory: .*#search3D3DDatabaseRootDirectory: /mnt/encrypted/facetec/2d-2d-id-scan#' /home/FaceTec_Custom_Server/deploy/config.yaml
 
 # FaceTec Usage Logs configuration
 RUN echo "usageLogsDirectory: /mnt/encrypted/usage-logs" >> /home/FaceTec_Custom_Server/deploy/facetec_usage_logs_server/config.yml
