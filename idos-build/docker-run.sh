@@ -42,6 +42,17 @@ done
 
 cd /home/FaceTec_Custom_Server/deploy
 
+echo "Fetching mongo connection string from secrets"
+aws s3 cp "s3://nitro-enclave-hello-secrets/mongodb_uri.txt" ./mongodb_uri.txt --region eu-west-1
+if [ ! -f ./mongodb_uri.txt ]; then
+  echo "Couldn't download mongodb_uri.txt from S3, exiting"
+  exit 1
+fi
+
+MONGO_URI="$(cat ./mongodb_uri.txt)"
+sed -i "s#export const MONGO_URI = \"INSERT YOUR MONGO URL HERE\";#export const MONGO_URI = \"${MONGO_URI//&/\\&}\";#" ./facesign-service/env.js
+sed -i "s#uri: INSERT YOUR MONGO URL HERE#uri: \"${MONGO_URI//&/\\&}\"#" ./config.yaml
+
 echo "Fetching AWS luks password key from S3"
 AWS_KMS_SECRETS_KEY_ID="$(cat ./secrets_key.arn)"
 ENC_FILE=luks_password.enc
@@ -109,9 +120,15 @@ mkdir /mnt/encrypted
 mount /dev/mapper/encrypted_disk /mnt/encrypted
 
 # Ensure there are 3d-db and logs directories
-if [ ! -d /mnt/encrypted/3d-db ]; then
-  echo "Creating /mnt/encrypted/3d-db directory..."
-  mkdir -p /mnt/encrypted/3d-db
+if [ ! -d /mnt/encrypted/facetec/search-3d-3d-database ]; then
+  echo "Creating /mnt/encrypted/facetec directories..."
+  mkdir -p \
+      /mnt/encrypted/facetec/search-3d-3d-database \
+      /mnt/encrypted/facetec/search-3d-3d-database-export \
+      /mnt/encrypted/facetec/search-3d-3d-eye-covered \
+      /mnt/encrypted/facetec/search-3d-2d-face-portrait \
+      /mnt/encrypted/facetec/search-3d-2d-kiosk \
+      /mnt/encrypted/facetec/search-2d-2d-id-scan
 
   # Running repopulate?!
   # node facesign-service/repopulate.js

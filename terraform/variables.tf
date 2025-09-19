@@ -11,21 +11,6 @@ variable "instance_type" {
   default     = "m6i.8xlarge"
 }
 
-# DocumentDB variables
-variable "docdb_username" {
-  description = "Username for DocumentDB"
-  type        = string
-  default     = "root"
-  sensitive   = true
-}
-
-variable "docdb_password" {
-  description = "Password for DocumentDB"
-  type        = string
-  default     = "password"
-  sensitive   = true
-}
-
 variable "docdb_instance_class" {
   description = "Instance class for DocumentDB"
   type        = string

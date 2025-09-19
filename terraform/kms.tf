@@ -7,6 +7,50 @@ resource "aws_kms_alias" "enclave_instance_root_volume_alias" {
   target_key_id = aws_kms_key.enclave_instance_root_volume.key_id
 }
 
+resource "aws_kms_key" "enclave_instance_encrypted_volume" {
+  description = "Key for Nitro Enclave EBS encrypted (data) volume"
+}
+
+resource "aws_kms_alias" "enclave_instance_encrypted_volume_alias" {
+  name          = "alias/enclaveInstanceEncryptedVolume"
+  target_key_id = aws_kms_key.enclave_instance_encrypted_volume.key_id
+}
+
+resource "aws_kms_key_policy" "enclave_instance_ebs_policy" {
+  key_id = aws_kms_key.enclave_instance_encrypted_volume.key_id
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Id      = "enclave-kms-key-policy",
+    Statement = [
+      {
+        Sid       = "AllowRootAccount",
+        Effect    = "Allow",
+        Principal = { AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root" },
+        Action    = "kms:*",
+        Resource  = "*"
+      },
+      {
+        Sid       = "AllowInstanceRoleUseForSpecificEBS",
+        Effect    = "Allow",
+        Principal = { AWS = aws_iam_role.enclave_instance_role.arn },
+        Action = [
+          "kms:Decrypt",
+          "kms:Encrypt",
+          "kms:ReEncrypt*",
+          "kms:GenerateDataKey*"
+        ],
+        Resource = "*",
+        Condition = {
+          StringEquals = {
+            "kms:EncryptionContext:aws:ebs:id" = aws_ebs_volume.enclave_instance_encrypted_volume.id
+          }
+        }
+      }
+    ]
+  })
+}
+
 data "aws_iam_policy_document" "kms_nitro_enclave" {
   statement {
     sid    = "AllowRootAdminOnly"
@@ -56,11 +100,6 @@ data "aws_iam_policy_document" "kms_nitro_enclave" {
 
     resources = ["*"]
   }
-}
-
-resource "aws_kms_key" "enclave_instance_ebs_volume" {
-  description = "Key for Nitro Enclave EBS volume"
-  policy      = data.aws_iam_policy_document.kms_nitro_enclave.json
 }
 
 resource "aws_kms_key" "secrets_encryption" {
