@@ -32,6 +32,12 @@ This should boot the enclave in debug mode and stream its stdout.
 - The current setup doesn't include the frontend. That's ok for the target end result, but it makes it clunky to test end-to-end.
 - The image building process is very close to FaceTec's original, which has a lot of room for improvement.
 
-### Labor needed
-- We're using hard-coded credentials for docdb. These should be gotten from Secrets Manager.
+### Known security concerns
 - Encrypt the stuff we put on mongo with a KMS key. Use FLE: https://docs.aws.amazon.com/documentdb/latest/developerguide/field-level-encryption.html
+  - There are only three biometric fields: faceScan, auditTrailImage, lowQualityAuditTrailImage. We don't store the audit images, and FaceTec has its own encryption for the faceScan (which is actually a faceVector).
+  - Checked with FaceTec, and their security audit didn't flag this as a concern.
+  - It would be great to encrypt everything in mongo nonetheless, but only out of a generic fear that a future update might introduce storage of new sensitive data.
+- We're using hard-coded credentials for docdb. These should be gotten from Secrets Manager.
+  - We tried using Secrets Manager, but we couldn't find a way to get terraform to behave on time.
+  - Since we can't use SM, the operator needs access to the secret to create the docdb instance.
+  - We don't think this is dangerous since it only allows an operator to get access to mongo-store data, which we know is already unusable enough.

@@ -21,6 +21,7 @@ export async function getSessionToken(key, deviceIdentifier) {
 }
 
 export async function enrollment3d(externalDatabaseRefID, faceScan, auditTrailImage, lowQualityAuditTrailImage, key, deviceIdentifier, sessionId) {
+  // TODO(pkoch): shouldn't we use deviceIdentifier?
   const enrollmentResponse = await fetch(`${FACETEC_SERVER}enrollment-3d`, {
     method: 'POST',
     headers: {

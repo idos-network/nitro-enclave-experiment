@@ -30,15 +30,13 @@ socat TCP4-LISTEN:443,fork,bind=127.0.0.6 VSOCK-CONNECT:3:6012 &
 # So that the FaceTec .so file can load some stuff on /tmp.
 mount /tmp -o remount,exec
 
-# Mount nbd0 drive
-sleep 2
-nbd-client localhost 10809 /dev/nbd0 &
-
-# Wait for nbd0 to be ready (for some reason the luksOpen immediatelly complains)
-while [ "$(cat /sys/block/nbd0/size)" -eq 0 ]; do
-  echo "Waiting for /dev/nbd0 to be ready..."
-  sleep 0.5
+echo "Checking nbd0..."
+while ! nbd-client -c /dev/nbd0; do
+  echo "Mounting nbd0..."
+  nbd-client localhost 10809 /dev/nbd0 || true
+  sleep 1
 done
+echo "Done with nbd0"
 
 cd /home/FaceTec_Custom_Server/deploy
 
