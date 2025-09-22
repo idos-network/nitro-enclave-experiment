@@ -36,8 +36,14 @@ sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock
 sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock-6009-tcp-aws-kms-s3--eu-west-1-443 alpine/socat -d -d VSOCK-LISTEN:6009,fork TCP:"kms.eu-west-1.amazonaws.com":443
 
 # AWS s3 for secrets (outgoing)
-sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock-6010-tcp-aws-nitro-enclave-hello-secrets-s3-eu-west-1-443 alpine/socat -d -d VSOCK-LISTEN:6010,fork TCP:"nitro-enclave-hello-secrets.s3.eu-west-1.amazonaws.com":443
-sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock-6011-tcp-aws-nitro-enclave-hello-secrets-s3-eu-west-1-443 alpine/socat -d -d VSOCK-LISTEN:6011,fork TCP:"nitro-enclave-hello-secrets.s3-eu-west-1.amazonaws.com":443
+S3_SECRETS_BUCKET=$(aws s3api list-buckets --query "Buckets[?contains(Name, 'facesign') && contains(Name, 'secrets')].Name" --output text)
+if [[ "${S3_SECRETS_BUCKET:-null}" == "null" ]]; then
+    echo >&2 "Couldn't determine S3_SECRETS_BUCKET"
+    exit 1
+fi
+
+sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock-6010-tcp-aws-$S3_SECRETS_BUCKET-s3-eu-west-1-443 alpine/socat -d -d VSOCK-LISTEN:6010,fork TCP:"$S3_SECRETS_BUCKET.s3.eu-west-1.amazonaws.com":443
+sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock-6011-tcp-aws-$S3_SECRETS_BUCKET-s3-eu-west-1-443 alpine/socat -d -d VSOCK-LISTEN:6011,fork TCP:"$S3_SECRETS_BUCKET.s3-eu-west-1.amazonaws.com":443
 
 # Let's encrypt acme lookup (outgoing)
 sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock-6012-tcp-acme-v02-api-lets-encrypt-org-443 alpine/socat -d -d VSOCK-LISTEN:6012,fork TCP:"acme-v02.api.letsencrypt.org":443

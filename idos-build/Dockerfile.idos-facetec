@@ -93,9 +93,13 @@ RUN echo "127.0.0.1 logs.facetec.com" | tee -a /root/extra_hosts
 # AWS kms (AWS identity are on ip tables forwarded to 127.0.0.2!)
 RUN echo "127.0.0.3 kms.eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
 
+ARG S3_SECRETS_BUCKET
+RUN if [ -z "$S3_SECRETS_BUCKET" ]; then (echo "S3_SECRETS_BUCKET must be provided as a --build-arg"; exit 1); fi
+RUN echo $S3_SECRETS_BUCKET > ./s3_secrets_bucket.txt
+
 # AWS secrets S3
-RUN echo "127.0.0.4 nitro-enclave-hello-secrets.s3.eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
-RUN echo "127.0.0.5 nitro-enclave-hello-secrets.s3-eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
+RUN echo "127.0.0.4 $S3_SECRETS_BUCKET.s3.eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
+RUN echo "127.0.0.5 $S3_SECRETS_BUCKET.s3-eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
 
 # Let's encrypt acme lookup
 RUN echo "127.0.0.6 acme-v02.api.letsencrypt.org" | tee -a /root/extra_hosts
