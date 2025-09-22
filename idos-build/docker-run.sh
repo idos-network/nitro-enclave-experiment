@@ -40,8 +40,10 @@ echo "Done with nbd0"
 
 cd /home/FaceTec_Custom_Server/deploy
 
+S3_SECRETS_BUCKET=$(cat ./s3_secrets_bucket.txt)
+
 echo "Fetching mongo connection string from secrets"
-aws s3 cp "s3://nitro-enclave-hello-secrets/mongodb_uri.txt" ./mongodb_uri.txt --region eu-west-1
+aws s3 cp "s3://$S3_SECRETS_BUCKET/mongodb_uri.txt" ./mongodb_uri.txt --region eu-west-1
 if [ ! -f ./mongodb_uri.txt ]; then
   echo "Couldn't download mongodb_uri.txt from S3, exiting"
   exit 1
@@ -56,12 +58,12 @@ AWS_KMS_SECRETS_KEY_ID="$(cat ./secrets_key.arn)"
 ENC_FILE=luks_password.enc
 PLAIN_FILE=luks_password.txt
 
-aws s3 cp "s3://nitro-enclave-hello-secrets/$ENC_FILE" "$ENC_FILE" --region eu-west-1 2>aws_s3_cp_error.log || true
+aws s3 cp "s3://$S3_SECRETS_BUCKET/$ENC_FILE" "$ENC_FILE" --region eu-west-1 2>aws_s3_cp_error.log || true
 
 if [ ! -f "$ENC_FILE" ]; then
   echo "Couldn't download luks_password.enc from S3, generating a new one"
   aws kms encrypt --key-id "$AWS_KMS_SECRETS_KEY_ID" --plaintext "$(openssl rand -hex 64)" --output text --query CiphertextBlob --region eu-west-1 > "$ENC_FILE"
-  aws s3 cp "$ENC_FILE" "s3://nitro-enclave-hello-secrets/$ENC_FILE" --region eu-west-1
+  aws s3 cp "$ENC_FILE" "s3://$S3_SECRETS_BUCKET/$ENC_FILE" --region eu-west-1
 fi
 
 echo "Decrypting AWS luks password key"
@@ -73,7 +75,7 @@ FACETEC_PRIVATE_ENC_FILE=facetec_private_key.pem.enc
 FACETEC_PRIVATE_PLAIN_FILE=facetec_private_key.pem
 FACETEC_PUBLIC_FILE=facetec_public_key.pem
 
-aws s3 cp "s3://nitro-enclave-hello-secrets/$FACETEC_PRIVATE_ENC_FILE" "$FACETEC_PRIVATE_ENC_FILE" --region eu-west-1 2>aws_s3_cp_error.log || true
+aws s3 cp "s3://$S3_SECRETS_BUCKET/$FACETEC_PRIVATE_ENC_FILE" "$FACETEC_PRIVATE_ENC_FILE" --region eu-west-1 2>aws_s3_cp_error.log || true
 if [ ! -f "$FACETEC_PRIVATE_ENC_FILE" ]; then
   echo "Couldn't download facetec_private_key.pem.enc from S3, creating a new one"
   openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 | openssl pkcs8 -topk8 -nocrypt &> "$FACETEC_PRIVATE_PLAIN_FILE"
@@ -81,8 +83,8 @@ if [ ! -f "$FACETEC_PRIVATE_ENC_FILE" ]; then
 
   echo "Encrypting them with AWS KMS"
   aws kms encrypt --key-id "$AWS_KMS_SECRETS_FACETEC_KEY_ID" --plaintext fileb://$FACETEC_PRIVATE_PLAIN_FILE --output text --query CiphertextBlob --region eu-west-1 > "$FACETEC_PRIVATE_ENC_FILE"
-  aws s3 cp "$FACETEC_PRIVATE_ENC_FILE" "s3://nitro-enclave-hello-secrets/$FACETEC_PRIVATE_ENC_FILE" --region eu-west-1
-  aws s3 cp "$FACETEC_PUBLIC_FILE" "s3://nitro-enclave-hello-secrets/$FACETEC_PUBLIC_FILE" --region eu-west-1
+  aws s3 cp "$FACETEC_PRIVATE_ENC_FILE" "s3://$S3_SECRETS_BUCKET/$FACETEC_PRIVATE_ENC_FILE" --region eu-west-1
+  aws s3 cp "$FACETEC_PUBLIC_FILE" "s3://$S3_SECRETS_BUCKET/$FACETEC_PUBLIC_FILE" --region eu-west-1
   rm $FACETEC_PRIVATE_PLAIN_FILE
   rm $FACETEC_PUBLIC_FILE
 fi
@@ -91,7 +93,7 @@ echo "Decrypting facetec private key"
 aws kms decrypt --ciphertext-blob "$(cat $FACETEC_PRIVATE_ENC_FILE)" --output text --query Plaintext --region eu-west-1 | base64 -d > "$FACETEC_PRIVATE_PLAIN_FILE"
 
 # Public facetec sdk key is stored unencrypted in the bucket
-aws s3 cp "s3://nitro-enclave-hello-secrets/$FACETEC_PUBLIC_FILE" "/home/FaceTec_Custom_Server/deploy/facesign-service/$FACETEC_PUBLIC_FILE" --region eu-west-1
+aws s3 cp "s3://$S3_SECRETS_BUCKET/$FACETEC_PUBLIC_FILE" "/home/FaceTec_Custom_Server/deploy/facesign-service/$FACETEC_PUBLIC_FILE" --region eu-west-1
 
 # Replace facetec encryption private key in facetec service
 sed -i "s|^faceMapEncryptionKey:.*|faceMapEncryptionKey: \"$(tr -d '\n' < "$FACETEC_PRIVATE_PLAIN_FILE")\"|" /home/FaceTec_Custom_Server/deploy/config.yaml
