@@ -26,6 +26,7 @@ export async function enrollment3d(externalDatabaseRefID, faceScan, auditTrailIm
     headers: {
       'Content-Type': 'application/json',
       'X-Device-Key': key,
+      'X-Device-Identifier': deviceIdentifier,
     },
     body: JSON.stringify({
       faceScan,

@@ -30,17 +30,26 @@ socat TCP4-LISTEN:443,fork,bind=127.0.0.6 VSOCK-CONNECT:3:6012 &
 # So that the FaceTec .so file can load some stuff on /tmp.
 mount /tmp -o remount,exec
 
-# Mount nbd0 drive
-sleep 2
-nbd-client localhost 10809 /dev/nbd0 &
-
-# Wait for nbd0 to be ready (for some reason the luksOpen immediatelly complains)
-while [ "$(cat /sys/block/nbd0/size)" -eq 0 ]; do
-  echo "Waiting for /dev/nbd0 to be ready..."
-  sleep 0.5
+echo "Checking nbd0..."
+while ! nbd-client -c /dev/nbd0; do
+  echo "Mounting nbd0..."
+  nbd-client localhost 10809 /dev/nbd0 || true
+  sleep 1
 done
+echo "Done with nbd0"
 
 cd /home/FaceTec_Custom_Server/deploy
+
+echo "Fetching mongo connection string from secrets"
+aws s3 cp "s3://nitro-enclave-hello-secrets/mongodb_uri.txt" ./mongodb_uri.txt --region eu-west-1
+if [ ! -f ./mongodb_uri.txt ]; then
+  echo "Couldn't download mongodb_uri.txt from S3, exiting"
+  exit 1
+fi
+
+MONGO_URI="$(cat ./mongodb_uri.txt)"
+sed -i "s#export const MONGO_URI = \"INSERT YOUR MONGO URL HERE\";#export const MONGO_URI = \"${MONGO_URI//&/\\&}\";#" ./facesign-service/env.js
+sed -i "s#uri: INSERT YOUR MONGO URL HERE#uri: \"${MONGO_URI//&/\\&}\"#" ./config.yaml
 
 echo "Fetching AWS luks password key from S3"
 AWS_KMS_SECRETS_KEY_ID="$(cat ./secrets_key.arn)"
@@ -109,9 +118,15 @@ mkdir /mnt/encrypted
 mount /dev/mapper/encrypted_disk /mnt/encrypted
 
 # Ensure there are 3d-db and logs directories
-if [ ! -d /mnt/encrypted/3d-db ]; then
-  echo "Creating /mnt/encrypted/3d-db directory..."
-  mkdir -p /mnt/encrypted/3d-db
+if [ ! -d /mnt/encrypted/facetec/search-3d-3d-database ]; then
+  echo "Creating /mnt/encrypted/facetec directories..."
+  mkdir -p \
+      /mnt/encrypted/facetec/search-3d-3d-database \
+      /mnt/encrypted/facetec/search-3d-3d-database-export \
+      /mnt/encrypted/facetec/search-3d-3d-eye-covered \
+      /mnt/encrypted/facetec/search-3d-2d-face-portrait \
+      /mnt/encrypted/facetec/search-3d-2d-kiosk \
+      /mnt/encrypted/facetec/search-2d-2d-id-scan
 
   # Running repopulate?!
   # node facesign-service/repopulate.js
