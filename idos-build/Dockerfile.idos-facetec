@@ -1,11 +1,32 @@
-FROM ubuntu:latest
+# ---------- Build stage ----------
+FROM ubuntu:latest AS builder
 
 ARG FACETEC_SDK_VERSION
 RUN if [ -z "$FACETEC_SDK_VERSION" ]; then (echo "FACETEC_SDK_VERSION must be provided as a --build-arg"; exit 1); fi
 
-# FaceTec Directories
 ARG FACETEC_CUSTOM_SERVER_DIRECTORY=./FaceTecSDK-custom-server-$FACETEC_SDK_VERSION
 ARG FACETEC_SERVER_CORE_DIRECTORY=./FaceTecSDK-server-core-java-$FACETEC_SDK_VERSION
+
+# Install build dependencies (Java + Maven + Node.js + libs)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    default-jdk \
+    libgomp1 \
+    maven \
+    libavcodec-dev libavutil-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY $FACETEC_CUSTOM_SERVER_DIRECTORY /home/FaceTec_Custom_Server
+COPY $FACETEC_SERVER_CORE_DIRECTORY /home/FaceTec_Server_Core
+
+# FaceTec mongo storage modifications (don't store face images, just empty strings)
+RUN sed -i 's#faceScanRequest.auditTrailImage.getBase64()#""#' /home/FaceTec_Custom_Server/src/main/java/com/facetec/customserver/database/MongoDatabase.java
+RUN sed -i 's#faceScanRequest.lowQualityAuditTrailImage.getBase64()#""#' /home/FaceTec_Custom_Server/src/main/java/com/facetec/customserver/database/MongoDatabase.java
+
+RUN mvn install:install-file -Dfile=/home/FaceTec_Server_Core/libs/FaceTecSDK-$FACETEC_SDK_VERSION.jar -DgroupId=com.facetec.servercore -DartifactId=server -Dversion=$FACETEC_SDK_VERSION -Dpackaging=jar
+RUN mvn -f /home/FaceTec_Custom_Server/pom.xml clean package -Plinux
+
+# ---------- Final stage ----------
+FROM ubuntu:latest
 
 # Install dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends --no-install-suggests \
@@ -13,7 +34,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends --no-install-su
     default-jdk \
     iproute2 \
     libgomp1 \
-    maven \
     net-tools \
     nodejs \
     npm \
@@ -45,16 +65,10 @@ RUN apt-get update && apt-get install -y \
     && apt-get install -y caddy \
     && rm -rf /var/lib/apt/lists/*
 
-COPY $FACETEC_CUSTOM_SERVER_DIRECTORY /home/FaceTec_Custom_Server
-COPY $FACETEC_SERVER_CORE_DIRECTORY /home/FaceTec_Server_Core
+# Setup & build FaceTec Server Core
+COPY --from=builder /home/FaceTec_Custom_Server /home/FaceTec_Custom_Server
+COPY --from=builder /home/FaceTec_Server_Core /home/FaceTec_Server_Core
 COPY ./OCRTemplates /home/OCRTemplates
-
-# FaceTec mongo storage modifications (don't store face images, just empty strings)
-RUN sed -i 's#faceScanRequest.auditTrailImage.getBase64()#""#' /home/FaceTec_Custom_Server/src/main/java/com/facetec/customserver/database/MongoDatabase.java
-RUN sed -i 's#faceScanRequest.lowQualityAuditTrailImage.getBase64()#""#' /home/FaceTec_Custom_Server/src/main/java/com/facetec/customserver/database/MongoDatabase.java
-
-RUN mvn install:install-file -Dfile=/home/FaceTec_Server_Core/libs/FaceTecSDK-$FACETEC_SDK_VERSION.jar -DgroupId=com.facetec.servercore -DartifactId=server -Dversion=$FACETEC_SDK_VERSION -Dpackaging=jar
-RUN mvn -f /home/FaceTec_Custom_Server/pom.xml clean package -Plinux
 
 RUN cp /home/FaceTec_Custom_Server/config.yaml /home/FaceTec_Custom_Server/deploy
 COPY ./facetec_usage_logs_server/package.json /home/FaceTec_Custom_Server/deploy/facetec_usage_logs_server/package.json
