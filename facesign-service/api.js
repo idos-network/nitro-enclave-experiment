@@ -58,7 +58,7 @@ export async function searchForDuplicates(externalDatabaseRefID, key, groupName,
     body: JSON.stringify({
       externalDatabaseRefID,
       groupName,
-      minMatchLevel: 10, // Adjust as needed
+      minMatchLevel: 15,
     }),
   });
 
