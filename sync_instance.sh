@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-EC2_IP=$(cd terraform && terraform output -raw ec2_public_ip)
+EC2_IP=52.19.134.72
 EC2_USER="ec2-user"
 
 echo "Syncing: $EC2_IP"

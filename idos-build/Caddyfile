@@ -3,7 +3,7 @@
 	email deployers@idos.network
 }
 
-facesign.staging.sandbox.fractal.id {
+nitro.idos.network {
 	encode gzip
 	bind 127.0.0.1
 	reverse_proxy 127.0.0.1:7000
