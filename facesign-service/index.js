@@ -4,7 +4,7 @@ import helmet from "helmet";
 import morgan from "morgan";
 import crypto from "node:crypto";
 import fs from "node:fs";
-import { writeLog } from "./agent.js";
+import agent from "./agent.js";
 
 import { enrollment3d, enrollUser, getSessionToken, searchForDuplicates } from "./api.js";
 import { insertMember, countMembersInGroup } from "./db.js";
@@ -27,7 +27,7 @@ app.get("/", (req, res) => {
 app.post("/session-token", async (req, res) => {
   try {
     const sessionToken = await getSessionToken(req.body.key, req.body.deviceIdentifier);
-    writeLog("session-token", { deviceIdentifier: req.body.deviceIdentifier });
+    agent.writeLog("session-token", { deviceIdentifier: req.body.deviceIdentifier });
     return res.status(200).json({ success: true, sessionToken });
   } catch (error) {
     console.error("Error getting session token:", error);
@@ -57,7 +57,7 @@ app.post("/login", async (req, res) => {
     )
 
     if (!success || !wasProcessed || error) {
-      writeLog("enrollment-failed", { success, wasProcessed, error });
+      agent.writeLog("enrollment-failed", { success, wasProcessed, error });
       return res.status(400).json({
         success,
         wasProcessed,
@@ -90,13 +90,14 @@ app.post("/login", async (req, res) => {
 
     if (newUser) {
       // Brand new user, let's enroll in 3d-db#users
-      writeLog("new-user", { results[0].identifier });
+      agent.writeLog("new-user", { identifier: results[0].identifier });
       await enrollUser(faceSignUserId, GROUP_NAME, key);
       await insertMember(GROUP_NAME, faceSignUserId);
     } else if (results.length > 1) {
+      agent.writeLog("duplicate", { identifiers: results.map(x => x.identifier) });
       throw new Error('Multiple users found with the same face-vector, this should never happen.');
     } else {
-      writeLog("duplicate", { results[0].identifier });
+      agent.writeLog("duplicate", { identifiers: results[0].identifier });
       faceSignUserId = results[0].identifier;
     }
 

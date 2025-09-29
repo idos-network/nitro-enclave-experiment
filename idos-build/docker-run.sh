@@ -28,7 +28,7 @@ socat TCP4-LISTEN:443,fork,bind=127.0.0.5 VSOCK-CONNECT:3:6011 &
 socat TCP4-LISTEN:443,fork,bind=127.0.0.6 VSOCK-CONNECT:3:6012 &
 
 # Outgoing (agent)
-socat TCP4-LISTEN:7001,fork,keepalive,bind=127.0.0.7 VSOCK-CONNECT:3:7001 &
+socat TCP4-LISTEN:7001,fork,bind=127.0.0.7 VSOCK-CONNECT:3:7001 &
 
 # So that the FaceTec .so file can load some stuff on /tmp.
 mount /tmp -o remount,exec

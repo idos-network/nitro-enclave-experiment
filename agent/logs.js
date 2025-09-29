@@ -16,7 +16,7 @@ async function sendLog(message) {
           logStreamName,
         }));
       } catch (e) {
-        // ignoruj pokud už existuje
+        // Ignore if already exists
       }
     }
 
