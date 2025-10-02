@@ -2,7 +2,7 @@
 set -e
 
 yum update -y
-yum install -y aws-nitro-enclaves-cli aws-nitro-enclaves-cli-devel make gcc
+yum install -y aws-nitro-enclaves-cli aws-nitro-enclaves-cli-devel make gcc nodejs
 
 usermod -a -G docker ec2-user
 systemctl enable --now docker
@@ -47,6 +47,9 @@ sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock
 
 # Let's encrypt acme lookup (outgoing)
 sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock-6012-tcp-acme-v02-api-lets-encrypt-org-443 alpine/socat -d -d VSOCK-LISTEN:6012,fork TCP:"acme-v02.api.letsencrypt.org":443
+
+# Agent
+sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock-16-7001-tcp-7000         alpine/socat -d -d VSOCK-LISTEN:7001,fork,keepalive TCP-CONNECT:127.0.0.1:7000
 
 cd ~
 wget https://download.libguestfs.org/nbdkit/1.44-stable/nbdkit-1.44.3.tar.gz
