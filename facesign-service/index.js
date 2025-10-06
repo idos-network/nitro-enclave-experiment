@@ -31,6 +31,9 @@ app.post("/session-token", async (req, res) => {
     return res.status(200).json({ success: true, sessionToken });
   } catch (error) {
     console.error("Error getting session token:", error);
+
+    agent.writeLog("error", { message: error.message, stack: error.stack });
+
     return res.status(500).json({
       success: false,
       message: 'Failed to get session token, check server logs.'
@@ -58,6 +61,7 @@ app.post("/login", async (req, res) => {
 
     if (!success || !wasProcessed || error) {
       agent.writeLog("enrollment-failed", { success, wasProcessed, error });
+
       return res.status(400).json({
         success,
         wasProcessed,
@@ -108,6 +112,8 @@ app.post("/login", async (req, res) => {
     });
   } catch (error) {
     console.error("Error during login process:", error);
+
+    agent.writeLog("error", { message: error.message, stack: error.stack });
 
     return res.status(500).json({
       success: false,
