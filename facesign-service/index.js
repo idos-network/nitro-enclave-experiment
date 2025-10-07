@@ -7,7 +7,7 @@ import fs from "node:fs";
 
 import { enrollment3d, enrollUser, getSessionToken, searchForDuplicates } from "./api.js";
 import { insertMember, countMembersInGroup } from "./db.js";
-import { FACETEC_PUBLIC_KEY_PATH, GROUP_NAME } from "./env.js";
+import { FACETEC_PUBLIC_KEY_PATH, GROUP_NAME, KEY_1_MULTIBASE_PUBLIC_PATH, HOST } from "./env.js";
 
 const app = express();
 
@@ -115,6 +115,21 @@ app.post("/login", async (req, res) => {
 app.get("/sdk/public-key", (req, res) => {
   const publicKey = fs.readFileSync(FACETEC_PUBLIC_KEY_PATH, "utf-8");
   res.status(200).send(publicKey);
+});
+
+// idOS issuer informations for VCs
+app.get("/idos/issuers/1", (req, res) => {
+  res.status(200).json({
+    "@context": "https://w3id.org/security/v2",
+    id: `${HOST}/idos/issuers/1`,
+    assertionMethod: [`${HOST}/idos/keys/1`],
+    authentication: [],
+  });
+});
+
+app.get("/idos/keys/1", (req, res) => {
+  const publicKeyMultibase = fs.readFileSync(KEY_1_MULTIBASE_PUBLIC_PATH, "utf-8").trim();
+  res.status(200).send(publicKeyMultibase);
 });
 
 const server = app.listen(PORT, () => {

@@ -4,3 +4,5 @@ export const MONGO_URI = "INSERT YOUR MONGO URL HERE";
 export const DB_COLLECTION_NAME = "faceSignGroupMembers";
 export const FACETEC_DEVICE_KEY = "daAezC7MmymLklxL6jwaORL17O6y8aUw";
 export const FACETEC_PUBLIC_KEY_PATH = "./facetec_public_key.pem";
+export const KEY_1_MULTIBASE_PUBLIC_PATH = "./multibase_key_1_public.txt";
+export const HOST = "INSERT YOUR HOST HERE";
