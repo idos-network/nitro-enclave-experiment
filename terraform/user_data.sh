@@ -77,8 +77,24 @@ User=root
 WantedBy=multi-user.target
 EOF
 
-systemctl daemon-reload
-systemctl enable nbdkit.service
-systemctl start nbdkit.service
+cat <<'EOF' | sudo tee /etc/systemd/system/agent-log.service
+[Unit]
+Description=Agent server
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/node /home/ec2-user/agent
+Restart=always
+User=ec2-user
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable nbdkit.service
+sudo systemctl enable agent-log.service
+sudo systemctl start nbdkit.service
+sudo systemctl start agent-log.service
 
 sudo -u ec2-user mkdir -p ~ec2-user/custom-server
