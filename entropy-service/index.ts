@@ -1,12 +1,12 @@
-// @ts-types="npm:@types/express@4.17.15"
 import express from "express";
 import process from "node:process";
 import helmet from "helmet";
 import cors from "cors";
 import morgan from "morgan";
-import * as bip39 from '@scure/bip39';
-import { wordlist } from '@scure/bip39/wordlists/english.js';
 import jwt from "jsonwebtoken";
+import { JWT_PUBLIC_KEY } from "./env";
+import { fetchOrCreateEntropy } from "./db";
+import fs from "node:fs";
 
 const app = express();
 
@@ -19,7 +19,7 @@ app.get("/", (_req, res) => {
   res.send("Welcome to the FaceSign entropy API!");
 });
 
-app.post("/entropy", (req, res) => {
+app.post("/entropy", async (req, res) => {
   // Validate token from body
   const token = req.body.token;
 
@@ -28,14 +28,11 @@ app.post("/entropy", (req, res) => {
   }
 
   try {
-    const publicKey = Deno.readTextFileSync("./jwt_public_key.pem");
-    const result = jwt.verify(token, publicKey, { algorithms: ["RS256"] });
+    const publicKey = fs.readFileSync(JWT_PUBLIC_KEY);
+    const result = jwt.verify(token, publicKey, { algorithms: ["HS512"] });
+    const entropy = await fetchOrCreateEntropy(result.sub as string);
 
-    console.log(result)
-
-    const mn = bip39.generateMnemonic(wordlist, 256);
-
-    res.json({ message: "Token is valid", mnemonic: mn });
+    res.json({ faceSignUserId: result.sub, entropy });
   } catch (err) {
     return res.status(401).json({ error: "Invalid token" });
   }
