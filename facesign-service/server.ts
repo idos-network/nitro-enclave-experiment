@@ -3,7 +3,9 @@ import fs from "node:fs";
 import cors from "cors";
 import express from "express";
 import helmet from "helmet";
+import jwt from "jsonwebtoken";
 import morgan from "morgan";
+
 import { FACETEC_PUBLIC_KEY_PATH, GROUP_NAME, HOST, KEY_1_MULTIBASE_PUBLIC_PATH } from "./env.ts";
 import agent from "./providers/agent.ts";
 import { enrollment3d, enrollUser, getSessionToken, searchForDuplicates } from "./providers/api.ts";
@@ -120,10 +122,18 @@ app.post("/login", async (req, res) => {
       faceSignUserId = results[0]?.identifier!;
     }
 
+    // Issue JWT token
+    const token = jwt.sign(
+      { sub: faceSignUserId },
+      fs.readFileSync(JWT_PRIVATE_KEY, "utf-8"),
+      { algorithm: "RS256", expiresIn: "5m" }, // Token valid for 5 minutes
+    );
+
     return res.status(200).json({
       success: true,
       scanResultBlob: scanResultBlob,
       faceSignUserId,
+      token,
     });
   } catch (error) {
     if (!(error instanceof Error)) {
