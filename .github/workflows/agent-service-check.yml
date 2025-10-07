@@ -7,7 +7,6 @@ on:
       - "agent/**"
       - ".github/workflows/agent-service-check.yml"
   pull_request:
-    branches: [master, main, develop]
     paths:
       - "agent/**"
       - ".github/workflows/agent-service-check.yml"
@@ -50,6 +49,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -57,10 +62,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build Docker image
+      - name: Build and push multi-arch Docker image
         run: |
-          docker build -t ghcr.io/${{ github.repository }}/agent:latest ./agent
-
-      - name: Push Docker image
-        run: |
-          docker push ghcr.io/${{ github.repository }}/agent:latest
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            -t ghcr.io/${{ github.repository }}/agent:latest \
+            --push \
+            ./agent

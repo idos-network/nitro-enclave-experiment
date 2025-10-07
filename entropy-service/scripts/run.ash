@@ -1,14 +1,9 @@
 #!/bin/ash
 # shellcheck shell=dash
-set -u
-set -e
-set -o pipefail
+set -ueo pipefail
 
 # Go to app dir
 cd /app
-
-# Configure minimal S3 networking setup to get vsock.json and config.env
-S3_SECRETS_BUCKET=$(cat ./s3_secrets_bucket.txt)
 
 # Script dir for sourcing shared scripts
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -40,7 +35,7 @@ echo "127.0.0.1 $(echo "$MONGO_HOST" | sed 's#-cluster.cluster-#-cluster.#')" | 
 
 # NBD
 source "$SCRIPT_DIR/shared/nbd.ash"
-setup_nbd
+setup_nbd "entropy"
 
 echo "Fetching Caddyfile from S3"
 CADDYFILE=Caddyfile
@@ -58,6 +53,6 @@ if [ ! -f "./$JWT_TOKEN_PUBLIC_FILE" ]; then
   exit 1
 fi
 
-echo "Running service with $KMS_LUKS_ARN"
+echo "Running service with pm2-runtime"
 export HOME=/app
 pm2-runtime ecosystem.config.cjs
