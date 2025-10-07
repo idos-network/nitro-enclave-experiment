@@ -30,8 +30,6 @@ app.post("/entropy", (req, res) => {
     const publicKey = fs.readFileSync("./jwt_public_key.pem");
     const result = jwt.verify(token, publicKey, { algorithms: ["RS256"] });
 
-    console.log(result)
-
     const mn = bip39.generateMnemonic(wordlist, 256);
 
     res.json({ message: "Token is valid", mnemonic: mn });
