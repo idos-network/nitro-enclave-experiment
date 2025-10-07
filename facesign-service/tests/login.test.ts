@@ -2,6 +2,24 @@ import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 import agent from "../providers/agent.ts";
 import * as facetecApi from "../providers/api.ts";
+import { generateKeyPairSync } from "node:crypto";
+import jwt from "jsonwebtoken";
+
+const { privateKey, publicKey } = generateKeyPairSync("ec", {
+  namedCurve: "secp521r1",
+  privateKeyEncoding: { type: "pkcs8", format: "pem" },
+  publicKeyEncoding: { type: "spki", format: "pem" },
+});
+
+vi.mock('fs', async () => {
+  // Načti skutečný modul fs
+  const actualFs = await vi.importActual<typeof import('fs')>('fs');
+
+  return {
+    ...actualFs,
+    readFileSync: vi.fn(() => privateKey),
+  };
+});
 
 // Mock modules before importing the app
 vi.mock("../providers/db.ts", () => ({
@@ -12,6 +30,7 @@ vi.mock("../providers/db.ts", () => ({
 
 import { ObjectId } from "mongodb";
 import * as db from "../providers/db.ts";
+
 import app from "../server.ts";
 
 describe("Login API", () => {
@@ -36,7 +55,7 @@ describe("Login API", () => {
       insertedId: new ObjectId(),
     });
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => { });
 
     const response = await request(app).post("/login").send({
       faceScan: "test-face-scan",
@@ -52,7 +71,12 @@ describe("Login API", () => {
       faceSignUserId: expect.any(String),
       scanResultBlob: "mock-scan-result-blob",
       success: true,
+      token: expect.any(String),
     });
+
+    // Verify the JWT token
+    const decoded = jwt.verify(response.body.token, publicKey, { algorithms: ['ES512'] })
+    expect(decoded.sub).toBe(response.body.faceSignUserId);
 
     expect(duplicateSpy).toHaveBeenCalledWith(
       response.body.faceSignUserId,
@@ -60,6 +84,7 @@ describe("Login API", () => {
       "facesign-users",
       "test-user-agent",
     );
+
     expect(enrollmentSpy).toHaveBeenCalledWith(
       response.body.faceSignUserId,
       "test-face-scan",
@@ -86,7 +111,7 @@ describe("Login API", () => {
       wasProcessed: true,
     });
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => { });
 
     const response = await request(app).post("/login").send({
       faceScan: "test-face-scan",
@@ -134,7 +159,7 @@ describe("Login API", () => {
       insertedId: new ObjectId(),
     });
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => { });
 
     const response = await request(app).post("/login").send({
       faceScan: "test-face-scan",
@@ -150,6 +175,7 @@ describe("Login API", () => {
       faceSignUserId: resultId,
       scanResultBlob: "mock-scan-result-blob",
       success: true,
+      token: expect.any(String),
     });
 
     expect(duplicateSpy).toHaveBeenCalledWith(
@@ -204,7 +230,7 @@ describe("Login API", () => {
       insertedId: new ObjectId(),
     });
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => { });
 
     const response = await request(app).post("/login").send({
       faceScan: "test-face-scan",

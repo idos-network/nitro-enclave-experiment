@@ -61,6 +61,8 @@ export async function connectDB() {
     return db;
   }
 
+  dataKeyId = await ensureKey();
+
   const schemaMap = {
     [`${DB_NAME}.${DB_COLLECTION_NAME}`]: {
       "bsonType": "object",

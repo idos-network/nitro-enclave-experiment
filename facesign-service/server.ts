@@ -1,12 +1,12 @@
 import crypto from "node:crypto";
-import fs from "node:fs";
+import { readFileSync } from "node:fs";
 import cors from "cors";
 import express from "express";
 import helmet from "helmet";
 import jwt from "jsonwebtoken";
 import morgan from "morgan";
 
-import { FACETEC_PUBLIC_KEY_PATH, GROUP_NAME, HOST, KEY_1_MULTIBASE_PUBLIC_PATH } from "./env.ts";
+import { FACETEC_PUBLIC_KEY_PATH, GROUP_NAME, HOST, JWT_PRIVATE_KEY, KEY_1_MULTIBASE_PUBLIC_PATH } from "./env.ts";
 import agent from "./providers/agent.ts";
 import { enrollment3d, enrollUser, getSessionToken, searchForDuplicates } from "./providers/api.ts";
 import { countMembersInGroup, insertMember } from "./providers/db.ts";
@@ -125,8 +125,8 @@ app.post("/login", async (req, res) => {
     // Issue JWT token
     const token = jwt.sign(
       { sub: faceSignUserId },
-      fs.readFileSync(JWT_PRIVATE_KEY, "utf-8"),
-      { algorithm: "RS256", expiresIn: "5m" }, // Token valid for 5 minutes
+      readFileSync(JWT_PRIVATE_KEY, "utf-8"),
+      { algorithm: "ES512", expiresIn: "1m" }, // Token valid for 5 minutes
     );
 
     return res.status(200).json({
@@ -153,7 +153,7 @@ app.post("/login", async (req, res) => {
 });
 
 app.get("/sdk/public-key", (_req, res) => {
-  const publicKey = fs.readFileSync(FACETEC_PUBLIC_KEY_PATH, "utf-8");
+  const publicKey = readFileSync(FACETEC_PUBLIC_KEY_PATH, "utf-8");
   res.status(200).send(publicKey);
 });
 
@@ -168,7 +168,7 @@ app.get("/idos/issuers/1", (_req, res) => {
 });
 
 app.get("/idos/keys/1", (_req, res) => {
-  const publicKeyMultibase = fs.readFileSync(KEY_1_MULTIBASE_PUBLIC_PATH, "utf-8").trim();
+  const publicKeyMultibase = readFileSync(KEY_1_MULTIBASE_PUBLIC_PATH, "utf-8").trim();
   res.status(200).send(publicKeyMultibase);
 });
 

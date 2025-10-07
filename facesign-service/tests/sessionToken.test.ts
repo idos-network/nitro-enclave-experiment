@@ -15,7 +15,7 @@ import app from "../server.ts";
 describe("Session token API", () => {
   it("should return session token on success", async () => {
     const spy = vi.spyOn(facetecApi, "getSessionToken").mockResolvedValue("mock-session-token");
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => { });
 
     const response = await request(app).post("/session-token").send({
       key: "test-key",
@@ -36,7 +36,7 @@ describe("Session token API", () => {
   it("should handle errors from getSessionToken", async () => {
     const error = new Error("Failed to get session token");
     const spy = vi.spyOn(facetecApi, "getSessionToken").mockRejectedValue(error);
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => { });
 
     const response = await request(app).post("/session-token").send({
       key: "test-key",
