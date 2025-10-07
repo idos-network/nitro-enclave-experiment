@@ -36,8 +36,6 @@ class AgentClient {
     this.lastPong = Date.now();
     this.reconnectDelay = 1000; // start with 1s
     this.maxReconnectDelay = 30000; // cap at 30s
-
-    this.connect();
   }
 
   connect() {
@@ -142,4 +140,5 @@ class AgentClient {
 }
 
 const agent = new AgentClient("127.0.0.7", 7001);
+agent.connect();
 export default agent;
