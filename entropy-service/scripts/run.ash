@@ -144,7 +144,7 @@ fi
 
 echo "Ensure folder exists for caddy"
 mkdir -p /mnt/encrypted/caddy
-mkdir -p  /mnt/encrypted/caddy/acme/acme-staging-v02.api.letsencrypt.org-directory/users/deployers@fractal.id/
+mkdir -p  /mnt/encrypted/caddy/acme/acme-staging-v02.api.letsencrypt.org-directory/users/deployers@idos.network/
 
 # Set-up facesing service
 echo "Fetching key 1 public multibase from S3"
@@ -165,35 +165,21 @@ fi
 HOST=$(cat ./$HOSTNAME_FILE)
 sed -i "s#export const HOST = \"INSERT YOUR HOST HERE\";#export const HOST = \"${HOST//&/\\&}\";#" ./facesign-service/env.ts
 
-echo "Fetching Caddyfile from S3"
-CADDYFILE=Caddyfile
-aws s3 cp "s3://$S3_SECRETS_BUCKET/$CADDYFILE-facesign" "./$CADDYFILE" --region eu-west-1
-if [ ! -f "./$CADDYFILE" ]; then
-  echo "Couldn't download $CADDYFILE from S3, exiting"
-  exit 1
-fi
-
 echo "Fetching JWT token secret from S3"
-AWS_KMS_JWT_KEY_ID="$(cat ./jwt_key.arn)"
+
 JWT_TOKEN_SECRET_FILE=jwt_token_private.pem.enc
 JWT_TOKEN_PUBLIC_FILE=jwt_token_public.pem
 
-aws s3 cp "s3://$S3_SECRETS_BUCKET/$JWT_TOKEN_SECRET_FILE" "./$JWT_TOKEN_SECRET_FILE" --region eu-west-1 2>aws_s3_cp_error.log || true
-if [ ! -f "./$JWT_TOKEN_SECRET_FILE" ]; then
+aws s3 cp "s3://$S3_SECRETS_BUCKET/$JWT_TOKEN_SECRET_FILE" "./facesign-service/$JWT_TOKEN_SECRET_FILE" --region eu-west-1
+if [ ! -f "./facesign-service/$JWT_TOKEN_SECRET_FILE" ]; then
   echo "JWT secret not found in S3, generating a new one ..."
   openssl ecparam -name secp521r1 -genkey -noout -out jwt_token_private.pem
   openssl ec -in jwt_token_private.pem -pubout -out jwt_token_public.pem
 
   echo "Encrypting JWT token secret with AWS KMS..."
-  aws kms encrypt --key-id "$AWS_KMS_JWT_KEY_ID" --plaintext fileb://jwt_token_private.pem --output text --query CiphertextBlob --region eu-west-1  > "$JWT_TOKEN_SECRET_FILE"
 
   echo "Uploading both parts of JWT key in S3..."
-  aws s3 cp "./$JWT_TOKEN_SECRET_FILE" "s3://$S3_SECRETS_BUCKET/$JWT_TOKEN_SECRET_FILE" --region eu-west-1
-  aws s3 cp "./$JWT_TOKEN_PUBLIC_FILE" "s3://$S3_SECRETS_BUCKET/$JWT_TOKEN_PUBLIC_FILE" --region eu-west-1
 fi
-
-echo "Decrypting JWT token private key"
-aws kms decrypt --ciphertext-blob "$(cat $JWT_TOKEN_SECRET_FILE)" --output text --query Plaintext --region eu-west-1 | base64 -d > ./facesign-service/jwt_token_private.pem
 
 echo "Running PM2-runtime"
 export HOME=/home/FaceTec_Custom_Server
