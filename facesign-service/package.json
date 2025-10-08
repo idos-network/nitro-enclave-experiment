@@ -4,8 +4,12 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "start": "node index.js",
-    "repopulate": "node repopulate.js"
+    "start": "node index.ts",
+    "repopulate": "node utils/repopulate.ts",
+    "test": "vitest",
+    "types": "tsc --noEmit",
+    "format": "npx @biomejs/biome check --write",
+    "format:ci": "npx @biomejs/biome ci"
   },
   "author": "",
   "license": "ISC",
@@ -17,5 +21,17 @@
     "mongodb": "^6.19.0",
     "morgan": "^1.10.1",
     "pm2": "^6.0.13"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.2.5",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/morgan": "^1.9.10",
+    "@types/node": "^24.7.0",
+    "@types/supertest": "^6.0.3",
+    "@vitest/ui": "^2.1.8",
+    "supertest": "^7.0.0",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.8"
   }
 }

@@ -1,0 +1,47 @@
+name: FaceSign Service Tests
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - "facesign-service/**"
+      - ".github/workflows/facesign-service-tests.yml"
+  pull_request:
+    branches: [master, main, develop]
+    paths:
+      - "facesign-service/**"
+      - ".github/workflows/facesign-service-tests.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [22.x, 24.x]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: "npm"
+          cache-dependency-path: facesign-service/package-lock.json
+
+      - name: Install dependencies
+        working-directory: facesign-service
+        run: npm ci
+
+      - name: Run type check
+        working-directory: facesign-service
+        run: npm run types
+
+      - name: Run lint
+        working-directory: facesign-service
+        run: npm run format:ci
+
+      - name: Run tests
+        working-directory: facesign-service
+        run: npm run test
