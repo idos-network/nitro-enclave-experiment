@@ -65,7 +65,7 @@ export async function searchForDuplicates(
   externalDatabaseRefID: string,
   key: string,
   groupName: string,
-  deviceIdentifier: string,
+  deviceIdentifier?: string,
 ) {
   const response = await fetch(`${FACETEC_SERVER}3d-db/search`, {
     method: "POST",
