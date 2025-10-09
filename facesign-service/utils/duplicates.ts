@@ -33,12 +33,16 @@ async function checkDuplicates() {
 
       i++;
 
-      const searchResult = await searchForDuplicates(externalDatabaseRefID, FACETEC_DEVICE_KEY, GROUP_NAME, "curl");
+      const searchResult = await searchForDuplicates(
+        externalDatabaseRefID,
+        FACETEC_DEVICE_KEY,
+        GROUP_NAME,
+      );
 
       if (searchResult.success && searchResult.results.length > 1) {
-        searchResult.results.forEach(item => {
+        searchResult.results.forEach((item) => {
           problematicUserId.add(item.identifier);
-        })
+        });
       }
     } catch (err) {
       console.error(err);
