@@ -1,16 +1,16 @@
-name: FaceSign Service Tests
+name: FaceSign Service
 
 on:
   push:
     branches: [master, main]
     paths:
       - "facesign-service/**"
-      - ".github/workflows/facesign-service-tests.yml"
+      - ".github/workflows/facesign-service.yml"
   pull_request:
     branches: [master, main, develop]
     paths:
       - "facesign-service/**"
-      - ".github/workflows/facesign-service-tests.yml"
+      - ".github/workflows/facesign-service.yml"
 
 jobs:
   test:

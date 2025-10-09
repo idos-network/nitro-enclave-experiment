@@ -8,6 +8,9 @@ set -o pipefail
 ifconfig lo 127.0.0.1
 ip route add default dev lo src 127.0.0.1
 
+sysctl -w net.ipv4.ip_forward=1
+iptables-legacy -t nat -A OUTPUT -d 169.254.169.254 -p tcp --dport 80 -j DNAT --to-destination 127.0.0.2:80
+
 # To be able to enable and control DNS resolution.
 cat /root/extra_hosts >> /etc/hosts
 
@@ -39,4 +42,4 @@ if false; then #SSH#
     /usr/sbin/sshd -f /etc/ssh/sshd_config -e -D &
 fi
 
-exec bash /app/scripts/run.sh
+exec bash /app/run.ash

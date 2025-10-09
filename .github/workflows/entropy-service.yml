@@ -1,0 +1,39 @@
+name: Entropy service
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - "entropy-service/**"
+      - ".github/workflows/entropy-service.yml"
+  pull_request:
+    branches: [master, main, develop]
+    paths:
+      - "entropy-service/**"
+      - ".github/workflows/entropy-service.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 24.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24.x"
+          cache: "npm"
+          cache-dependency-path: entropy-service/package-lock.json
+
+      - name: Install dependencies
+        working-directory: entropy-service
+        run: npm ci
+
+      - name: Run type check
+        working-directory: entropy-service
+        run: npm run types
+
+      - name: Run lint
+        working-directory: entropy-service
+        run: npm run format:ci

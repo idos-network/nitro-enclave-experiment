@@ -1,44 +1,19 @@
-import express from "express";
 import process from "node:process";
-import helmet from "helmet";
-import cors from "cors";
-import morgan from "morgan";
-import jwt from "jsonwebtoken";
-import { JWT_PUBLIC_KEY } from "./env";
-import { fetchOrCreateEntropy } from "./db";
-import fs from "node:fs";
+import app from "./server.ts";
 
-const app = express();
+const PORT = process.env.PORT || 7000;
 
-app.use(helmet());
-app.use(cors());
-app.use(morgan("dev"));
-app.use(express.json({ limit: "50mb" }));
-
-app.get("/", (_req, res) => {
-  res.send("Welcome to the FaceSign entropy API!");
+const server = app.listen(PORT, () => {
+	console.log(`Server started and listening on port ${PORT}`);
 });
 
-app.post("/entropy", async (req, res) => {
-  // Validate token from body
-  const token = req.body.token;
-
-  if (!token) {
-    return res.status(400).json({ error: "Token is required" });
-  }
-
-  try {
-    const publicKey = fs.readFileSync(JWT_PUBLIC_KEY);
-    const result = jwt.verify(token, publicKey, { algorithms: ["HS512"] });
-    const entropy = await fetchOrCreateEntropy(result.sub as string);
-
-    res.json({ faceSignUserId: result.sub, entropy });
-  } catch (err) {
-    return res.status(401).json({ error: "Invalid token" });
-  }
+server.on("error", (err) => {
+	if ("code" in err && err.code === "EADDRINUSE") {
+		console.error(
+			`Port ${PORT} is already in use. Please choose another port or stop the process using it.`,
+		);
+	} else {
+		console.error("Failed to start server:", err);
+	}
+	process.exit(1);
 });
-
-const port = process.env.PORT || 8000;
-
-app.listen(port);
-console.log(`Server is running on http://localhost:${port}`);
