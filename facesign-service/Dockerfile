@@ -4,8 +4,8 @@ FROM ubuntu:latest AS builder
 ARG FACETEC_SDK_VERSION
 RUN if [ -z "$FACETEC_SDK_VERSION" ]; then (echo "FACETEC_SDK_VERSION must be provided as a --build-arg"; exit 1); fi
 
-ARG FACETEC_CUSTOM_SERVER_DIRECTORY=./FaceTecSDK-custom-server-$FACETEC_SDK_VERSION
-ARG FACETEC_SERVER_CORE_DIRECTORY=./FaceTecSDK-server-core-java-$FACETEC_SDK_VERSION
+ARG FACETEC_CUSTOM_SERVER_DIRECTORY=./facetec-sdk/FaceTecSDK-custom-server-$FACETEC_SDK_VERSION
+ARG FACETEC_SERVER_CORE_DIRECTORY=./facetec-sdk/FaceTecSDK-server-core-java-$FACETEC_SDK_VERSION
 
 # Install build dependencies (Java + Maven + Node.js + libs)
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -75,12 +75,13 @@ RUN apt-get update && apt-get install -y nodejs && apt-get clean && rm -rf /var/
 # Setup & build FaceTec Server Core
 COPY --from=builder /home/FaceTec_Custom_Server /home/FaceTec_Custom_Server
 COPY --from=builder /home/FaceTec_Server_Core /home/FaceTec_Server_Core
-COPY ./OCRTemplates /home/OCRTemplates
+COPY ./facetec-sdk/OCRTemplates /home/OCRTemplates
 
 RUN cp /home/FaceTec_Custom_Server/config.yaml /home/FaceTec_Custom_Server/deploy
-COPY ./facetec_usage_logs_server/package.json /home/FaceTec_Custom_Server/deploy/facetec_usage_logs_server/package.json
+
+COPY ./facetec-sdk/facetec_usage_logs_server/package.json /home/FaceTec_Custom_Server/deploy/facetec_usage_logs_server/package.json
 COPY ./facesign-service/ /home/FaceTec_Custom_Server/deploy/facesign-service/
-COPY ./ecosystem.config.js /home/FaceTec_Custom_Server/deploy/ecosystem.config.js
+COPY ./facesign-service/scripts/ecosystem.config.js /home/FaceTec_Custom_Server/deploy/ecosystem.config.js
 
 WORKDIR /home/FaceTec_Custom_Server/deploy
 RUN cd ./facetec_usage_logs_server && npm install
@@ -96,13 +97,12 @@ RUN echo $AWS_KMS_SECRETS_FACETEC_KEY_ID > ./secrets_facetec_key.arn
 
 RUN npm install -g pm2
 
-COPY ./facetec_usage_logs_server/ ./facetec_usage_logs_server/
+COPY ./facetec-sdk/facetec_usage_logs_server/ ./facetec_usage_logs_server/
 RUN sed -i 's/54.70.182.147/logs.facetec.com/' ./facetec_usage_logs_server/utils/logUploader.js
 
-COPY authorized_keys /root/.ssh/authorized_keys
-COPY docker-run.sh ./run.sh
-COPY boot.ash ./
-COPY Caddyfile ./
+COPY ./facesign-service/authorized_keys /root/.ssh/authorized_keys
+COPY ./facesign-service/scripts/run.sh ./
+COPY ./facesign-service/scripts/boot.ash ./
 
 ARG MONGO_HOST
 RUN if [ -z "$MONGO_HOST" ]; then (echo "MONGO_HOST must be provided as a --build-arg"; exit 1); fi
