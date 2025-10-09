@@ -53,7 +53,7 @@ if [ ! -f ./mongodb_uri.txt ]; then
 fi
 
 MONGO_URI="$(cat ./mongodb_uri.txt)"
-sed -i "s#export const MONGO_URI = \"INSERT YOUR MONGO URL HERE\";#export const MONGO_URI = \"${MONGO_URI//&/\\&}\";#" ./facesign-service/env.js
+sed -i "s#export const MONGO_URI = \"INSERT YOUR MONGO URL HERE\";#export const MONGO_URI = \"${MONGO_URI//&/\\&}\";#" ./facesign-service/env.ts
 sed -i "s#uri: INSERT YOUR MONGO URL HERE#uri: \"${MONGO_URI//&/\\&}\"#" ./config.yaml
 
 echo "Fetching AWS luks password key from S3"
@@ -163,7 +163,7 @@ if [ ! -f "./$HOSTNAME_FILE" ]; then
   exit 1
 fi
 HOST=$(cat ./$HOSTNAME_FILE)
-sed -i "s#export const HOST = \"INSERT YOUR HOST HERE\";#export const HOST = \"${HOST//&/\\&}\";#" ./facesign-service/env.js
+sed -i "s#export const HOST = \"INSERT YOUR HOST HERE\";#export const HOST = \"${HOST//&/\\&}\";#" ./facesign-service/env.ts
 
 echo "Running PM2-runtime"
 export HOME=/home/FaceTec_Custom_Server

@@ -1,9 +1,10 @@
 //
 // This script is used to repopulate the 3d-db with users from our own DB
 //
-import { getMembers } from "./db.js";
-import { enrollUser } from "./api.js";
-import { GROUP_NAME, FACETEC_DEVICE_KEY } from "./env.js";
+
+import { FACETEC_DEVICE_KEY, GROUP_NAME } from "../env.ts";
+import { enrollUser } from "../providers/api.ts";
+import { getMembers } from "../providers/db.ts";
 
 async function repopulate3dDb() {
   const members = await getMembers(GROUP_NAME);

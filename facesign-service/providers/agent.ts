@@ -1,5 +1,5 @@
-import net from "net";
-import os from "os";
+import net from "node:net";
+import os from "node:os";
 import pm2 from "pm2";
 
 function pm2Stats() {
@@ -12,13 +12,13 @@ function pm2Stats() {
         if (err) return reject(err);
 
         resolve(
-          list.map(proc => ({
+          list.map((proc) => ({
             name: proc.name,
             pid: proc.pid,
-            status: proc.pm2_env.status,
-            cpu: proc.monit.cpu,
-            memory: proc.monit.memory,
-          }))
+            status: proc.pm2_env?.status,
+            cpu: proc.monit?.cpu,
+            memory: proc.monit?.memory,
+          })),
         );
       });
     });
@@ -26,7 +26,17 @@ function pm2Stats() {
 }
 
 class AgentClient {
-  constructor(host, port) {
+  private host: string;
+  private port: number;
+  private client: net.Socket | null;
+  private heartbeatInterval: NodeJS.Timeout | null;
+  private pongCheckInterval: NodeJS.Timeout | null;
+  private statsInterval: NodeJS.Timeout | null;
+  private lastPong: number;
+  private reconnectDelay: number;
+  private maxReconnectDelay: number;
+
+  constructor(host: string, port: number) {
     this.host = host;
     this.port = port;
     this.client = null;
@@ -56,14 +66,14 @@ class AgentClient {
 
     // heartbeat ping
     this.heartbeatInterval = setInterval(() => {
-      this.client.write("ping\n");
+      this.client?.write("ping\n");
     }, 5000);
 
     // heartbeat check
     this.pongCheckInterval = setInterval(() => {
       if (Date.now() - this.lastPong > 15000) {
         console.error("[AGENT] No pong in 15s, destroying socket...");
-        this.client.destroy();
+        this.client?.destroy();
       }
     }, 5000);
 
@@ -83,11 +93,12 @@ class AgentClient {
     }, 15000);
   }
 
-  onData(data) {
+  // biome-ignore lint/suspicious/noExplicitAny: On data on socket
+  onData(data: any) {
     const messages = data
       .toString()
       .split("\n")
-      .map((s) => s.trim())
+      .map((s: string) => s.trim())
       .filter(Boolean);
 
     for (const msg of messages) {
@@ -99,10 +110,10 @@ class AgentClient {
     }
   }
 
-  onError(err) {
+  onError(err: Error) {
     console.error("[AGENT] Socket error:", err);
     this.cleanup();
-    this.client.destroy(); // trigger close
+    this.client?.destroy(); // trigger close
   }
 
   onClose() {
@@ -126,7 +137,7 @@ class AgentClient {
     this.reconnectDelay = Math.min(this.reconnectDelay * 2, this.maxReconnectDelay);
   }
 
-  writeLog(type, data) {
+  writeLog(type: string, data: unknown) {
     if (!this.client || this.client.destroyed) return;
 
     const logEntry = {
@@ -135,7 +146,7 @@ class AgentClient {
       timestamp: new Date().toISOString(),
     };
 
-    this.client.write(JSON.stringify(logEntry) + "\n");
+    this.client.write(`${JSON.stringify(logEntry)}\n`);
   }
 }
 
