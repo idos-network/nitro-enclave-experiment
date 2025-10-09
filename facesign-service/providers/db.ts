@@ -1,5 +1,5 @@
 import { type Db, MongoClient, MongoServerError } from "mongodb";
-import { DB_COLLECTION_NAME, MONGO_URI } from "../env.ts";
+import { DB_COLLECTION_NAME, MONGO_URI, DB_NAME } from "../env.ts";
 
 const client = new MongoClient(MONGO_URI, {
   maxPoolSize: 10,
@@ -11,7 +11,7 @@ let db: Db | null = null;
 export async function connectDB() {
   if (!db) {
     await client.connect();
-    db = client.db("face-sign-data");
+    db = client.db(DB_NAME);
 
     // Create a member group members with unique users
     await db
