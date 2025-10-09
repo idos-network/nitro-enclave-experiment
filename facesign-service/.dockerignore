@@ -1,0 +1,7 @@
+node_modules/
+Dockerfile
+tsconfig.json
+vitest.config.ts
+scripts/
+biome.jsonc
+*.env
