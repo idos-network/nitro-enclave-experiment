@@ -43,5 +43,5 @@ const server = net.createServer((socket) => {
 
 (async () => {
   const PORT = Number(process.env.PORT) || 7000;
-  server.listen(PORT, "127.0.0.1", () => console.log(`Listening on ${PORT}`));
+  server.listen(PORT, "0.0.0.0", () => console.log(`Listening on ${PORT}`));
 })();
