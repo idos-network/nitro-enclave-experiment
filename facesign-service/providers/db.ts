@@ -1,5 +1,5 @@
 import { type Db, MongoClient, MongoServerError } from "mongodb";
-import { DB_COLLECTION_NAME, MONGO_URI, DB_NAME } from "../env.ts";
+import { DB_COLLECTION_NAME, DB_NAME, MONGO_URI } from "../env.ts";
 
 const client = new MongoClient(MONGO_URI, {
   maxPoolSize: 10,
