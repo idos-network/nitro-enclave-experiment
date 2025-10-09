@@ -144,6 +144,10 @@ if [ ! -d /mnt/encrypted/logs ]; then
   mkdir -p /mnt/encrypted/logs
 fi
 
+echo "Ensure folder exists for caddy"
+mkdir -p /mnt/encrypted/caddy
+mkdir -p  /mnt/encrypted/caddy/acme/acme-staging-v02.api.letsencrypt.org-directory/users/deployers@fractal.id/
+
 # Set-up facesing service
 echo "Fetching key 1 public multibase from S3"
 KEY_1_MULTIBASE_PUBLIC_FILE=multibase_key_1_public.txt
@@ -171,6 +175,7 @@ if [ ! -f "./$CADDYFILE" ]; then
   exit 1
 fi
 
+<<<<<<< HEAD
 echo "Ensure folder exists for caddy"
 mkdir -p /mnt/encrypted/caddy
 mkdir -p  /mnt/encrypted/caddy/acme/acme-staging-v02.api.letsencrypt.org-directory/users/deployers@fractal.id/
