@@ -5,7 +5,7 @@ module.exports = {
       cwd: "/home/FaceTec_Custom_Server/deploy/facetec_usage_logs_server",
       script: "index.js",
       args: "start",
-      log_file: '/home/FaceTec_Custom_Server/deploy/facetec_usage_logs_server/server/logs.txt',
+      log_file: "/home/FaceTec_Custom_Server/deploy/facetec_usage_logs_server/server/logs.txt",
       time: true, // Add timestamps to logs
       wait_ready: true, // Wait for "ready" signal before considering
       listen_timeout: 15000, // Wait 15 seconds for "ready" signal
@@ -34,6 +34,6 @@ module.exports = {
       args: "run --config /home/FaceTec_Custom_Server/deploy/Caddyfile --adapter caddyfile",
       wait_ready: true,
       autorestart: true,
-    }
+    },
   ],
 };

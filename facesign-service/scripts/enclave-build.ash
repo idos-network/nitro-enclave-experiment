@@ -19,12 +19,12 @@ if [ "${MONGO_HOST:-null}" = "null" ]; then
 fi
 
 # Get the FaceTec SDK version
-FACETEC_SDK_VERSION="$(find ~ec2-user/custom-server/ -name 'FaceTecSDK-custom-server-*' | sed -E 's#.*/FaceTecSDK-custom-server-([[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+)#\1#')"
+FACETEC_SDK_VERSION="$(find ~ec2-user/server/facetec-sdk/ -name 'FaceTecSDK-custom-server-*' | sed -E 's#.*/FaceTecSDK-custom-server-([[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+)#\1#')"
 AWS_KMS_SECRETS_KEY_ID="$(aws kms describe-key --key-id alias/secretsEncryption --query 'KeyMetadata.Arn' --output text --region eu-west-1)"
 AWS_KMS_SECRETS_FACETEC_KEY_ID="$(aws kms describe-key --key-id alias/secretsFacetecEncryption --query 'KeyMetadata.Arn' --output text --region eu-west-1)"
 
-sudo cp ~ec2-user/.ssh/authorized_keys ~ec2-user/custom-server/
-sudo chown ec2-user:ec2-user ~ec2-user/custom-server/authorized_keys
+sudo cp ~ec2-user/.ssh/authorized_keys ~ec2-user/server/facesign-service/
+sudo chown ec2-user:ec2-user ~ec2-user/server/facesign-service/authorized_keys
 
 S3_SECRETS_BUCKET=$(aws s3api list-buckets --query "Buckets[?contains(Name, 'facesign') && contains(Name, 'secrets')].Name" --output text)
 if [[ "${S3_SECRETS_BUCKET:-null}" == "null" ]]; then
@@ -40,8 +40,8 @@ docker build \
     --build-arg AWS_KMS_SECRETS_FACETEC_KEY_ID="$AWS_KMS_SECRETS_FACETEC_KEY_ID" \
     --build-arg S3_SECRETS_BUCKET="$S3_SECRETS_BUCKET" \
     -t "$TARGET_DOCKER_IMAGE" \
-    -f ~ec2-user/custom-server/Dockerfile."$TARGET_DOCKER_IMAGE" \
-    ~ec2-user/custom-server/ \
+    -f ~ec2-user/server/facesign-service/Dockerfile \
+    ~ec2-user/server/ \
 ;
 
 # Free up memory for build-enclave

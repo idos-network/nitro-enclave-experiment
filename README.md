@@ -1,6 +1,6 @@
 # Nitro experiment
 
-## Setting up
+## Setting up facesign service
 
 1. Download the custom server SDK from <https://dev.facetec.com/configuration-wizard?platform=custom-server>, extract it into `facetec-sdk`.
     - Wizard config
@@ -9,14 +9,10 @@
         - SFTP usage logs
         - No postman init
 2. On `facetec-sdk/facetec_usage_logs_server/config.yml`, set the `sftpConfig.privateKey` field to the right key (that needs to have been configured in FaceTec beforehand).
-2. (OPTIONAL) Add your ssh key to `terraform/terraform.tfvars`.
-2. (OPTIONAL) Apply the terraform in the `terraform` folder. You'll need to `aws configure sso` and choose the `nitro-enclave` account.
-3. Update `IP` address in `sync_instance.sh`
-4. Update `Caddyfile` to proper URL
-5. Run `bash sync_instance.sh` from root dir.
-6. `ssh ec2-user@"$(cd terraform; terraform output -raw ec2_public_ip)" bash custom-server/build.ash`
-7. `ssh ec2-user@"$(cd terraform; terraform output -raw ec2_public_ip)" sudo reboot`
-8. `ssh ec2-user@"$(cd terraform; terraform output -raw ec2_public_ip)" bash custom-server/run.ash`
+3. Run `bash sync_instance.sh EC2_IP_ADDR` from root dir.
+4. `ssh ec2-user@"$(cd terraform; terraform output -raw ec2_public_ip)" bash server/facesign-service/scripts/enclave-build.ash`
+5. `ssh ec2-user@"$(cd terraform; terraform output -raw ec2_public_ip)" sudo reboot`
+6. `ssh ec2-user@"$(cd terraform; terraform output -raw ec2_public_ip)" bash server/facesign-service/scripts/enclave-run.ash`
 
 This should boot the enclave in debug mode and stream its stdout.
 
