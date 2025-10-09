@@ -5,11 +5,11 @@ on:
     branches: [master, main]
     paths:
       - "agent/**"
-      - ".github/workflows/agent-service-check.yml"
+      - ".github/workflows/agent-service.yml"
   pull_request:
     paths:
       - "agent/**"
-      - ".github/workflows/agent-service-check.yml"
+      - ".github/workflows/agent-service.yml"
 
 jobs:
   check:
@@ -40,7 +40,6 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     needs: check
-    if: github.ref == 'refs/heads/master'
 
     permissions:
       contents: read

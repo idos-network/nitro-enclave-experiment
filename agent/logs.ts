@@ -5,7 +5,7 @@ import {
   PutLogEventsCommand,
 } from "@aws-sdk/client-cloudwatch-logs";
 
-const logGroupName = "/ec2/nitro/facesign";
+const logGroupName = `/ec2/nitro/${process.env.PREFIX}`;
 const logStreamName = "agent-stream";
 const cwLogs = new CloudWatchLogsClient({ region: "eu-west-1" });
 
