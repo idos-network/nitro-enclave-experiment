@@ -1,8 +1,5 @@
 FROM node:24-alpine
 
-# Install pnpm
-RUN corepack enable && corepack prepare pnpm@10.15.0 --activate
-
 WORKDIR /app
 
 # Copy package files
