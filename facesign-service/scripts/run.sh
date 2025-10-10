@@ -173,6 +173,28 @@ if [ ! -f "./$CADDYFILE" ]; then
   exit 1
 fi
 
+echo "Fetching JWT token secret from S3"
+AWS_KMS_JWT_KEY_ID="$(cat ./jwt_key.arn)"
+JWT_TOKEN_SECRET_FILE=jwt_token_private.pem.enc
+JWT_TOKEN_PUBLIC_FILE=jwt_token_public.pem
+
+aws s3 cp "s3://$S3_SECRETS_BUCKET/$JWT_TOKEN_SECRET_FILE" "./$JWT_TOKEN_SECRET_FILE" --region eu-west-1 2>aws_s3_cp_error.log || true
+if [ ! -f "./$JWT_TOKEN_SECRET_FILE" ]; then
+  echo "JWT secret not found in S3, generating a new one ..."
+  openssl ecparam -name secp521r1 -genkey -noout -out jwt_token_private.pem
+  openssl ec -in jwt_token_private.pem -pubout -out jwt_token_public.pem
+
+  echo "Encrypting JWT token secret with AWS KMS..."
+  aws kms encrypt --key-id "$AWS_KMS_JWT_KEY_ID" --plaintext fileb://jwt_token_private.pem --output text --query CiphertextBlob --region eu-west-1  > "$JWT_TOKEN_SECRET_FILE"
+
+  echo "Uploading both parts of JWT key in S3..."
+  aws s3 cp "./$JWT_TOKEN_SECRET_FILE" "s3://$S3_SECRETS_BUCKET/$JWT_TOKEN_SECRET_FILE" --region eu-west-1
+  aws s3 cp "./$JWT_TOKEN_PUBLIC_FILE" "s3://$S3_SECRETS_BUCKET/$JWT_TOKEN_PUBLIC_FILE" --region eu-west-1
+fi
+
+echo "Decrypting JWT token private key"
+aws kms decrypt --ciphertext-blob "$(cat $JWT_TOKEN_SECRET_FILE)" --output text --query Plaintext --region eu-west-1 | base64 -d > ./facesign-service/jwt_token_private.pem
+
 echo "Running PM2-runtime"
 export HOME=/home/FaceTec_Custom_Server
 pm2-runtime ecosystem.config.js

@@ -3,7 +3,7 @@
 set -u
 set -o pipefail
 
-TARGET_DOCKER_IMAGE=idos-facetec
+TARGET_DOCKER_IMAGE=idos-entropy
 
 # Cleanup. This is ok to fail and proceed.
 sudo nitro-cli terminate-enclave --all
@@ -18,14 +18,11 @@ if [ "${MONGO_HOST:-null}" = "null" ]; then
     exit 1
 fi
 
-# Get the FaceTec SDK version
-FACETEC_SDK_VERSION="$(find ~ec2-user/server/facetec-sdk/ -name 'FaceTecSDK-custom-server-*' | sed -E 's#.*/FaceTecSDK-custom-server-([[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+)#\1#')"
-AWS_KMS_SECRETS_KEY_ID="$(aws kms describe-key --key-id alias/secretsEncryption --query 'KeyMetadata.Arn' --output text --region eu-west-1)"
-AWS_KMS_SECRETS_FACETEC_KEY_ID="$(aws kms describe-key --key-id alias/secretsFacetecEncryption --query 'KeyMetadata.Arn' --output text --region eu-west-1)"
-AWS_KMS_JWT_KEY_ID="$(aws kms describe-key --key-id alias/jwtEncryption --query 'KeyMetadata.Arn' --output text --region eu-west-1)"
+# Get FLE keys
+AWS_KMS_FLE_KEY_ID="$(aws kms describe-key --key-id alias/entropyFleEncryption --query 'KeyMetadata.Arn' --output text --region eu-west-1)"
 
-sudo cp ~ec2-user/.ssh/authorized_keys ~ec2-user/server/facesign-service/
-sudo chown ec2-user:ec2-user ~ec2-user/server/facesign-service/authorized_keys
+sudo cp ~ec2-user/.ssh/authorized_keys ~ec2-user/entropy-service/
+sudo chown ec2-user:ec2-user ~ec2-user/entropy-service/authorized_keys
 
 S3_SECRETS_BUCKET=$(aws s3api list-buckets --query "Buckets[?contains(Name, 'facesign') && contains(Name, 'secrets')].Name" --output text)
 if [[ "${S3_SECRETS_BUCKET:-null}" == "null" ]]; then
@@ -36,14 +33,11 @@ fi
 # Build origin Docker image
 docker build \
     --build-arg MONGO_HOST="$MONGO_HOST" \
-    --build-arg FACETEC_SDK_VERSION="$FACETEC_SDK_VERSION" \
-    --build-arg AWS_KMS_SECRETS_KEY_ID="$AWS_KMS_SECRETS_KEY_ID" \
-    --build-arg AWS_KMS_SECRETS_FACETEC_KEY_ID="$AWS_KMS_SECRETS_FACETEC_KEY_ID" \
-    --build-arg AWS_KMS_JWT_KEY_ID="$AWS_KMS_JWT_KEY_ID" \
+    --build-arg AWS_KMS_FLE_KEY_ID="$AWS_KMS_FLE_KEY_ID" \
     --build-arg S3_SECRETS_BUCKET="$S3_SECRETS_BUCKET" \
     -t "$TARGET_DOCKER_IMAGE" \
-    -f ~ec2-user/server/facesign-service/Dockerfile \
-    ~ec2-user/server/ \
+    -f ~ec2-user/entropy-service/Dockerfile \
+    ~ec2-user/entropy-service/ \
 ;
 
 # Free up memory for build-enclave
