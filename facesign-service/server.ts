@@ -151,8 +151,8 @@ app.post("/login", async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      wasProcessed: true,
-      error: false,
+      wasProcessed,
+      error: error ?? false,
       scanResultBlob: scanResultBlob,
       faceSignUserId,
       token,
