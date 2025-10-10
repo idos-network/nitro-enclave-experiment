@@ -68,9 +68,11 @@ describe("Login API", () => {
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
+      error: false,
       faceSignUserId: expect.any(String),
       scanResultBlob: "mock-scan-result-blob",
       success: true,
+      wasProcessed: true,
       token: expect.any(String),
     });
 
@@ -172,9 +174,11 @@ describe("Login API", () => {
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
+      error: false,
       faceSignUserId: resultId,
       scanResultBlob: "mock-scan-result-blob",
       success: true,
+      wasProcessed: true,
       token: expect.any(String),
     });
 
