@@ -1,7 +1,16 @@
+import { defaultProvider } from "@aws-sdk/credential-provider-node";
 import * as bip39 from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
-import { ClientEncryption, type Db, MongoClient, type ObjectId } from "mongodb";
 import {
+	Binary,
+	ClientEncryption,
+	type Db,
+	type KMSProviders,
+	MongoClient,
+	type UUID,
+} from "mongodb";
+import {
+	AWS_REGION,
 	DB_COLLECTION_NAME,
 	DB_NAME,
 	FLE_KEY_ALIAS,
@@ -10,117 +19,170 @@ import {
 } from "../env.ts";
 
 let db: Db;
-let dataKeyId: ObjectId | null = null;
+let cacheKmsProvider: KMSProviders | null = null;
+let cacheClientEncryption: ClientEncryption | null = null;
 
 // FLE configuration
-const keyVaultNamespace = "encryption.__keyVault";
-
-const kmsProviders = {
-	aws: {
-		accessKeyId: process.env.AWS_ACCESS_KEY_ID as string,
-		secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY as string,
-	},
-};
-
-const masterKey = {
-	key: FLE_KMS_KEY_ID,
-	region: process.env.AWS_REGION as string,
-};
+const KEY_DB = "encryption";
+const KEY_COLLECTION = "__keyVault";
+const keyVaultNamespace = `${KEY_DB}.${KEY_COLLECTION}`;
 
 const client = new MongoClient(MONGO_URI, {
 	maxPoolSize: 10,
 	wtimeoutMS: 2500,
 });
 
-const clientEncryption = new ClientEncryption(client, {
-	keyVaultNamespace,
-	kmsProviders,
-});
+async function ensureKmsProviders() {
+	if (cacheKmsProvider) {
+		return cacheKmsProvider;
+	}
+
+	const credentialsProvider = defaultProvider();
+	const credentials = await credentialsProvider();
+
+	cacheKmsProvider = {
+		aws: {
+			accessKeyId: credentials.accessKeyId,
+			secretAccessKey: credentials.secretAccessKey,
+			// For some reason the types say sessionToken is string, but it can be undefined
+			// and it's trying to set never to string... it's weird
+			// biome-ignore lint/suspicious/noExplicitAny: invalid types
+			sessionToken: credentials.sessionToken as any,
+		},
+	};
+
+	return cacheKmsProvider;
+}
+
+async function getClientEncryption() {
+	if (cacheClientEncryption) {
+		return cacheClientEncryption;
+	}
+
+	const kmsProviders = await ensureKmsProviders();
+
+	cacheClientEncryption = new ClientEncryption(client, {
+		keyVaultNamespace,
+		kmsProviders,
+	});
+
+	return cacheClientEncryption;
+}
 
 /**
  * Find or create the data encryption key
  */
-async function ensureKey() {
+async function ensureKey(): Promise<UUID> {
 	await client.connect();
 
-	const keyVaultCollection = client.db("encryption").collection("__keyVault");
-	let existingKey = await keyVaultCollection.findOne({
-		keyAltNames: FLE_KEY_ALIAS,
-	});
+	// Check if collection exists
+	const collections = await client
+		.db(KEY_DB)
+		.listCollections({}, { nameOnly: true })
+		.toArray();
+	const collectionExists = collections.some((c) => c.name === KEY_COLLECTION);
+
+	if (!collectionExists) {
+		// Initialize key storage
+		await client.db(KEY_DB).createCollection(KEY_COLLECTION);
+		await client
+			.db(KEY_DB)
+			.collection(KEY_COLLECTION)
+			.createIndex(
+				{ keyAltNames: 1 },
+				{
+					unique: true,
+					partialFilterExpression: { keyAltNames: { $exists: true } },
+				},
+			);
+	}
+
+	const clientEncryption = await getClientEncryption();
+	const existingKey = await clientEncryption.getKeyByAltName(FLE_KEY_ALIAS);
 
 	if (existingKey) {
 		return existingKey._id;
 	}
 
-	await clientEncryption.createDataKey("aws", {
-		masterKey,
+	return await clientEncryption.createDataKey("aws", {
+		masterKey: {
+			key: FLE_KMS_KEY_ID,
+			region: AWS_REGION,
+		},
 		keyAltNames: [FLE_KEY_ALIAS],
 	});
-
-	existingKey = await keyVaultCollection.findOne({
-		keyAltNames: FLE_KEY_ALIAS,
-	});
-
-	if (!existingKey) {
-		throw new Error("Failed to create data encryption key");
-	}
-
-	return existingKey._id;
 }
 
 export async function connectDB() {
-	if (db && dataKeyId) {
-		return db;
+	if (!db) {
+		await client.connect();
+		db = client.db(DB_NAME);
 	}
 
-	dataKeyId = await ensureKey();
+	const dataKeyId = await ensureKey();
+	const clientEncryption = await getClientEncryption();
 
-	const schemaMap = {
-		[`${DB_NAME}.${DB_COLLECTION_NAME}`]: {
-			bsonType: "object",
-			properties: {
-				entropy: {
-					encrypt: {
-						bsonType: "string",
-						algorithm: "AEAD_AES_256_CBC_HMAC_SHA_512-Random",
-						keyId: [dataKeyId],
-					},
-				},
-			},
+	return {
+		db,
+		encrypt: async (value: string) => {
+			return clientEncryption.encrypt(value, {
+				keyId: dataKeyId,
+				algorithm: "AEAD_AES_256_CBC_HMAC_SHA_512-Random",
+			});
+		},
+		decrypt: async (value: Binary) => {
+			return clientEncryption.decrypt(value);
 		},
 	};
-
-	// Auto encryption options
-	const autoEncryption = {
-		keyVaultNamespace,
-		kmsProviders,
-		schemaMap,
-	};
-
-	const encryptedClient = new MongoClient(MONGO_URI, {
-		autoEncryption,
-		maxPoolSize: 10,
-		wtimeoutMS: 2500,
-	});
-
-	db = encryptedClient.db(DB_NAME);
-	return db;
 }
 
-export async function fetchOrCreateEntropy(faceSignUserId: string) {
-	const database = await connectDB();
+export async function fetchOrCreateEntropy(
+	faceSignUserId: string,
+): Promise<{ insert: boolean; entropy: string }> {
+	const { db, encrypt, decrypt } = await connectDB();
 
-	const record = await database
+	// try to find existing encrypted record
+	const existing = await db
+		.collection(DB_COLLECTION_NAME)
+		.findOne({ faceSignUserId });
+
+	if (existing?.entropy) {
+		let payloadForDecrypt: Binary | undefined;
+
+		// Entropy can be stored in different formats, depending on how it was read from MongoDB
+		// But in the end it needs to be Binary(6) type for decrypt()
+		if (Buffer.isBuffer(existing.entropy)) {
+			payloadForDecrypt = new Binary(existing.entropy, 6);
+		} else if (typeof existing.entropy === "string") {
+			const buf = Buffer.from(existing.entropy, "base64");
+			payloadForDecrypt = new Binary(buf, 6);
+		} else if (existing.entropy?.$binary?.base64) {
+			const buf = Buffer.from(existing.entropy.$binary.base64, "base64");
+			payloadForDecrypt = new Binary(
+				buf,
+				parseInt(existing.entropy.$binary.subType, 16),
+			);
+		}
+
+		if (!payloadForDecrypt) {
+			throw new Error("Invalid entropy format");
+		}
+
+		const decrypted = await decrypt(payloadForDecrypt);
+		return { insert: false, entropy: decrypted.toString() };
+	}
+
+	// create new entropy and encrypt
+	const mnemonic = bip39.generateMnemonic(wordlist, 256);
+	const encryptedEntropy = await encrypt(mnemonic);
+
+	await db
 		.collection(DB_COLLECTION_NAME)
 		.findOneAndUpdate(
 			{ faceSignUserId },
-			{ $setOnInsert: { entropy: bip39.generateMnemonic(wordlist, 256) } },
-			{ upsert: true, returnDocument: "after" },
+			{ $setOnInsert: { entropy: encryptedEntropy } },
+			{ upsert: true },
 		);
 
-	if (!record || !record.value) {
-		throw new Error("Failed to fetch or create entropy");
-	}
-
-	return record.value.entropy as string;
+	return { insert: true, entropy: mnemonic };
 }

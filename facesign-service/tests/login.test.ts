@@ -12,7 +12,6 @@ const { privateKey, publicKey } = generateKeyPairSync("ec", {
 });
 
 vi.mock('fs', async () => {
-  // Načti skutečný modul fs
   const actualFs = await vi.importActual<typeof import('fs')>('fs');
 
   return {
