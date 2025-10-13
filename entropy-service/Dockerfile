@@ -2,9 +2,8 @@ FROM ubuntu:latest
 
 RUN apt-get update && apt-get install -y --no-install-recommends --no-install-suggests \
     curl \
-    default-jdk \
+    ca-certificates \
     iproute2 \
-    libgomp1 \
     net-tools \
     iptables \
     openssh-server \
@@ -14,11 +13,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends --no-install-su
     cryptsetup \
     vim \
     jq \
-&& rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
+&& update-ca-certificates && rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
 
 # Install AWS CLI v2
 RUN apt-get update && apt-get install -y \
-    curl unzip less groff \
+    unzip less groff \
     && rm -rf /var/lib/apt/lists/* \
     && curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/awscliv2.zip" \
     && unzip /tmp/awscliv2.zip -d /tmp \
@@ -27,7 +26,7 @@ RUN apt-get update && apt-get install -y \
 
 # Install Caddy
 RUN apt-get update && apt-get install -y \
-    debian-keyring debian-archive-keyring apt-transport-https curl gnupg \
+    debian-keyring debian-archive-keyring apt-transport-https gnupg \
     && curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg \
     && curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list \
     && chmod o+r /usr/share/keyrings/caddy-stable-archive-keyring.gpg \

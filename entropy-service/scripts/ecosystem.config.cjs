@@ -5,6 +5,9 @@ module.exports = {
 			cwd: "/app",
 			script: "npm",
 			args: "start",
+      env: {
+        NODE_ENV: "production",
+      }
 		},
 		{
 			name: "Caddy",
