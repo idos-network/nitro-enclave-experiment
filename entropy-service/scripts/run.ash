@@ -23,18 +23,16 @@ setup_vsock_networking "./vsock.json"
 
 # Get config.env and source it
 aws s3 cp "s3://$S3_SECRETS_BUCKET/entropy/config.env" ./config.env --region eu-west-1
+
+# Load env vars from config.env to global space
+set -a
 source ./config.env
+set +a
 
 if true; then #SSH#
   source "$SCRIPT_DIR/shared/ssh.ash"
   setup_ssh "$SSH_PUBLIC_KEY"
 fi
-
-# Replace env vars in env.ts
-# TODO: Solve this in pm2
-sed -i "s|INSERT MONGO URI HERE|$MONGO_URI|g" ./env.ts
-sed -i "s|INSERT KMS FLE ARN HERE|$KMS_FLE_ARN|g" ./env.ts
-sed -i "s|INSERT AWS REGION HERE|$AWS_REGION|g" ./env.ts
 
 # Add mongo host to /etc/hosts
 # TODO: Solve this in configuration
@@ -60,6 +58,6 @@ if [ ! -f "./$JWT_TOKEN_PUBLIC_FILE" ]; then
   exit 1
 fi
 
-echo "Running service"
+echo "Running service with $KMS_LUKS_ARN"
 export HOME=/app
 pm2-runtime ecosystem.config.cjs

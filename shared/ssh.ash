@@ -4,8 +4,8 @@
 setup_ssh() {
   local ssh_key="$1"
 
-  if [ ! -f "$ssh_key" ]; then
-    echo "⚠️ SSH key file $ssh_key not found, skipping SSH setup"
+  if [ -z "$ssh_key" ]; then
+    echo "⚠️ No SSH public key provided, skipping SSH setup"
     return
   fi
 
