@@ -147,20 +147,19 @@ export async function fetchOrCreateEntropy(
 		.findOne({ faceSignUserId });
 
 	if (existing?.entropy) {
-		let payloadForDecrypt: Binary | undefined;
+		// biome-ignore lint/suspicious/noExplicitAny: We don't know the type yet
+		let payloadForDecrypt: any = existing.entropy;
 
-		// Entropy can be stored in different formats, depending on how it was read from MongoDB
-		// But in the end it needs to be Binary(6) type for decrypt()
-		if (Buffer.isBuffer(existing.entropy)) {
-			payloadForDecrypt = new Binary(existing.entropy, 6);
-		} else if (typeof existing.entropy === "string") {
-			const buf = Buffer.from(existing.entropy, "base64");
+		if (Buffer.isBuffer(payloadForDecrypt)) {
+			payloadForDecrypt = new Binary(payloadForDecrypt, 6);
+		} else if (typeof payloadForDecrypt === "string") {
+			const buf = Buffer.from(payloadForDecrypt, "base64");
 			payloadForDecrypt = new Binary(buf, 6);
-		} else if (existing.entropy?.$binary?.base64) {
-			const buf = Buffer.from(existing.entropy.$binary.base64, "base64");
+		} else if (payloadForDecrypt?.$binary?.base64) {
+			const buf = Buffer.from(payloadForDecrypt.$binary.base64, "base64");
 			payloadForDecrypt = new Binary(
 				buf,
-				parseInt(existing.entropy.$binary.subType, 16),
+				parseInt(payloadForDecrypt.$binary.subType, 16),
 			);
 		}
 

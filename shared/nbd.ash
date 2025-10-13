@@ -2,7 +2,7 @@
 # shellcheck shell=dash
 
 setup_nbd() {
-  echo "💾 Starting and checking bdkit..."
+  echo "💾 Starting and checking nbdkit..."
 
   echo "–> opening socat for nbd on localhost:10809"
   socat TCP4-LISTEN:10809,fork,bind=127.0.0.1 VSOCK-CONNECT:3:10809 &
