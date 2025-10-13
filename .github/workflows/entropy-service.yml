@@ -7,7 +7,6 @@ on:
       - "entropy-service/**"
       - ".github/workflows/entropy-service.yml"
   pull_request:
-    branches: [master, main, develop]
     paths:
       - "entropy-service/**"
       - ".github/workflows/entropy-service.yml"

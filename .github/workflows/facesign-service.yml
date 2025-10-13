@@ -7,7 +7,6 @@ on:
       - "facesign-service/**"
       - ".github/workflows/facesign-service.yml"
   pull_request:
-    branches: [master, main, develop]
     paths:
       - "facesign-service/**"
       - ".github/workflows/facesign-service.yml"
