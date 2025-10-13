@@ -19,7 +19,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends --no-install-su
 RUN apt-get update && apt-get install -y \
     unzip less groff \
     && rm -rf /var/lib/apt/lists/* \
-    && curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "/tmp/awscliv2.zip" \
+    && curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/awscliv2.zip" \
     && unzip /tmp/awscliv2.zip -d /tmp \
     && /tmp/aws/install \
     && rm -rf /tmp/aws /tmp/awscliv2.zip
@@ -56,22 +56,12 @@ RUN npm ci --production
 
 # Copy source files & scripts
 COPY . .
-<<<<<<< HEAD
 COPY scripts/shared ./scripts/
-=======
-COPY scripts/boot.ash .
-COPY scripts/run.ash .
->>>>>>> 3e7ca6d (feat(entropy) Building enclave)
 COPY scripts/ecosystem.config.cjs .
 
 # S3 buckets contains configurations and aws keys arn
 # This will be replaced during the CI/CD process from secrets
 ENV S3_SECRETS_BUCKET="INSERT_S3_SECRETS_BUCKET_HERE"
-
-# FLE KMS key
-ARG AWS_KMS_FLE_KEY_ID
-RUN if [ -z "$AWS_KMS_FLE_KEY_ID" ]; then (echo "AWS_KMS_FLE_KEY_ID must be provided as a --build-arg"; exit 1); fi
-RUN sed -i "s#export const FLE_KMS_KEY_ID = \"INSERT YOUR KMS KEY ID HERE\";#export const FLE_KMS_KEY_ID = \"${AWS_KMS_FLE_KEY_ID}\";#" ./env.ts
 
 # Expose port (default 8000, configurable via PORT env var)
 EXPOSE 8000
