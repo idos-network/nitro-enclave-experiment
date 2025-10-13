@@ -126,7 +126,7 @@ app.post("/login", async (req, res) => {
     const token = jwt.sign(
       { sub: faceSignUserId },
       readFileSync(JWT_PRIVATE_KEY, "utf-8"),
-      { algorithm: "ES512", expiresIn: "1m" }, // Token valid for 5 minutes
+      { algorithm: "ES512" }, // Token contains "iat" which is used in entropy-service to check token age
     );
 
     return res.status(200).json({

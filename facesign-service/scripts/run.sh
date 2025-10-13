@@ -33,6 +33,12 @@ socat TCP4-LISTEN:7001,fork,bind=127.0.0.7 VSOCK-CONNECT:3:7001 &
 # So that the FaceTec .so file can load some stuff on /tmp.
 mount /tmp -o remount,exec
 
+cd /home/FaceTec_Custom_Server/deploy
+
+# S3 secrets
+S3_SECRETS_BUCKET=$(cat ./s3_secrets_bucket.txt)
+
+# NBD device
 echo "Checking nbd0..."
 while ! nbd-client -c /dev/nbd0; do
   echo "Mounting nbd0..."
@@ -40,21 +46,6 @@ while ! nbd-client -c /dev/nbd0; do
   sleep 1
 done
 echo "Done with nbd0"
-
-cd /home/FaceTec_Custom_Server/deploy
-
-S3_SECRETS_BUCKET=$(cat ./s3_secrets_bucket.txt)
-
-echo "Fetching mongo connection string from secrets"
-aws s3 cp "s3://$S3_SECRETS_BUCKET/mongodb_uri.txt" ./mongodb_uri.txt --region eu-west-1
-if [ ! -f ./mongodb_uri.txt ]; then
-  echo "Couldn't download mongodb_uri.txt from S3, exiting"
-  exit 1
-fi
-
-MONGO_URI="$(cat ./mongodb_uri.txt)"
-sed -i "s#export const MONGO_URI = \"INSERT YOUR MONGO URL HERE\";#export const MONGO_URI = \"${MONGO_URI//&/\\&}\";#" ./facesign-service/env.ts
-sed -i "s#uri: INSERT YOUR MONGO URL HERE#uri: \"${MONGO_URI//&/\\&}\"#" ./config.yaml
 
 echo "Fetching AWS luks password key from S3"
 AWS_KMS_SECRETS_KEY_ID="$(cat ./secrets_key.arn)"
@@ -71,6 +62,38 @@ fi
 
 echo "Decrypting AWS luks password key"
 aws kms decrypt --ciphertext-blob "$(cat $ENC_FILE)" --output text --query Plaintext --region eu-west-1 > "$PLAIN_FILE"
+
+if cryptsetup isLuks /dev/nbd0; then
+  echo "/dev/nbd0 is luks already, continuing..."
+else
+  echo "/dev/nbd0 is not luks, formatting..."
+  cat $PLAIN_FILE | cryptsetup luksFormat --batch-mode /dev/nbd0 --key-file -
+fi
+
+cat $PLAIN_FILE | cryptsetup luksOpen /dev/nbd0 encrypted_disk --key-file -
+rm -f $PLAIN_FILE
+
+if ! blkid /dev/mapper/encrypted_disk > /dev/null 2>&1; then
+  echo "Formatting /dev/mapper/encrypted_disk with ext4 filesystem..."
+  mkfs.ext4 /dev/mapper/encrypted_disk
+else
+  echo "/dev/mapper/encrypted_disk already has a filesystem, continuing..."
+fi
+
+# Mount
+mkdir /mnt/encrypted
+mount /dev/mapper/encrypted_disk /mnt/encrypted
+
+echo "Fetching mongo connection string from secrets"
+aws s3 cp "s3://$S3_SECRETS_BUCKET/mongodb_uri.txt" ./mongodb_uri.txt --region eu-west-1
+if [ ! -f ./mongodb_uri.txt ]; then
+  echo "Couldn't download mongodb_uri.txt from S3, exiting"
+  exit 1
+fi
+
+MONGO_URI="$(cat ./mongodb_uri.txt)"
+sed -i "s#export const MONGO_URI = \"INSERT YOUR MONGO URL HERE\";#export const MONGO_URI = \"${MONGO_URI//&/\\&}\";#" ./facesign-service/env.ts
+sed -i "s#uri: INSERT YOUR MONGO URL HERE#uri: \"${MONGO_URI//&/\\&}\"#" ./config.yaml
 
 echo "Fetching facetec private key from S3"
 AWS_KMS_SECRETS_FACETEC_KEY_ID="$(cat ./secrets_facetec_key.arn)"
@@ -101,27 +124,6 @@ aws s3 cp "s3://$S3_SECRETS_BUCKET/$FACETEC_PUBLIC_FILE" "/home/FaceTec_Custom_S
 # Replace facetec encryption private key in facetec service
 sed -i "s|^faceMapEncryptionKey:.*|faceMapEncryptionKey: \"$(tr -d '\n' < "$FACETEC_PRIVATE_PLAIN_FILE")\"|" /home/FaceTec_Custom_Server/deploy/config.yaml
 
-if cryptsetup isLuks /dev/nbd0; then
-  echo "/dev/nbd0 is luks already, continuing..."
-else
-  echo "/dev/nbd0 is not luks, formatting..."
-  cat $PLAIN_FILE | cryptsetup luksFormat --batch-mode /dev/nbd0 --key-file -
-fi
-
-cat $PLAIN_FILE | cryptsetup luksOpen /dev/nbd0 encrypted_disk --key-file -
-rm -f $PLAIN_FILE
-
-if ! blkid /dev/mapper/encrypted_disk > /dev/null 2>&1; then
-  echo "Formatting /dev/mapper/encrypted_disk with ext4 filesystem..."
-  mkfs.ext4 /dev/mapper/encrypted_disk
-else
-  echo "/dev/mapper/encrypted_disk already has a filesystem, continuing..."
-fi
-
-# Mount
-mkdir /mnt/encrypted
-mount /dev/mapper/encrypted_disk /mnt/encrypted
-
 # Ensure there are 3d-db and logs directories
 if [ ! -d /mnt/encrypted/facetec/search-3d-3d-database ]; then
   echo "Creating /mnt/encrypted/facetec directories..."
@@ -141,10 +143,6 @@ if [ ! -d /mnt/encrypted/logs ]; then
   echo "Creating /mnt/encrypted/logs directory..."
   mkdir -p /mnt/encrypted/logs
 fi
-
-echo "Ensure folder exists for caddy"
-mkdir -p /mnt/encrypted/caddy
-mkdir -p  /mnt/encrypted/caddy/acme/acme-staging-v02.api.letsencrypt.org-directory/users/deployers@fractal.id/
 
 # Set-up facesing service
 echo "Fetching key 1 public multibase from S3"
@@ -167,11 +165,15 @@ sed -i "s#export const HOST = \"INSERT YOUR HOST HERE\";#export const HOST = \"$
 
 echo "Fetching Caddyfile from S3"
 CADDYFILE=Caddyfile
-aws s3 cp "s3://$S3_SECRETS_BUCKET/$CADDYFILE-facesign" "./$CADDYFILE" --region eu-west-1
+aws s3 cp "s3://$S3_SECRETS_BUCKET/facesign/$CADDYFILE" "./$CADDYFILE" --region eu-west-1
 if [ ! -f "./$CADDYFILE" ]; then
   echo "Couldn't download $CADDYFILE from S3, exiting"
   exit 1
 fi
+
+echo "Ensure folder exists for caddy"
+mkdir -p /mnt/encrypted/caddy
+mkdir -p  /mnt/encrypted/caddy/acme/acme-staging-v02.api.letsencrypt.org-directory/users/deployers@fractal.id/
 
 echo "Fetching JWT token secret from S3"
 AWS_KMS_JWT_KEY_ID="$(cat ./jwt_key.arn)"

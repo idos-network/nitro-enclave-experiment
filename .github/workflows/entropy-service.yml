@@ -37,3 +37,7 @@ jobs:
       - name: Run lint
         working-directory: entropy-service
         run: npm run format:ci
+
+      - name: Run tests
+        working-directory: entropy-service
+        run: npm run test

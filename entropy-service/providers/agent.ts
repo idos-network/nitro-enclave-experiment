@@ -153,6 +153,6 @@ class AgentClient {
 	}
 }
 
-const agent = new AgentClient("127.0.0.7", 7001);
+const agent = new AgentClient("127.0.0.1", 7001);
 agent.connect();
 export default agent;

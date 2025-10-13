@@ -9,10 +9,12 @@
 	"scripts": {
 		"start": "node index.ts",
 		"types": "tsc --noEmit",
+		"test": "vitest",
 		"format": "npx @biomejs/biome check --write",
 		"format:ci": "npx @biomejs/biome ci"
 	},
 	"dependencies": {
+		"@aws-sdk/credential-provider-node": "^3.907.0",
 		"@scure/bip39": "^2.0.1",
 		"@types/morgan": "^1.9.10",
 		"cors": "^2.8.5",
@@ -32,6 +34,9 @@
 		"@types/jsonwebtoken": "^9.0.10",
 		"@types/mongodb": "^4.0.6",
 		"@types/node": "^24.7.0",
-		"typescript": "^5.9.3"
+		"@types/supertest": "^6.0.3",
+		"supertest": "^7.0.0",
+		"typescript": "^5.9.3",
+		"vitest": "^2.1.8"
 	}
 }
