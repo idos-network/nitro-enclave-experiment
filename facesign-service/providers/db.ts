@@ -1,5 +1,11 @@
 import { type Db, MongoClient, MongoServerError } from "mongodb";
-import { DB_COLLECTION_NAME, DB_NAME, FACETEC_DB_NAME, FACETEC_SESSION_COLLECTION, MONGO_URI } from "../env.ts";
+import {
+  DB_COLLECTION_NAME,
+  DB_NAME,
+  FACETEC_DB_NAME,
+  FACETEC_SESSION_COLLECTION,
+  MONGO_URI,
+} from "../env.ts";
 
 const client = new MongoClient(MONGO_URI, {
   maxPoolSize: 10,
@@ -27,7 +33,10 @@ export async function getOldestFaceSignUserId(identifiers: string[]) {
   const sessionsCollection = facetecDb.collection(FACETEC_SESSION_COLLECTION);
 
   const sessions = await sessionsCollection
-    .find({ externalDatabaseRefID: { $in: identifiers } }, { projection: { externalDatabaseRefID: 1, "callData.date": 1 } })
+    .find(
+      { externalDatabaseRefID: { $in: identifiers } },
+      { projection: { externalDatabaseRefID: 1, "callData.date": 1 } },
+    )
     .sort({ "callData.date": 1 })
     .limit(1)
     .toArray();

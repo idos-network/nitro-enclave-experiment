@@ -37,7 +37,7 @@ describe("Login API", () => {
       insertedId: new ObjectId(),
     });
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => { });
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
     const response = await request(app).post("/login").send({
       faceScan: "test-face-scan",
@@ -164,7 +164,7 @@ describe("Login API", () => {
       wasProcessed: true,
     });
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => { });
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
     const response = await request(app).post("/login").send({
       faceScan: "test-face-scan",
@@ -212,7 +212,7 @@ describe("Login API", () => {
       insertedId: new ObjectId(),
     });
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => { });
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
     const response = await request(app).post("/login").send({
       faceScan: "test-face-scan",
@@ -286,7 +286,7 @@ describe("Login API", () => {
       insertedId: new ObjectId(),
     });
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => { });
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
     const response = await request(app).post("/login").send({
       faceScan: "test-face-scan",
