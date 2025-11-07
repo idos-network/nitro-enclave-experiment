@@ -22,6 +22,7 @@ fi
 FACETEC_SDK_VERSION="$(find ~ec2-user/server/facetec-sdk/ -name 'FaceTecSDK-custom-server-*' | sed -E 's#.*/FaceTecSDK-custom-server-([[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+)#\1#')"
 AWS_KMS_SECRETS_KEY_ID="$(aws kms describe-key --key-id alias/secretsEncryption --query 'KeyMetadata.Arn' --output text --region eu-west-1)"
 AWS_KMS_SECRETS_FACETEC_KEY_ID="$(aws kms describe-key --key-id alias/secretsFacetecEncryption --query 'KeyMetadata.Arn' --output text --region eu-west-1)"
+AWS_KMS_JWT_KEY_ID="$(aws kms describe-key --key-id alias/jwtEncryption --query 'KeyMetadata.Arn' --output text --region eu-west-1)"
 
 sudo cp ~ec2-user/.ssh/authorized_keys ~ec2-user/server/facesign-service/
 sudo chown ec2-user:ec2-user ~ec2-user/server/facesign-service/authorized_keys
@@ -38,6 +39,7 @@ docker build \
     --build-arg FACETEC_SDK_VERSION="$FACETEC_SDK_VERSION" \
     --build-arg AWS_KMS_SECRETS_KEY_ID="$AWS_KMS_SECRETS_KEY_ID" \
     --build-arg AWS_KMS_SECRETS_FACETEC_KEY_ID="$AWS_KMS_SECRETS_FACETEC_KEY_ID" \
+    --build-arg AWS_KMS_JWT_KEY_ID="$AWS_KMS_JWT_KEY_ID" \
     --build-arg S3_SECRETS_BUCKET="$S3_SECRETS_BUCKET" \
     -t "$TARGET_DOCKER_IMAGE" \
     -f ~ec2-user/server/facesign-service/Dockerfile \

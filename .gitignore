@@ -2,3 +2,4 @@ terraform/.terraform
 terraform/terraform.tfvars
 facetec-sdk/
 facesign-service/node_modules/
+entropy-service/node_modules/

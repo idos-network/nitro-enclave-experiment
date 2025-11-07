@@ -1,13 +1,31 @@
+import { generateKeyPairSync } from "node:crypto";
+import jwt from "jsonwebtoken";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 import agent from "../providers/agent.ts";
 import * as facetecApi from "../providers/api.ts";
+
+const { privateKey, publicKey } = generateKeyPairSync("ec", {
+  namedCurve: "secp521r1",
+  privateKeyEncoding: { type: "pkcs8", format: "pem" },
+  publicKeyEncoding: { type: "spki", format: "pem" },
+});
+
+vi.mock("fs", async () => {
+  const actualFs = await vi.importActual<typeof import("fs")>("fs");
+
+  return {
+    ...actualFs,
+    readFileSync: vi.fn(() => privateKey),
+  };
+});
 
 // Mock modules before importing the app
 vi.mock("../providers/db.ts", () => ({
   insertMember: vi.fn(),
   countMembersInGroup: vi.fn(),
   getMembers: vi.fn(),
+  getOldestFaceSignUserId: vi.fn(),
 }));
 
 import { ObjectId } from "mongodb";
@@ -15,7 +33,7 @@ import * as db from "../providers/db.ts";
 
 import app from "../server.ts";
 
-describe("Login API", () => {
+describe("Pinocchio Login API", () => {
   it("new user", async () => {
     const enrollmentSpy = vi.spyOn(facetecApi, "enrollment3d").mockResolvedValue({
       success: true,
@@ -39,7 +57,7 @@ describe("Login API", () => {
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
-    const response = await request(app).post("/login").send({
+    const response = await request(app).post("/pinocchio-login").send({
       faceScan: "test-face-scan",
       key: "test-key",
       userAgent: "test-user-agent",
@@ -55,7 +73,12 @@ describe("Login API", () => {
       scanResultBlob: "mock-scan-result-blob",
       success: true,
       wasProcessed: true,
+      token: expect.any(String),
     });
+
+    // Verify the JWT token
+    const decoded = jwt.verify(response.body.token, publicKey, { algorithms: ["ES512"] });
+    expect(decoded.sub).toBe(response.body.faceSignUserId);
 
     expect(duplicateSpy).toHaveBeenCalledWith(
       response.body.faceSignUserId,
@@ -79,82 +102,10 @@ describe("Login API", () => {
       "facesign-users",
       "test-key",
     );
-    expect(agentSpy).toHaveBeenCalledWith("login-new-user", {
+    expect(agentSpy).toHaveBeenCalledWith("pinocchio-new-user", {
       identifier: response.body.faceSignUserId,
-      groupName: "facesign-users",
     });
     expect(insertMemberSpy).toHaveBeenCalledWith("facesign-users", response.body.faceSignUserId);
-  });
-
-  it("new user (different group and faceMap instead of vectors)", async () => {
-    const enrollmentSpy = vi.spyOn(facetecApi, "enrollment3d").mockResolvedValue({
-      success: true,
-      wasProcessed: true,
-      scanResultBlob: "mock-scan-result-blob",
-    });
-
-    const enrollUserSpy = vi.spyOn(facetecApi, "enrollUser").mockResolvedValue({
-      success: true,
-    });
-
-    const duplicateSpy = vi.spyOn(facetecApi, "searchForDuplicates").mockResolvedValue({
-      success: true,
-      results: [],
-    });
-
-    const insertMemberSpy = vi.spyOn(db, "insertMember").mockResolvedValue({
-      acknowledged: true,
-      insertedId: new ObjectId(),
-    });
-
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
-
-    const response = await request(app).post("/login").send({
-      faceScan: "test-face-scan",
-      key: "test-key",
-      userAgent: "test-user-agent",
-      auditTrailImage: "test-audit-trail-image",
-      lowQualityAuditTrailImage: "test-low-quality-audit-trail-image",
-      sessionId: "test-session-id",
-      groupName: "test-users",
-      faceVector: false,
-    });
-
-    expect(response.status).toBe(200);
-    expect(response.body).toEqual({
-      error: false,
-      faceSignUserId: expect.any(String),
-      scanResultBlob: "mock-scan-result-blob",
-      success: true,
-      wasProcessed: true,
-    });
-
-    expect(duplicateSpy).toHaveBeenCalledWith(
-      response.body.faceSignUserId,
-      "test-key",
-      "test-users",
-      "test-user-agent",
-    );
-    expect(enrollmentSpy).toHaveBeenCalledWith(
-      response.body.faceSignUserId,
-      "test-face-scan",
-      "test-audit-trail-image",
-      "test-low-quality-audit-trail-image",
-      "test-key",
-      "test-user-agent",
-      "test-session-id",
-      false,
-    );
-    expect(enrollUserSpy).toHaveBeenCalledWith(
-      response.body.faceSignUserId,
-      "test-users",
-      "test-key",
-    );
-    expect(agentSpy).toHaveBeenCalledWith("login-new-user", {
-      identifier: response.body.faceSignUserId,
-      groupName: "test-users",
-    });
-    expect(insertMemberSpy).toHaveBeenCalledWith("test-users", response.body.faceSignUserId);
   });
 
   it("failing liveness", async () => {
@@ -165,7 +116,7 @@ describe("Login API", () => {
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
-    const response = await request(app).post("/login").send({
+    const response = await request(app).post("/pinocchio-login").send({
       faceScan: "test-face-scan",
       key: "test-key",
       userAgent: "test-user-agent",
@@ -181,7 +132,7 @@ describe("Login API", () => {
       wasProcessed: true,
     });
 
-    expect(agentSpy).toHaveBeenCalledWith("login-enrollment-failed", {
+    expect(agentSpy).toHaveBeenCalledWith("pinocchio-enrollment-failed", {
       success: false,
       wasProcessed: true,
       error: undefined,
@@ -213,7 +164,9 @@ describe("Login API", () => {
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
-    const response = await request(app).post("/login").send({
+    const oldestSpy = vi.spyOn(db, "getOldestFaceSignUserId").mockResolvedValue(resultId);
+
+    const response = await request(app).post("/pinocchio-login").send({
       faceScan: "test-face-scan",
       key: "test-key",
       userAgent: "test-user-agent",
@@ -222,6 +175,10 @@ describe("Login API", () => {
       sessionId: "test-session-id",
     });
 
+    // Verify the JWT token
+    const decoded = jwt.verify(response.body.token, publicKey, { algorithms: ["ES512"] });
+    expect(decoded.sub).toBe(resultId);
+
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
       error: false,
@@ -229,6 +186,7 @@ describe("Login API", () => {
       scanResultBlob: "mock-scan-result-blob",
       success: true,
       wasProcessed: true,
+      token: expect.any(String),
     });
 
     expect(duplicateSpy).toHaveBeenCalledWith(
@@ -237,6 +195,7 @@ describe("Login API", () => {
       "facesign-users",
       "test-user-agent",
     );
+
     expect(enrollmentSpy).toHaveBeenCalledWith(
       expect.any(String),
       "test-face-scan",
@@ -247,18 +206,20 @@ describe("Login API", () => {
       "test-session-id",
       true,
     );
+
     expect(enrollUserSpy).not.toHaveBeenCalled();
 
-    expect(agentSpy).toHaveBeenCalledWith("login-duplicate", {
+    expect(oldestSpy).toHaveBeenCalledWith([resultId]);
+
+    expect(agentSpy).toHaveBeenCalledWith("pinocchio-duplicate", {
       count: 1,
       identifiers: [resultId],
-      groupName: "facesign-users",
     });
 
     expect(insertMemberSpy).not.toHaveBeenCalled();
   });
 
-  it("duplicate (error)", async () => {
+  it("duplicate (more than 1, choose oldest)", async () => {
     const enrollmentSpy = vi.spyOn(facetecApi, "enrollment3d").mockResolvedValue({
       success: true,
       wasProcessed: true,
@@ -271,12 +232,14 @@ describe("Login API", () => {
 
     const resultId = crypto.randomUUID();
     const resultId2 = crypto.randomUUID();
+    const resultId3 = crypto.randomUUID();
 
     const duplicateSpy = vi.spyOn(facetecApi, "searchForDuplicates").mockResolvedValue({
       success: true,
       results: [
         { identifier: resultId, matchLevel: 15 },
         { identifier: resultId2, matchLevel: 15 },
+        { identifier: resultId3, matchLevel: 15 },
       ],
     });
 
@@ -287,7 +250,9 @@ describe("Login API", () => {
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
-    const response = await request(app).post("/login").send({
+    const oldestSpy = vi.spyOn(db, "getOldestFaceSignUserId").mockResolvedValue(resultId3);
+
+    const response = await request(app).post("/pinocchio-login").send({
       faceScan: "test-face-scan",
       key: "test-key",
       userAgent: "test-user-agent",
@@ -296,14 +261,19 @@ describe("Login API", () => {
       sessionId: "test-session-id",
     });
 
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(200);
     expect(response.body).toEqual({
-      error: true,
-      errorMessage:
-        "Login process failed, check server logs: Multiple users found with the same face-vector.",
-      success: false,
-      wasProcessed: false,
+      error: false,
+      faceSignUserId: resultId3, // 3 is the oldest
+      scanResultBlob: "mock-scan-result-blob",
+      success: true,
+      wasProcessed: true,
+      token: expect.any(String),
     });
+
+    // Verify the JWT token
+    const decoded = jwt.verify(response.body.token, publicKey, { algorithms: ["ES512"] });
+    expect(decoded.sub).toBe(resultId3);
 
     expect(duplicateSpy).toHaveBeenCalledWith(
       expect.any(String),
@@ -323,16 +293,12 @@ describe("Login API", () => {
     );
     expect(enrollUserSpy).not.toHaveBeenCalled();
 
-    expect(agentSpy).toBeCalledWith("login-duplicate-error", {
-      count: 2,
-      identifiers: [resultId, resultId2],
-      groupName: "facesign-users",
+    expect(agentSpy).toBeCalledWith("pinocchio-duplicate", {
+      count: 3,
+      identifiers: [resultId, resultId2, resultId3],
     });
 
-    expect(agentSpy).toHaveBeenCalledWith("login-error", {
-      message: "Multiple users found with the same face-vector.",
-      stack: expect.any(String),
-    });
+    expect(oldestSpy).toHaveBeenCalledWith([resultId, resultId2, resultId3]);
 
     expect(insertMemberSpy).not.toHaveBeenCalled();
   });
