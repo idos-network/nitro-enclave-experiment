@@ -5,7 +5,6 @@ import {
   Binary,
   ClientEncryption,
   type Db,
-  type KMSProviders,
   MongoClient,
   type UUID,
 } from "mongodb";
@@ -19,7 +18,6 @@ import {
 } from "../env.ts";
 
 let db: Db;
-let cacheKmsProvider: KMSProviders | null = null;
 let cacheClientEncryption: ClientEncryption | null = null;
 
 // FLE configuration
@@ -33,14 +31,10 @@ const client = new MongoClient(MONGO_URI, {
 });
 
 async function ensureKmsProviders() {
-  if (cacheKmsProvider) {
-    return cacheKmsProvider;
-  }
-
   const credentialsProvider = defaultProvider();
   const credentials = await credentialsProvider();
 
-  cacheKmsProvider = {
+  return {
     aws: {
       accessKeyId: credentials.accessKeyId,
       secretAccessKey: credentials.secretAccessKey,
@@ -50,8 +44,6 @@ async function ensureKmsProviders() {
       sessionToken: credentials.sessionToken as any,
     },
   };
-
-  return cacheKmsProvider;
 }
 
 async function getClientEncryption() {
