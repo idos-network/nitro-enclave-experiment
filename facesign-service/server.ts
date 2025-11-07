@@ -177,6 +177,7 @@ app.post("/pinocchio-login", async (req, res) => {
       key,
       userAgent,
       sessionId,
+      true,
     );
 
     if (!success || !wasProcessed || error) {

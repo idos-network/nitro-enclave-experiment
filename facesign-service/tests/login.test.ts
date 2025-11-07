@@ -151,7 +151,7 @@ describe("Login API", () => {
       "test-users",
       "test-key",
     );
-    expect(agentSpy).toHaveBeenCalledWith("new-user", {
+    expect(agentSpy).toHaveBeenCalledWith("login-new-user", {
       identifier: response.body.faceSignUserId,
       groupName: "test-users",
     });

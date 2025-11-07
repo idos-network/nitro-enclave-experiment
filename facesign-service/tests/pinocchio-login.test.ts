@@ -95,6 +95,7 @@ describe("Pinocchio Login API", () => {
       "test-key",
       "test-user-agent",
       "test-session-id",
+      true,
     );
     expect(enrollUserSpy).toHaveBeenCalledWith(
       response.body.faceSignUserId,
@@ -203,6 +204,7 @@ describe("Pinocchio Login API", () => {
       "test-key",
       "test-user-agent",
       "test-session-id",
+      true,
     );
 
     expect(enrollUserSpy).not.toHaveBeenCalled();
@@ -287,6 +289,7 @@ describe("Pinocchio Login API", () => {
       "test-key",
       "test-user-agent",
       "test-session-id",
+      true,
     );
     expect(enrollUserSpy).not.toHaveBeenCalled();
 
