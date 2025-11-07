@@ -72,6 +72,7 @@ describe("Login API", () => {
       "test-key",
       "test-user-agent",
       "test-session-id",
+      true,
     );
     expect(enrollUserSpy).toHaveBeenCalledWith(
       response.body.faceSignUserId,
@@ -80,8 +81,80 @@ describe("Login API", () => {
     );
     expect(agentSpy).toHaveBeenCalledWith("login-new-user", {
       identifier: response.body.faceSignUserId,
+      groupName: "facesign-users",
     });
     expect(insertMemberSpy).toHaveBeenCalledWith("facesign-users", response.body.faceSignUserId);
+  });
+
+  it("new user (different group and faceMap instead of vectors)", async () => {
+    const enrollmentSpy = vi.spyOn(facetecApi, "enrollment3d").mockResolvedValue({
+      success: true,
+      wasProcessed: true,
+      scanResultBlob: "mock-scan-result-blob",
+    });
+
+    const enrollUserSpy = vi.spyOn(facetecApi, "enrollUser").mockResolvedValue({
+      success: true,
+    });
+
+    const duplicateSpy = vi.spyOn(facetecApi, "searchForDuplicates").mockResolvedValue({
+      success: true,
+      results: [],
+    });
+
+    const insertMemberSpy = vi.spyOn(db, "insertMember").mockResolvedValue({
+      acknowledged: true,
+      insertedId: new ObjectId(),
+    });
+
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => { });
+
+    const response = await request(app).post("/login").send({
+      faceScan: "test-face-scan",
+      key: "test-key",
+      userAgent: "test-user-agent",
+      auditTrailImage: "test-audit-trail-image",
+      lowQualityAuditTrailImage: "test-low-quality-audit-trail-image",
+      sessionId: "test-session-id",
+      groupName: "test-users",
+      faceVector: false,
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      error: false,
+      faceSignUserId: expect.any(String),
+      scanResultBlob: "mock-scan-result-blob",
+      success: true,
+      wasProcessed: true,
+    });
+
+    expect(duplicateSpy).toHaveBeenCalledWith(
+      response.body.faceSignUserId,
+      "test-key",
+      "test-users",
+      "test-user-agent",
+    );
+    expect(enrollmentSpy).toHaveBeenCalledWith(
+      response.body.faceSignUserId,
+      "test-face-scan",
+      "test-audit-trail-image",
+      "test-low-quality-audit-trail-image",
+      "test-key",
+      "test-user-agent",
+      "test-session-id",
+      false,
+    );
+    expect(enrollUserSpy).toHaveBeenCalledWith(
+      response.body.faceSignUserId,
+      "test-users",
+      "test-key",
+    );
+    expect(agentSpy).toHaveBeenCalledWith("login-new-user", {
+      identifier: response.body.faceSignUserId,
+      groupName: "test-users",
+    });
+    expect(insertMemberSpy).toHaveBeenCalledWith("test-users", response.body.faceSignUserId);
   });
 
   it("failing liveness", async () => {
@@ -172,12 +245,14 @@ describe("Login API", () => {
       "test-key",
       "test-user-agent",
       "test-session-id",
+      true,
     );
     expect(enrollUserSpy).not.toHaveBeenCalled();
 
     expect(agentSpy).toHaveBeenCalledWith("login-duplicate", {
       count: 1,
       identifiers: [resultId],
+      groupName: "facesign-users",
     });
 
     expect(insertMemberSpy).not.toHaveBeenCalled();
@@ -244,12 +319,14 @@ describe("Login API", () => {
       "test-key",
       "test-user-agent",
       "test-session-id",
+      true,
     );
     expect(enrollUserSpy).not.toHaveBeenCalled();
 
     expect(agentSpy).toBeCalledWith("login-duplicate-error", {
       count: 2,
       identifiers: [resultId, resultId2],
+      groupName: "facesign-users",
     });
 
     expect(agentSpy).toHaveBeenCalledWith("login-error", {

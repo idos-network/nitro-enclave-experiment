@@ -51,8 +51,16 @@ app.post("/session-token", async (req, res) => {
 app.post("/login", async (req, res) => {
   let faceSignUserId: string = crypto.randomUUID();
 
-  const { faceScan, key, userAgent, auditTrailImage, lowQualityAuditTrailImage, sessionId } =
-    req.body;
+  const {
+    faceScan,
+    key,
+    userAgent,
+    auditTrailImage,
+    lowQualityAuditTrailImage,
+    sessionId,
+    groupName = GROUP_NAME,
+    faceVector = true,
+  } = req.body;
 
   try {
     // First check if liveness is proven
@@ -64,6 +72,7 @@ app.post("/login", async (req, res) => {
       key,
       userAgent,
       sessionId,
+      faceVector,
     );
 
     if (!success || !wasProcessed || error) {
@@ -80,7 +89,7 @@ app.post("/login", async (req, res) => {
     // Search for 3d-db duplicates
     let results: { identifier: string; matchLevel: number }[] = [];
 
-    const searchResult = await searchForDuplicates(faceSignUserId, key, GROUP_NAME, userAgent);
+    const searchResult = await searchForDuplicates(faceSignUserId, key, groupName, userAgent);
 
     if (searchResult.success) {
       results = searchResult.results;
@@ -89,7 +98,7 @@ app.post("/login", async (req, res) => {
       searchResult.errorMessage?.includes("groupName when that groupName does not exist")
     ) {
       // Check if group exists in DB, if yes, we have a problem (most likely recovery from corrupted FS)
-      const memberCount = await countMembersInGroup(GROUP_NAME);
+      const memberCount = await countMembersInGroup(groupName);
       if (memberCount > 0) {
         throw new Error("Group exists in our DB, but not in 3d-db, this should never happen.");
       }
@@ -104,19 +113,24 @@ app.post("/login", async (req, res) => {
 
     if (newUser) {
       // Brand new user, let's enroll in 3d-db#users
-      agent.writeLog("login-new-user", { identifier: faceSignUserId });
-      await enrollUser(faceSignUserId, GROUP_NAME, key);
-      await insertMember(GROUP_NAME, faceSignUserId);
+      agent.writeLog("login-new-user", {
+        identifier: faceSignUserId,
+        groupName,
+      });
+      await enrollUser(faceSignUserId, groupName, key);
+      await insertMember(groupName, faceSignUserId);
     } else if (results.length > 1) {
       agent.writeLog("login-duplicate-error", {
         identifiers: results.map((x) => x.identifier),
         count: results.length,
+        groupName,
       });
       throw new Error("Multiple users found with the same face-vector.");
     } else {
       agent.writeLog("login-duplicate", {
         identifiers: results.map((x) => x.identifier),
         count: results.length,
+        groupName,
       });
       // biome-ignore lint/style/noNonNullAssertion: This is safe because we check results.length > 1
       faceSignUserId = results[0]?.identifier!;
@@ -163,6 +177,7 @@ app.post("/pinocchio-login", async (req, res) => {
       key,
       userAgent,
       sessionId,
+      true,
     );
 
     if (!success || !wasProcessed || error) {

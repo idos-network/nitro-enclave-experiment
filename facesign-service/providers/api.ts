@@ -28,6 +28,7 @@ export async function enrollment3d(
   key: string,
   deviceIdentifier: string,
   sessionId: string,
+  storeAsFaceVector: boolean,
 ) {
   const enrollmentResponse = await fetch(`${FACETEC_SERVER}enrollment-3d`, {
     method: "POST",
@@ -42,7 +43,7 @@ export async function enrollment3d(
       lowQualityAuditTrailImage,
       externalDatabaseRefID,
       sessionId,
-      storeAsFaceVector: true,
+      storeAsFaceVector,
     }),
   });
 
