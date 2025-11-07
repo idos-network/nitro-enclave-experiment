@@ -1,9 +1,9 @@
+import { generateKeyPairSync } from "node:crypto";
+import jwt from "jsonwebtoken";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 import agent from "../providers/agent.ts";
 import * as facetecApi from "../providers/api.ts";
-import { generateKeyPairSync } from "node:crypto";
-import jwt from "jsonwebtoken";
 
 const { privateKey, publicKey } = generateKeyPairSync("ec", {
   namedCurve: "secp521r1",
@@ -11,8 +11,8 @@ const { privateKey, publicKey } = generateKeyPairSync("ec", {
   publicKeyEncoding: { type: "spki", format: "pem" },
 });
 
-vi.mock('fs', async () => {
-  const actualFs = await vi.importActual<typeof import('fs')>('fs');
+vi.mock("fs", async () => {
+  const actualFs = await vi.importActual<typeof import("fs")>("fs");
 
   return {
     ...actualFs,
@@ -55,7 +55,7 @@ describe("Pinocchio Login API", () => {
       insertedId: new ObjectId(),
     });
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => { });
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
     const response = await request(app).post("/pinocchio-login").send({
       faceScan: "test-face-scan",
@@ -77,7 +77,7 @@ describe("Pinocchio Login API", () => {
     });
 
     // Verify the JWT token
-    const decoded = jwt.verify(response.body.token, publicKey, { algorithms: ['ES512'] })
+    const decoded = jwt.verify(response.body.token, publicKey, { algorithms: ["ES512"] });
     expect(decoded.sub).toBe(response.body.faceSignUserId);
 
     expect(duplicateSpy).toHaveBeenCalledWith(
@@ -114,7 +114,7 @@ describe("Pinocchio Login API", () => {
       wasProcessed: true,
     });
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => { });
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
     const response = await request(app).post("/pinocchio-login").send({
       faceScan: "test-face-scan",
@@ -162,7 +162,7 @@ describe("Pinocchio Login API", () => {
       insertedId: new ObjectId(),
     });
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => { });
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
     const oldestSpy = vi.spyOn(db, "getOldestFaceSignUserId").mockResolvedValue(resultId);
 
@@ -176,7 +176,7 @@ describe("Pinocchio Login API", () => {
     });
 
     // Verify the JWT token
-    const decoded = jwt.verify(response.body.token, publicKey, { algorithms: ['ES512'] })
+    const decoded = jwt.verify(response.body.token, publicKey, { algorithms: ["ES512"] });
     expect(decoded.sub).toBe(resultId);
 
     expect(response.status).toBe(200);
@@ -248,7 +248,7 @@ describe("Pinocchio Login API", () => {
       insertedId: new ObjectId(),
     });
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => { });
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
     const oldestSpy = vi.spyOn(db, "getOldestFaceSignUserId").mockResolvedValue(resultId3);
 
@@ -272,7 +272,7 @@ describe("Pinocchio Login API", () => {
     });
 
     // Verify the JWT token
-    const decoded = jwt.verify(response.body.token, publicKey, { algorithms: ['ES512'] })
+    const decoded = jwt.verify(response.body.token, publicKey, { algorithms: ["ES512"] });
     expect(decoded.sub).toBe(resultId3);
 
     expect(duplicateSpy).toHaveBeenCalledWith(

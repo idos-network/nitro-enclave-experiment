@@ -6,7 +6,13 @@ import helmet from "helmet";
 import jwt from "jsonwebtoken";
 import morgan from "morgan";
 
-import { FACETEC_PUBLIC_KEY_PATH, GROUP_NAME, HOST, JWT_PRIVATE_KEY, KEY_1_MULTIBASE_PUBLIC_PATH } from "./env.ts";
+import {
+  FACETEC_PUBLIC_KEY_PATH,
+  GROUP_NAME,
+  HOST,
+  JWT_PRIVATE_KEY,
+  KEY_1_MULTIBASE_PUBLIC_PATH,
+} from "./env.ts";
 import agent from "./providers/agent.ts";
 import { enrollment3d, enrollUser, getSessionToken, searchForDuplicates } from "./providers/api.ts";
 import { countMembersInGroup, getOldestFaceSignUserId, insertMember } from "./providers/db.ts";
