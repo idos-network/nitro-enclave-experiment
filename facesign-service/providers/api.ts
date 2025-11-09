@@ -62,6 +62,54 @@ export async function enrollment3d(
   }>;
 }
 
+export async function match3d3d(
+  externalDatabaseRefID: string,
+  faceScan: string,
+  auditTrailImage: string,
+  lowQualityAuditTrailImage: string,
+  key: string,
+  deviceIdentifier: string,
+  sessionId: string,
+) {
+  const matchResponse = await fetch(`${FACETEC_SERVER}match-3d-3d`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Device-Key": key,
+      "X-Device-Identifier": deviceIdentifier,
+    },
+    body: JSON.stringify({
+      faceScan,
+      auditTrailImage,
+      lowQualityAuditTrailImage,
+      externalDatabaseRefID,
+      sessionId,
+    }),
+  });
+
+  if (!matchResponse.ok) {
+    console.error("Failed to match, status:", matchResponse.status);
+    console.error("Response text:", await matchResponse.text());
+    throw new Error("Failed to match, check for logs.");
+  }
+
+  return matchResponse.json() as Promise<{
+    success: boolean;
+    wasProcessed: boolean;
+    matchLevel?: number;
+    retryScreenEnumInt?: number;
+    scanResultBlob?: string;
+    error?: string;
+    errorMessage?: string;
+    faceScanSecurityChecks: {
+      replayCheckSucceeded: boolean;
+      sessionTokenCheckSucceeded: boolean;
+      auditTrailVerificationCheckSucceeded: boolean;
+      faceScanLivenessCheckSucceeded: boolean;
+    }
+  }>;
+}
+
 export async function searchForDuplicates(
   externalDatabaseRefID: string,
   key: string,
