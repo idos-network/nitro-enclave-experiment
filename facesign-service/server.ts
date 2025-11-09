@@ -14,7 +14,7 @@ import {
   KEY_1_MULTIBASE_PUBLIC_PATH,
 } from "./env.ts";
 import agent from "./providers/agent.ts";
-import { enrollment3d, enrollUser, getSessionToken, searchForDuplicates } from "./providers/api.ts";
+import { enrollment3d, enrollUser, getSessionToken, match3d3d, searchForDuplicates } from "./providers/api.ts";
 import { countMembersInGroup, getOldestFaceSignUserId, insertMember } from "./providers/db.ts";
 
 const app = express();
