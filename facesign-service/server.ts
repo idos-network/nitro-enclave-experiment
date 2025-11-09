@@ -6,7 +6,7 @@ import helmet from "helmet";
 import morgan from "morgan";
 import { FACETEC_PUBLIC_KEY_PATH, GROUP_NAME, HOST, KEY_1_MULTIBASE_PUBLIC_PATH } from "./env.ts";
 import agent from "./providers/agent.ts";
-import { enrollment3d, enrollUser, getSessionToken, searchForDuplicates } from "./providers/api.ts";
+import { enrollment3d, enrollUser, getSessionToken, match3d3d, searchForDuplicates } from "./providers/api.ts";
 import { countMembersInGroup, insertMember } from "./providers/db.ts";
 
 const app = express();
@@ -136,6 +136,8 @@ app.post("/login", async (req, res) => {
 
     return res.status(200).json({
       success: true,
+      wasProcessed: true,
+      error: false,
       scanResultBlob: scanResultBlob,
       faceSignUserId,
     });
@@ -152,6 +154,63 @@ app.post("/login", async (req, res) => {
       error: true,
       // biome-ignore lint/suspicious/noExplicitAny: We want to show the message even if error is not an instance of Error
       errorMessage: `Login process failed, check server logs: ${(error as any).message}`,
+    });
+  }
+});
+
+app.post("/match", async (req, res) => {
+  const {
+    faceScan,
+    key,
+    userAgent,
+    auditTrailImage,
+    lowQualityAuditTrailImage,
+    sessionId,
+    externalUserId,
+  } = req.body;
+
+  try {
+    // First check if liveness is proven
+    const { success, wasProcessed, scanResultBlob, error, matchLevel, retryScreenEnumInt, ...others } = await match3d3d(
+      externalUserId,
+      faceScan,
+      auditTrailImage,
+      lowQualityAuditTrailImage,
+      key,
+      userAgent,
+      sessionId,
+    );
+
+    if (!wasProcessed || error) {
+      agent.writeLog("match-3d-3d-failed", { success, wasProcessed, error });
+    } else {
+      agent.writeLog("match-3d-3d-done", { identifier: externalUserId, matchLevel, retryScreenEnumInt });
+    }
+
+    return res.status(200).json({
+      // Success can be false even if wasProcessed is true (e.g. failed match)
+      success,
+      wasProcessed,
+      scanResultBlob,
+      error,
+      // We have to differentiate between failed match and failed liveness
+      // in the UI we want user to repeat liveness check if this fails
+      livenessDone: others.faceScanSecurityChecks.faceScanLivenessCheckSucceeded,
+      retryScreenEnumInt,
+      // 0-15
+      matchLevel,
+      others,
+    });
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      agent.writeLog("match-error", { message: "Unknown error in /match", error });
+    } else {
+      agent.writeLog("match-error", { message: error.message, stack: error.stack });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: "Match process failed, check server logs.",
     });
   }
 });
