@@ -13,6 +13,7 @@ vi.mock("../providers/db.ts", () => ({
 import { ObjectId } from "mongodb";
 import * as db from "../providers/db.ts";
 import app from "../server.ts";
+import { error } from "node:console";
 
 describe("Login API", () => {
   it("new user", async () => {
@@ -36,7 +37,7 @@ describe("Login API", () => {
       insertedId: new ObjectId(),
     });
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => { });
 
     const response = await request(app).post("/login").send({
       faceScan: "test-face-scan",
@@ -52,6 +53,8 @@ describe("Login API", () => {
       faceSignUserId: expect.any(String),
       scanResultBlob: "mock-scan-result-blob",
       success: true,
+      error: false,
+      wasProcessed: true,
     });
 
     expect(duplicateSpy).toHaveBeenCalledWith(
@@ -103,7 +106,7 @@ describe("Login API", () => {
       insertedId: new ObjectId(),
     });
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => { });
 
     const response = await request(app).post("/login").send({
       faceScan: "test-face-scan",
@@ -121,6 +124,8 @@ describe("Login API", () => {
       faceSignUserId: expect.any(String),
       scanResultBlob: "mock-scan-result-blob",
       success: true,
+      error: false,
+      wasProcessed: true,
     });
 
     expect(duplicateSpy).toHaveBeenCalledWith(
@@ -157,7 +162,7 @@ describe("Login API", () => {
       wasProcessed: true,
     });
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => { });
 
     const response = await request(app).post("/login").send({
       faceScan: "test-face-scan",
@@ -205,7 +210,7 @@ describe("Login API", () => {
       insertedId: new ObjectId(),
     });
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => { });
 
     const response = await request(app).post("/login").send({
       faceScan: "test-face-scan",
@@ -221,6 +226,8 @@ describe("Login API", () => {
       faceSignUserId: resultId,
       scanResultBlob: "mock-scan-result-blob",
       success: true,
+      error: false,
+      wasProcessed: true,
     });
 
     expect(duplicateSpy).toHaveBeenCalledWith(
@@ -277,7 +284,7 @@ describe("Login API", () => {
       insertedId: new ObjectId(),
     });
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => { });
 
     const response = await request(app).post("/login").send({
       faceScan: "test-face-scan",
