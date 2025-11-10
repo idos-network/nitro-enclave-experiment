@@ -106,7 +106,7 @@ export async function match3d3d(
       sessionTokenCheckSucceeded: boolean;
       auditTrailVerificationCheckSucceeded: boolean;
       faceScanLivenessCheckSucceeded: boolean;
-    }
+    };
   }>;
 }
 
