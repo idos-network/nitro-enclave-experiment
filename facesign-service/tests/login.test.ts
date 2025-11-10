@@ -52,6 +52,8 @@ describe("Login API", () => {
       faceSignUserId: expect.any(String),
       scanResultBlob: "mock-scan-result-blob",
       success: true,
+      error: false,
+      wasProcessed: true,
     });
 
     expect(duplicateSpy).toHaveBeenCalledWith(
@@ -121,6 +123,8 @@ describe("Login API", () => {
       faceSignUserId: expect.any(String),
       scanResultBlob: "mock-scan-result-blob",
       success: true,
+      error: false,
+      wasProcessed: true,
     });
 
     expect(duplicateSpy).toHaveBeenCalledWith(
@@ -221,6 +225,8 @@ describe("Login API", () => {
       faceSignUserId: resultId,
       scanResultBlob: "mock-scan-result-blob",
       success: true,
+      error: false,
+      wasProcessed: true,
     });
 
     expect(duplicateSpy).toHaveBeenCalledWith(
