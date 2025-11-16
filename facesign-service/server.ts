@@ -14,7 +14,13 @@ import {
   KEY_1_MULTIBASE_PUBLIC_PATH,
 } from "./env.ts";
 import agent from "./providers/agent.ts";
-import { enrollment3d, enrollUser, getSessionToken, match3d3d, searchForDuplicates } from "./providers/api.ts";
+import {
+  enrollment3d,
+  enrollUser,
+  getSessionToken,
+  match3d3d,
+  searchForDuplicates,
+} from "./providers/api.ts";
 import { countMembersInGroup, getOldestFaceSignUserId, insertMember } from "./providers/db.ts";
 
 const app = express();
@@ -139,6 +145,7 @@ app.post("/login", async (req, res) => {
         groupName,
       });
       // biome-ignore lint/style/noNonNullAssertion: This is safe because we check results.length > 1
+      // biome-ignore lint/suspicious/noNonNullAssertedOptionalChain: This is safe because we check results.length > 1
       faceSignUserId = results[0]?.identifier!;
     }
 
@@ -284,7 +291,15 @@ app.post("/match", async (req, res) => {
 
   try {
     // First check if liveness is proven
-    const { success, wasProcessed, scanResultBlob, error, matchLevel, retryScreenEnumInt, ...others } = await match3d3d(
+    const {
+      success,
+      wasProcessed,
+      scanResultBlob,
+      error,
+      matchLevel,
+      retryScreenEnumInt,
+      ...others
+    } = await match3d3d(
       externalUserId,
       faceScan,
       auditTrailImage,
@@ -297,7 +312,11 @@ app.post("/match", async (req, res) => {
     if (!wasProcessed || error) {
       agent.writeLog("match-3d-3d-failed", { success, wasProcessed, error });
     } else {
-      agent.writeLog("match-3d-3d-done", { identifier: externalUserId, matchLevel, retryScreenEnumInt });
+      agent.writeLog("match-3d-3d-done", {
+        identifier: externalUserId,
+        matchLevel,
+        retryScreenEnumInt,
+      });
     }
 
     return res.status(200).json({
