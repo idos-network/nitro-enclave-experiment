@@ -1,49 +1,33 @@
 import { FACETEC_SERVER } from "../env.ts";
 
-export async function getSessionToken(key: string, deviceIdentifier: string) {
-  const response = await fetch(`${FACETEC_SERVER}session-token`, {
+export async function getStatus() {
+  // https://dev.facetec.com/api-guide#status
+  const response = await fetch(`${FACETEC_SERVER}status`, {
     method: "GET",
-    headers: {
-      "X-Device-Key": key,
-      "X-Device-Identifier": deviceIdentifier,
-    },
   });
 
   if (!response.ok) {
-    console.error("Failed to get session token, status:", response.status);
-    console.error("Response text:", response.text);
-    throw new Error(`Failed to get session token, status: ${response.status}`);
+    throw new Error(`Failed to get status, status: ${response.status}`);
   }
 
-  const { sessionToken } = (await response.json()) as { sessionToken: string };
+  const data = (await response.json()) as { running: boolean, success: boolean, error?: string, serverInfo: any };
 
-  return sessionToken;
+  return data;
 }
 
 export async function enrollment3d(
+  requestBlob: string,
   externalDatabaseRefID: string,
-  faceScan: string,
-  auditTrailImage: string,
-  lowQualityAuditTrailImage: string,
-  key: string,
-  deviceIdentifier: string,
-  sessionId: string,
-  storeAsFaceVector: boolean,
 ) {
-  const enrollmentResponse = await fetch(`${FACETEC_SERVER}enrollment-3d`, {
+  const enrollmentResponse = await fetch(`${FACETEC_SERVER}process-request`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Device-Key": key,
-      "X-Device-Identifier": deviceIdentifier,
     },
     body: JSON.stringify({
-      faceScan,
-      auditTrailImage,
-      lowQualityAuditTrailImage,
+      // TODO: MISSING STORE AS VECTOR!
       externalDatabaseRefID,
-      sessionId,
-      storeAsFaceVector,
+      requestBlob,
     }),
   });
 
@@ -54,36 +38,23 @@ export async function enrollment3d(
   }
 
   return enrollmentResponse.json() as Promise<{
+    livenessProven: boolean,
     success: boolean;
-    wasProcessed: boolean;
-    scanResultBlob?: string;
-    error?: string;
-    errorMessage?: string;
   }>;
 }
 
 export async function match3d3d(
   externalDatabaseRefID: string,
-  faceScan: string,
-  auditTrailImage: string,
-  lowQualityAuditTrailImage: string,
-  key: string,
-  deviceIdentifier: string,
-  sessionId: string,
+  requestBlob: string,
 ) {
-  const matchResponse = await fetch(`${FACETEC_SERVER}match-3d-3d`, {
+  const matchResponse = await fetch(`${FACETEC_SERVER}process-request`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Device-Key": key,
-      "X-Device-Identifier": deviceIdentifier,
     },
     body: JSON.stringify({
-      faceScan,
-      auditTrailImage,
-      lowQualityAuditTrailImage,
       externalDatabaseRefID,
-      sessionId,
+      requestBlob,
     }),
   });
 
@@ -94,19 +65,9 @@ export async function match3d3d(
   }
 
   return matchResponse.json() as Promise<{
-    success: boolean;
-    wasProcessed: boolean;
+    livenessProven: boolean;
     matchLevel?: number;
-    retryScreenEnumInt?: number;
-    scanResultBlob?: string;
-    error?: string;
-    errorMessage?: string;
-    faceScanSecurityChecks: {
-      replayCheckSucceeded: boolean;
-      sessionTokenCheckSucceeded: boolean;
-      auditTrailVerificationCheckSucceeded: boolean;
-      faceScanLivenessCheckSucceeded: boolean;
-    };
+    success: boolean;
   }>;
 }
 

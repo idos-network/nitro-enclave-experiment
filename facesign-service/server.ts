@@ -17,7 +17,6 @@ import agent from "./providers/agent.ts";
 import {
   enrollment3d,
   enrollUser,
-  getSessionToken,
   match3d3d,
   searchForDuplicates,
 } from "./providers/api.ts";
@@ -32,31 +31,6 @@ app.use(express.json({ limit: "50mb" }));
 
 app.get("/", (_req, res) => {
   res.json({ message: "FaceSign Service is running" });
-});
-
-// Session-Token
-app.post("/session-token", async (req, res) => {
-  try {
-    const sessionToken = await getSessionToken(req.body.key, req.body.deviceIdentifier);
-    agent.writeLog("session-token", {
-      deviceIdentifier: req.body.deviceIdentifier,
-    });
-    return res.status(200).json({ success: true, sessionToken });
-  } catch (error) {
-    if (!(error instanceof Error)) {
-      agent.writeLog("error", {
-        message: "Unknown error in /session-token",
-        error,
-      });
-    } else {
-      agent.writeLog("error", { message: error.message, stack: error.stack });
-    }
-
-    return res.status(500).json({
-      success: false,
-      message: "Failed to get session token, check server logs.",
-    });
-  }
 });
 
 // Login
@@ -76,24 +50,18 @@ app.post("/login", async (req, res) => {
 
   try {
     // First check if liveness is proven
-    const { success, wasProcessed, scanResultBlob, error } = await enrollment3d(
+    const { success, livenessProven } = await enrollment3d(
       faceSignUserId,
       faceScan,
-      auditTrailImage,
-      lowQualityAuditTrailImage,
-      key,
-      userAgent,
-      sessionId,
-      faceVector,
     );
 
-    if (!success || !wasProcessed || error) {
-      agent.writeLog("login-enrollment-failed", { success, wasProcessed, error });
+    if (!success || !livenessProven) {
+      agent.writeLog("login-enrollment-failed", { success, livenessProven });
 
       return res.status(400).json({
         success,
-        wasProcessed,
-        error,
+        livenessProven,
+        error: true,
         errorMessage: "Liveness check or enrollment 3D failed and was not processed.",
       });
     }
@@ -150,10 +118,9 @@ app.post("/login", async (req, res) => {
     }
 
     return res.status(200).json({
-      success: true,
-      wasProcessed,
-      error: error ?? false,
-      scanResultBlob: scanResultBlob,
+      success,
+      livenessProven,
+      error: false,
       faceSignUserId,
     });
   } catch (error) {
@@ -165,7 +132,7 @@ app.post("/login", async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      wasProcessed: false,
+      livenessProven: false,
       error: true,
       // biome-ignore lint/suspicious/noExplicitAny: We want to show the message even if error is not an instance of Error
       errorMessage: `Login process failed, check server logs: ${(error as any).message}`,
@@ -182,24 +149,19 @@ app.post("/pinocchio-login", async (req, res) => {
 
   try {
     // First check if liveness is proven
-    const { success, wasProcessed, scanResultBlob, error } = await enrollment3d(
+    const { success, livenessProven } = await enrollment3d(
       faceSignUserId,
       faceScan,
-      auditTrailImage,
-      lowQualityAuditTrailImage,
-      key,
-      userAgent,
-      sessionId,
-      true,
+      // STORE faceVector for pinocchio-login
     );
 
-    if (!success || !wasProcessed || error) {
-      agent.writeLog("pinocchio-enrollment-failed", { success, wasProcessed, error });
+    if (!success || !livenessProven) {
+      agent.writeLog("pinocchio-enrollment-failed", { success, livenessProven });
 
       return res.status(400).json({
         success,
-        wasProcessed,
-        error,
+        livenessProven,
+        error: true,
         errorMessage: "Liveness check or enrollment 3D failed and was not processed.",
       });
     }
@@ -254,10 +216,9 @@ app.post("/pinocchio-login", async (req, res) => {
     );
 
     return res.status(200).json({
-      success: true,
-      wasProcessed,
-      error: error ?? false,
-      scanResultBlob: scanResultBlob,
+      success,
+      livenessProven,
+      error: false,
       faceSignUserId,
       token,
     });
@@ -270,7 +231,7 @@ app.post("/pinocchio-login", async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      wasProcessed: false,
+      livenessProven: false,
       error: true,
       // biome-ignore lint/suspicious/noExplicitAny: We want to show the message even if error is not an instance of Error
       errorMessage: `Login process failed, check server logs: ${(error as any).message}`,
@@ -293,45 +254,31 @@ app.post("/match", async (req, res) => {
     // First check if liveness is proven
     const {
       success,
-      wasProcessed,
-      scanResultBlob,
-      error,
+      livenessProven,
       matchLevel,
-      retryScreenEnumInt,
-      ...others
     } = await match3d3d(
       externalUserId,
       faceScan,
-      auditTrailImage,
-      lowQualityAuditTrailImage,
-      key,
-      userAgent,
-      sessionId,
     );
 
-    if (!wasProcessed || error) {
-      agent.writeLog("match-3d-3d-failed", { success, wasProcessed, error });
+    if (!success || !livenessProven) {
+      agent.writeLog("match-3d-3d-failed", { success, livenessProven, externalUserId });
     } else {
       agent.writeLog("match-3d-3d-done", {
         identifier: externalUserId,
         matchLevel,
-        retryScreenEnumInt,
       });
     }
 
     return res.status(200).json({
       // Success can be false even if wasProcessed is true (e.g. failed match)
       success,
-      wasProcessed,
-      scanResultBlob,
-      error,
       // We have to differentiate between failed match and failed liveness
       // in the UI we want user to repeat liveness check if this fails
-      livenessDone: others.faceScanSecurityChecks.faceScanLivenessCheckSucceeded,
-      retryScreenEnumInt,
+      livenessProven,
+      error: false,
       // 0-15
       matchLevel,
-      others,
     });
   } catch (error) {
     if (!(error instanceof Error)) {
