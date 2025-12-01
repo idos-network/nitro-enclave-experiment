@@ -33,7 +33,7 @@ socat TCP4-LISTEN:7001,fork,bind=127.0.0.7 VSOCK-CONNECT:3:7001 &
 # So that the FaceTec .so file can load some stuff on /tmp.
 mount /tmp -o remount,exec
 
-cd /home/FaceTec_Custom_Server/deploy
+cd /home/deploy/
 
 # S3 secrets
 S3_SECRETS_BUCKET=$(cat ./s3_secrets_bucket.txt)
@@ -92,8 +92,11 @@ if [ ! -f ./mongodb_uri.txt ]; then
 fi
 
 MONGO_URI="$(cat ./mongodb_uri.txt)"
-sed -i "s#export const MONGO_URI = \"INSERT YOUR MONGO URL HERE\";#export const MONGO_URI = \"${MONGO_URI//&/\\&}\";#" ./facesign-service/env.ts
-sed -i "s#uri: INSERT YOUR MONGO URL HERE#uri: \"${MONGO_URI//&/\\&}\"#" ./config.yaml
+sed -i "s#export const MONGO_URI = \"INSERT YOUR MONGO URL HERE\";#export const MONGO_URI = \"${MONGO_URI//&/\\&}\";#" $HOME_FACESIGN_SERVICE/env.ts
+sed -i "s#uri: INSERT YOUR MONGO URL HERE#uri: \"${MONGO_URI//&/\\&}\"#" $HOME_FACETEC_CUSTOM_SERVER/deploy/config.yaml
+
+echo "Fetching FaceTec SDK server core jar from S3"
+aws s3 sync "s3://$S3_SECRETS_BUCKET/FaceTec_Server_Core/" /home/FaceTec_Server_Core/  --region eu-west-1
 
 echo "Fetching facetec private key from S3"
 AWS_KMS_SECRETS_FACETEC_KEY_ID="$(cat ./secrets_facetec_key.arn)"
@@ -119,10 +122,10 @@ echo "Decrypting facetec private key"
 aws kms decrypt --ciphertext-blob "$(cat $FACETEC_PRIVATE_ENC_FILE)" --output text --query Plaintext --region eu-west-1 | base64 -d > "$FACETEC_PRIVATE_PLAIN_FILE"
 
 # Public facetec sdk key is stored unencrypted in the bucket
-aws s3 cp "s3://$S3_SECRETS_BUCKET/$FACETEC_PUBLIC_FILE" "/home/FaceTec_Custom_Server/deploy/facesign-service/$FACETEC_PUBLIC_FILE" --region eu-west-1
+aws s3 cp "s3://$S3_SECRETS_BUCKET/$FACETEC_PUBLIC_FILE" "$HOME_FACESIGN_SERVICE/$FACETEC_PUBLIC_FILE" --region eu-west-1
 
 # Replace facetec encryption private key in facetec service
-sed -i "s|^faceMapEncryptionKey:.*|faceMapEncryptionKey: \"$(tr -d '\n' < "$FACETEC_PRIVATE_PLAIN_FILE")\"|" /home/FaceTec_Custom_Server/deploy/config.yaml
+sed -i "s|^faceMapEncryptionKey:.*|faceMapEncryptionKey: \"$(tr -d '\n' < "$FACETEC_PRIVATE_PLAIN_FILE")\"|" $HOME_FACETEC_CUSTOM_SERVER/deploy/config.yaml
 
 # Ensure there are 3d-db and logs directories
 if [ ! -d /mnt/encrypted/facetec/search-3d-3d-database ]; then
@@ -130,10 +133,12 @@ if [ ! -d /mnt/encrypted/facetec/search-3d-3d-database ]; then
   mkdir -p \
       /mnt/encrypted/facetec/search-3d-3d-database \
       /mnt/encrypted/facetec/search-3d-3d-database-export \
-      /mnt/encrypted/facetec/search-3d-3d-eye-covered \
+      /mnt/encrypted/facetec/search-3d-3d-accessibility \
       /mnt/encrypted/facetec/search-3d-2d-face-portrait \
       /mnt/encrypted/facetec/search-3d-2d-kiosk \
-      /mnt/encrypted/facetec/search-2d-2d-id-scan
+      /mnt/encrypted/facetec/search-2d-2d-id-scan \
+      /mnt/encrypted/facetec/search-2d-2d-profile-pic \
+      /mnt/encrypted/facetec/search-2d-2d-face-portrait
 
   # Running repopulate?!
   # node facesign-service/repopulate.js
@@ -147,8 +152,8 @@ fi
 # Set-up facesing service
 echo "Fetching key 1 public multibase from S3"
 KEY_1_MULTIBASE_PUBLIC_FILE=multibase_key_1_public.txt
-aws s3 cp "s3://$S3_SECRETS_BUCKET/$KEY_1_MULTIBASE_PUBLIC_FILE" "./facesign-service/$KEY_1_MULTIBASE_PUBLIC_FILE" --region eu-west-1
-if [ ! -f "./facesign-service/$KEY_1_MULTIBASE_PUBLIC_FILE" ]; then
+aws s3 cp "s3://$S3_SECRETS_BUCKET/$KEY_1_MULTIBASE_PUBLIC_FILE" "$HOME_FACESIGN_SERVICE/$KEY_1_MULTIBASE_PUBLIC_FILE" --region eu-west-1
+if [ ! -f "$HOME_FACESIGN_SERVICE/$KEY_1_MULTIBASE_PUBLIC_FILE" ]; then
   echo "Couldn't download $KEY_1_MULTIBASE_PUBLIC_FILE from S3, exiting"
   exit 1
 fi
@@ -161,7 +166,7 @@ if [ ! -f "./$HOSTNAME_FILE" ]; then
   exit 1
 fi
 HOST=$(cat ./$HOSTNAME_FILE)
-sed -i "s#export const HOST = \"INSERT YOUR HOST HERE\";#export const HOST = \"${HOST//&/\\&}\";#" ./facesign-service/env.ts
+sed -i "s#export const HOST = \"INSERT YOUR HOST HERE\";#export const HOST = \"${HOST//&/\\&}\";#" $HOME_FACESIGN_SERVICE/env.ts
 
 echo "Fetching Caddyfile from S3"
 CADDYFILE=Caddyfile
@@ -195,8 +200,8 @@ if [ ! -f "./$JWT_TOKEN_SECRET_FILE" ]; then
 fi
 
 echo "Decrypting JWT token private key"
-aws kms decrypt --ciphertext-blob "$(cat $JWT_TOKEN_SECRET_FILE)" --output text --query Plaintext --region eu-west-1 | base64 -d > ./facesign-service/jwt_token_private.pem
+aws kms decrypt --ciphertext-blob "$(cat $JWT_TOKEN_SECRET_FILE)" --output text --query Plaintext --region eu-west-1 | base64 -d > $HOME_FACESIGN_SERVICE/jwt_token_private.pem
 
 echo "Running PM2-runtime"
-export HOME=/home/FaceTec_Custom_Server
+export HOME=/home/deploy
 pm2-runtime ecosystem.config.js
