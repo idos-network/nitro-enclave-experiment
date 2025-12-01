@@ -58,6 +58,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends --no-install-su
     libnbd-bin \
     nbd-client \
     cryptsetup \
+    vim \
+    jq \
 && rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
 
 # Install AWS CLI v2
@@ -132,18 +134,6 @@ RUN npm install
 # Download or copy all required secrets and setup environment
 WORKDIR /home/deploy
 
-ARG AWS_KMS_SECRETS_KEY_ID
-RUN if [ -z "$AWS_KMS_SECRETS_KEY_ID" ]; then (echo "AWS_KMS_SECRETS_KEY_ID must be provided as a --build-arg"; exit 1); fi
-RUN echo $AWS_KMS_SECRETS_KEY_ID > ./secrets_key.arn
-
-ARG AWS_KMS_SECRETS_FACETEC_KEY_ID
-RUN if [ -z "$AWS_KMS_SECRETS_FACETEC_KEY_ID" ]; then (echo "AWS_KMS_SECRETS_FACETEC_KEY_ID must be provided as a --build-arg"; exit 1); fi
-RUN echo $AWS_KMS_SECRETS_FACETEC_KEY_ID > ./secrets_facetec_key.arn
-
-ARG AWS_KMS_JWT_KEY_ID
-RUN if [ -z "$AWS_KMS_JWT_KEY_ID" ]; then (echo "AWS_KMS_JWT_KEY_ID must be provided as a --build-arg"; exit 1); fi
-RUN echo $AWS_KMS_JWT_KEY_ID > ./jwt_key.arn
-
 # Setup PM2
 RUN npm install -g pm2
 COPY ./facesign-service/scripts/ecosystem.config.js ./ecosystem.config.js
@@ -151,30 +141,11 @@ COPY ./facesign-service/scripts/ecosystem.config.js ./ecosystem.config.js
 # Support boot.ash scripts
 COPY ./facesign-service/authorized_keys /root/.ssh/authorized_keys
 COPY ./facesign-service/scripts/run.ash ./
-COPY ./facesign-service/scripts/boot.ash ./
-
-# Setup /etc/hosts entries for local services
-ARG MONGO_HOST
-RUN if [ -z "$MONGO_HOST" ]; then (echo "MONGO_HOST must be provided as a --build-arg"; exit 1); fi
-
-RUN echo "127.0.0.1 $MONGO_HOST" | tee -a /root/extra_hosts
-RUN echo "127.0.0.1 $(echo "$MONGO_HOST" | sed 's#-cluster.cluster-#-cluster.#')" | tee -a /root/extra_hosts
-RUN echo "127.0.0.1 logs.facetec.com" | tee -a /root/extra_hosts
-
-# AWS kms (AWS identity are on ip tables forwarded to 127.0.0.2!)
-RUN echo "127.0.0.3 kms.eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
+COPY ./facesign-service/scripts/shared ./shared/
 
 ARG S3_SECRETS_BUCKET
 RUN if [ -z "$S3_SECRETS_BUCKET" ]; then (echo "S3_SECRETS_BUCKET must be provided as a --build-arg"; exit 1); fi
 RUN echo $S3_SECRETS_BUCKET > ./s3_secrets_bucket.txt
 
-# AWS secrets S3
-RUN echo "127.0.0.4 $S3_SECRETS_BUCKET.s3.eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
-RUN echo "127.0.0.5 $S3_SECRETS_BUCKET.s3-eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
-
-# Let's encrypt acme lookup
-RUN echo "127.0.0.6 acme-v02.api.letsencrypt.org" | tee -a /root/extra_hosts
-
 EXPOSE 8080
-
-CMD ["/bin/bash", "/home/deploy/boot.ash"]
+CMD ["/bin/bash", "/home/deploy/run.ash"]
