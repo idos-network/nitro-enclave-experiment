@@ -14,7 +14,7 @@ iptables-legacy -t nat -A OUTPUT -d 169.254.169.254 -p tcp --dport 80 -j DNAT --
 # To be able to enable and control DNS resolution.
 cat /root/extra_hosts >> /etc/hosts
 
-if false; then #SSH#
+if true; then #SSH#
     socat -d -d VSOCK-LISTEN:5005,fork TCP4-CONNECT:127.0.0.1:2222 &
 
     ssh-keygen -A
@@ -42,4 +42,4 @@ if false; then #SSH#
     /usr/sbin/sshd -f /etc/ssh/sshd_config -e -D &
 fi
 
-exec bash /home/FaceTec_Custom_Server/deploy/run.sh
+exec bash /home/deploy/run.ash
