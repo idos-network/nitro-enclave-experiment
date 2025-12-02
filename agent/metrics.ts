@@ -35,9 +35,15 @@ async function sendOsMetrics(item: OsMetrics) {
   });
 
   metricData.push({
-    MetricName: "LoadAvg",
+    MetricName: "MemoryUtilization",
+    Value: (item.data.memUsed / item.data.memTotal) * 100,
+    Unit: "Percent",
+  })
+
+  metricData.push({
+    MetricName: "CPUUtilization",
     Value: item.data.loadavg,
-    Unit: "Count",
+    Unit: "Percent",
   });
 
   try {
