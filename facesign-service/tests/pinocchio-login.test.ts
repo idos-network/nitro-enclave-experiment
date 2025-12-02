@@ -37,8 +37,8 @@ describe("Pinocchio Login API", () => {
   it("new user", async () => {
     const enrollmentSpy = vi.spyOn(facetecApi, "enrollment3d").mockResolvedValue({
       success: true,
-      wasProcessed: true,
-      scanResultBlob: "mock-scan-result-blob",
+      livenessProven: true,
+      responseBlob: "mock-scan-result-blob",
     });
 
     const enrollUserSpy = vi.spyOn(facetecApi, "enrollUser").mockResolvedValue({
@@ -55,7 +55,7 @@ describe("Pinocchio Login API", () => {
       insertedId: new ObjectId(),
     });
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => { });
 
     const response = await request(app).post("/pinocchio-login").send({
       faceScan: "test-face-scan",
@@ -111,10 +111,11 @@ describe("Pinocchio Login API", () => {
   it("failing liveness", async () => {
     vi.spyOn(facetecApi, "enrollment3d").mockResolvedValue({
       success: false,
-      wasProcessed: true,
+      livenessProven: true,
+      responseBlob: "",
     });
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => { });
 
     const response = await request(app).post("/pinocchio-login").send({
       faceScan: "test-face-scan",
@@ -142,8 +143,8 @@ describe("Pinocchio Login API", () => {
   it("duplicate (normal)", async () => {
     const enrollmentSpy = vi.spyOn(facetecApi, "enrollment3d").mockResolvedValue({
       success: true,
-      wasProcessed: true,
-      scanResultBlob: "mock-scan-result-blob",
+      livenessProven: true,
+      responseBlob: "mock-scan-result-blob",
     });
 
     const enrollUserSpy = vi.spyOn(facetecApi, "enrollUser").mockResolvedValue({
@@ -162,7 +163,7 @@ describe("Pinocchio Login API", () => {
       insertedId: new ObjectId(),
     });
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => { });
 
     const oldestSpy = vi.spyOn(db, "getOldestFaceSignUserId").mockResolvedValue(resultId);
 
@@ -222,8 +223,8 @@ describe("Pinocchio Login API", () => {
   it("duplicate (more than 1, choose oldest)", async () => {
     const enrollmentSpy = vi.spyOn(facetecApi, "enrollment3d").mockResolvedValue({
       success: true,
-      wasProcessed: true,
-      scanResultBlob: "mock-scan-result-blob",
+      livenessProven: true,
+      responseBlob: "mock-scan-result-blob",
     });
 
     const enrollUserSpy = vi.spyOn(facetecApi, "enrollUser").mockResolvedValue({
@@ -248,7 +249,7 @@ describe("Pinocchio Login API", () => {
       insertedId: new ObjectId(),
     });
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => { });
 
     const oldestSpy = vi.spyOn(db, "getOldestFaceSignUserId").mockResolvedValue(resultId3);
 

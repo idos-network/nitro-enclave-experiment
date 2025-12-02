@@ -1,0 +1,35 @@
+name: "Entropy enclave build"
+
+on:
+  pull_request:
+
+# The following permissions are required when "enable-ghcr-push" is true
+permissions:
+  packages: write
+  id-token: write
+
+jobs:
+  build_and_sign_image:
+    name: Build and sign entropy image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      - name: Replace S3 bucket name
+        run: |
+          sed -i 's/INSERT_S3_BUCKET_HERE/'"${{ secrets.STAGING_S3_BUCKET }}"'/g' entropy-service/Dockerfile
+
+      - name: Build EIF
+        id: build-eif
+        uses: richardfan1126/nitro-enclaves-eif-build-action@v1
+        with:
+          docker-build-context-path: entropy-service/
+          dockerfile-path: Dockerfile
+          enable-ghcr-push: true
+          enable-artifact-sign: false
+          eif-file-name: entropy-enclave.eif
+          eif-info-file-name: entropy-enclave-info.json
+          artifact-tag: latest
+          save-pcrs-in-annotation: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}

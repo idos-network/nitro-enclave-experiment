@@ -16,8 +16,8 @@ export async function getStatus() {
 }
 
 export async function enrollment3d(
-  requestBlob: string,
   externalDatabaseRefID: string,
+  requestBlob: string,
 ) {
   const enrollmentResponse = await fetch(`${FACETEC_SERVER}process-request`, {
     method: "POST",
@@ -39,6 +39,29 @@ export async function enrollment3d(
 
   return enrollmentResponse.json() as Promise<{
     livenessProven: boolean,
+    success: boolean;
+    responseBlob: string;
+  }>;
+}
+
+export async function convertToVector(externalDatabaseRefID: string) {
+  const convertToVectorResponse = await fetch(`${FACETEC_SERVER}convert-facemap-to-face-vector`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      externalDatabaseRefID,
+    }),
+  });
+
+  if (!convertToVectorResponse.ok) {
+    console.error("Failed to convert to vector, status:", convertToVectorResponse.status);
+    console.error("Response text:", await convertToVectorResponse.text());
+    throw new Error("Failed to enroll, check for logs.");
+  }
+
+  return convertToVectorResponse.json() as Promise<{
     success: boolean;
   }>;
 }
@@ -73,16 +96,12 @@ export async function match3d3d(
 
 export async function searchForDuplicates(
   externalDatabaseRefID: string,
-  key: string,
   groupName: string,
-  deviceIdentifier?: string,
 ) {
   const response = await fetch(`${FACETEC_SERVER}3d-db/search`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Device-Key": key,
-      "X-Device-Identifier": deviceIdentifier,
     },
     body: JSON.stringify({
       externalDatabaseRefID,
@@ -103,12 +122,11 @@ export async function searchForDuplicates(
   }>;
 }
 
-export async function enrollUser(externalDatabaseRefID: string, groupName: string, key: string) {
+export async function enrollUser(externalDatabaseRefID: string, groupName: string) {
   const response = await fetch(`${FACETEC_SERVER}3d-db/enroll`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Device-Key": key,
     },
     body: JSON.stringify({
       externalDatabaseRefID,

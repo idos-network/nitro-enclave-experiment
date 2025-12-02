@@ -1,5 +1,5 @@
 import { MongoClient } from "mongodb";
-import { FACETEC_DEVICE_KEY, GROUP_NAME, MONGO_URI } from "../env.ts";
+import { GROUP_NAME, MONGO_URI } from "../env.ts";
 import { searchForDuplicates } from "../providers/api.ts";
 
 const client = new MongoClient(MONGO_URI, {
@@ -32,7 +32,6 @@ async function checkDuplicates() {
 
       const searchResult = await searchForDuplicates(
         externalDatabaseRefID,
-        FACETEC_DEVICE_KEY,
         GROUP_NAME,
       );
 

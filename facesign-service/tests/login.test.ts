@@ -19,8 +19,8 @@ describe("Login API", () => {
   it("new user", async () => {
     const enrollmentSpy = vi.spyOn(facetecApi, "enrollment3d").mockResolvedValue({
       success: true,
-      wasProcessed: true,
-      scanResultBlob: "mock-scan-result-blob",
+      livenessProven: true,
+      responseBlob: "mock-scan-result-blob",
     });
 
     const enrollUserSpy = vi.spyOn(facetecApi, "enrollUser").mockResolvedValue({
@@ -37,7 +37,7 @@ describe("Login API", () => {
       insertedId: new ObjectId(),
     });
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => { });
 
     const response = await request(app).post("/login").send({
       faceScan: "test-face-scan",
@@ -89,8 +89,8 @@ describe("Login API", () => {
   it("new user (different group and faceMap instead of vectors)", async () => {
     const enrollmentSpy = vi.spyOn(facetecApi, "enrollment3d").mockResolvedValue({
       success: true,
-      wasProcessed: true,
-      scanResultBlob: "mock-scan-result-blob",
+      livenessProven: true,
+      responseBlob: "mock-scan-result-blob",
     });
 
     const enrollUserSpy = vi.spyOn(facetecApi, "enrollUser").mockResolvedValue({
@@ -107,7 +107,7 @@ describe("Login API", () => {
       insertedId: new ObjectId(),
     });
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => { });
 
     const response = await request(app).post("/login").send({
       faceScan: "test-face-scan",
@@ -160,10 +160,11 @@ describe("Login API", () => {
   it("failing liveness", async () => {
     vi.spyOn(facetecApi, "enrollment3d").mockResolvedValue({
       success: false,
-      wasProcessed: true,
+      livenessProven: true,
+      responseBlob: "",
     });
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => { });
 
     const response = await request(app).post("/login").send({
       faceScan: "test-face-scan",
@@ -191,8 +192,8 @@ describe("Login API", () => {
   it("duplicate (normal)", async () => {
     const enrollmentSpy = vi.spyOn(facetecApi, "enrollment3d").mockResolvedValue({
       success: true,
-      wasProcessed: true,
-      scanResultBlob: "mock-scan-result-blob",
+      livenessProven: true,
+      responseBlob: "mock-scan-result-blob",
     });
 
     const enrollUserSpy = vi.spyOn(facetecApi, "enrollUser").mockResolvedValue({
@@ -211,7 +212,7 @@ describe("Login API", () => {
       insertedId: new ObjectId(),
     });
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => { });
 
     const response = await request(app).post("/login").send({
       faceScan: "test-face-scan",
@@ -261,8 +262,8 @@ describe("Login API", () => {
   it("duplicate (error)", async () => {
     const enrollmentSpy = vi.spyOn(facetecApi, "enrollment3d").mockResolvedValue({
       success: true,
-      wasProcessed: true,
-      scanResultBlob: "mock-scan-result-blob",
+      livenessProven: true,
+      responseBlob: "mock-scan-result-blob",
     });
 
     const enrollUserSpy = vi.spyOn(facetecApi, "enrollUser").mockResolvedValue({
@@ -285,7 +286,7 @@ describe("Login API", () => {
       insertedId: new ObjectId(),
     });
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => { });
 
     const response = await request(app).post("/login").send({
       faceScan: "test-face-scan",
