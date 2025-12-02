@@ -12,6 +12,8 @@ jobs:
   build_and_sign_image:
     name: Build and sign entropy image
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
