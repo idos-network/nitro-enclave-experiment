@@ -1,6 +1,7 @@
 import net from "node:net";
 import os from "os-utils";
 import pm2 from "pm2";
+import checkDiskSpace from "check-disk-space";
 
 function pm2Stats() {
   return new Promise((resolve, reject) => {
@@ -79,7 +80,16 @@ class AgentClient {
 
     // send stats
     this.statsInterval = setInterval(async () => {
-      const osData = await new Promise((resolve) => {
+      const osData = await new Promise<{
+        loadavg: number;
+        memUsed: number;
+        memTotal: number;
+        disks?: Array<{
+          name: string;
+          used: number;
+          total: number;
+        }>;
+      }>((resolve) => {
         os.cpuUsage((v) => {
           resolve({
             loadavg: v,
@@ -88,6 +98,25 @@ class AgentClient {
           });
         });
       });
+
+      // Load disk space
+      // @ts-expect-error check-disk-space types are broken
+      const spaceRoot = await checkDiskSpace("/");
+      // @ts-expect-error check-disk-space types are broken
+      const spaceMntEncrypted = await checkDiskSpace("/mnt/encrypted");
+
+      osData["disks"] = [
+        {
+          name: "root",
+          used: spaceRoot.size - spaceRoot.free,
+          total: spaceRoot.size,
+        },
+        {
+          name: "encrypted",
+          used: spaceMntEncrypted.size - spaceMntEncrypted.free,
+          total: spaceMntEncrypted.size,
+        },
+      ];
 
       this.writeLog("os", osData);
 
@@ -140,7 +169,10 @@ class AgentClient {
   scheduleReconnect() {
     console.log(`[AGENT] Reconnecting in ${this.reconnectDelay / 1000}s...`);
     setTimeout(() => this.connect(), this.reconnectDelay);
-    this.reconnectDelay = Math.min(this.reconnectDelay * 2, this.maxReconnectDelay);
+    this.reconnectDelay = Math.min(
+      this.reconnectDelay * 2,
+      this.maxReconnectDelay,
+    );
   }
 
   writeLog(type: string, data: unknown) {

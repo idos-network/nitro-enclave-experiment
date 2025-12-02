@@ -17,6 +17,7 @@
 		"@aws-sdk/credential-provider-node": "^3.907.0",
 		"@scure/bip39": "^2.0.1",
 		"@types/morgan": "^1.9.10",
+		"check-disk-space": "^3.4.0",
 		"cors": "^2.8.5",
 		"express": "^5.1.0",
 		"helmet": "^8.1.0",
