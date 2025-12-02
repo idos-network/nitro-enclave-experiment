@@ -1,3 +1,4 @@
+// biome-ignore-all lint/suspicious/noExplicitAny: Test files often need any
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 import agent from "../providers/agent.ts";
@@ -42,7 +43,7 @@ describe("Login API", () => {
       insertedId: new ObjectId(),
     });
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => { });
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
     const response = await request(app).post("/login").send({
       requestBlob: "test-face-scan",
@@ -57,20 +58,11 @@ describe("Login API", () => {
       success: true,
     });
 
-    expect(duplicateSpy).toHaveBeenCalledWith(
-      response.body.faceSignUserId,
-      "facesign-users",
-    );
+    expect(duplicateSpy).toHaveBeenCalledWith(response.body.faceSignUserId, "facesign-users");
 
-    expect(enrollmentSpy).toHaveBeenCalledWith(
-      response.body.faceSignUserId,
-      "test-face-scan",
-    );
+    expect(enrollmentSpy).toHaveBeenCalledWith(response.body.faceSignUserId, "test-face-scan");
 
-    expect(enrollUserSpy).toHaveBeenCalledWith(
-      response.body.faceSignUserId,
-      "facesign-users",
-    );
+    expect(enrollUserSpy).toHaveBeenCalledWith(response.body.faceSignUserId, "facesign-users");
 
     expect(agentSpy).toHaveBeenCalledWith("login-new-user", {
       identifier: response.body.faceSignUserId,
@@ -85,7 +77,7 @@ describe("Login API", () => {
     const enrollmentSpy = vi.spyOn(facetecApi, "enrollment3d").mockResolvedValue({
       success: true,
       didError: false,
-      result: { livenessProven: true, },
+      result: { livenessProven: true },
       responseBlob: "mock-scan-result-blob",
     } as any);
 
@@ -107,7 +99,7 @@ describe("Login API", () => {
       success: true,
     });
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => { });
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
     const response = await request(app).post("/login").send({
       requestBlob: "test-face-scan",
@@ -124,19 +116,10 @@ describe("Login API", () => {
       result: { livenessProven: true },
     });
 
-    expect(duplicateSpy).toHaveBeenCalledWith(
-      response.body.faceSignUserId,
-      "test-users",
-    );
-    expect(enrollmentSpy).toHaveBeenCalledWith(
-      response.body.faceSignUserId,
-      "test-face-scan",
-    );
+    expect(duplicateSpy).toHaveBeenCalledWith(response.body.faceSignUserId, "test-users");
+    expect(enrollmentSpy).toHaveBeenCalledWith(response.body.faceSignUserId, "test-face-scan");
 
-    expect(enrollUserSpy).toHaveBeenCalledWith(
-      response.body.faceSignUserId,
-      "test-users",
-    );
+    expect(enrollUserSpy).toHaveBeenCalledWith(response.body.faceSignUserId, "test-users");
 
     expect(agentSpy).toHaveBeenCalledWith("login-new-user", {
       identifier: response.body.faceSignUserId,
@@ -154,7 +137,7 @@ describe("Login API", () => {
       responseBlob: "",
     } as any);
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => { });
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
     const response = await request(app).post("/login").send({
       requestBlob: "test-face-scan",
@@ -206,7 +189,7 @@ describe("Login API", () => {
       insertedId: new ObjectId(),
     });
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => { });
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
     const response = await request(app).post("/login").send({
       requestBlob: "test-face-scan",
@@ -221,15 +204,9 @@ describe("Login API", () => {
       didError: false,
     });
 
-    expect(duplicateSpy).toHaveBeenCalledWith(
-      expect.any(String),
-      "facesign-users",
-    );
+    expect(duplicateSpy).toHaveBeenCalledWith(expect.any(String), "facesign-users");
 
-    expect(enrollmentSpy).toHaveBeenCalledWith(
-      expect.any(String),
-      "test-face-scan",
-    );
+    expect(enrollmentSpy).toHaveBeenCalledWith(expect.any(String), "test-face-scan");
     expect(enrollUserSpy).not.toHaveBeenCalled();
 
     expect(agentSpy).toHaveBeenCalledWith("login-duplicate", {
@@ -270,7 +247,7 @@ describe("Login API", () => {
       insertedId: new ObjectId(),
     });
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => { });
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
     const response = await request(app).post("/login").send({
       requestBlob: "test-face-scan",
@@ -284,14 +261,8 @@ describe("Login API", () => {
       success: false,
     });
 
-    expect(duplicateSpy).toHaveBeenCalledWith(
-      expect.any(String),
-      "facesign-users",
-    );
-    expect(enrollmentSpy).toHaveBeenCalledWith(
-      expect.any(String),
-      "test-face-scan",
-    );
+    expect(duplicateSpy).toHaveBeenCalledWith(expect.any(String), "facesign-users");
+    expect(enrollmentSpy).toHaveBeenCalledWith(expect.any(String), "test-face-scan");
 
     expect(enrollUserSpy).not.toHaveBeenCalled();
 

@@ -1,3 +1,4 @@
+// biome-ignore-all lint/suspicious/noExplicitAny: Test files often need any
 import { generateKeyPairSync } from "node:crypto";
 import jwt from "jsonwebtoken";
 import request from "supertest";
@@ -30,9 +31,7 @@ vi.mock("../providers/db.ts", () => ({
 
 import { ObjectId } from "mongodb";
 import * as db from "../providers/db.ts";
-
 import app from "../server.ts";
-import { resourceUsage } from "node:process";
 
 describe("Pinocchio Login API", () => {
   it("new user", async () => {
@@ -61,7 +60,7 @@ describe("Pinocchio Login API", () => {
       insertedId: new ObjectId(),
     });
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => { });
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
     const response = await request(app).post("/pinocchio").send({
       requestBlob: "test-face-scan",
@@ -81,22 +80,11 @@ describe("Pinocchio Login API", () => {
     const decoded = jwt.verify(response.body.token, publicKey, { algorithms: ["ES512"] });
     expect(decoded.sub).toBe(response.body.faceSignUserId);
 
-    expect(duplicateSpy).toHaveBeenCalledWith(
-      response.body.faceSignUserId,
-      "facesign-users",
-    );
+    expect(duplicateSpy).toHaveBeenCalledWith(response.body.faceSignUserId, "facesign-users");
 
-    expect(enrollmentSpy).toHaveBeenCalledWith(
-      response.body.faceSignUserId,
-      "test-face-scan",
-    );
-    expect(vectorConvertSpy).toHaveBeenCalledWith(
-      response.body.faceSignUserId,
-    );
-    expect(enrollUserSpy).toHaveBeenCalledWith(
-      response.body.faceSignUserId,
-      "facesign-users",
-    );
+    expect(enrollmentSpy).toHaveBeenCalledWith(response.body.faceSignUserId, "test-face-scan");
+    expect(vectorConvertSpy).toHaveBeenCalledWith(response.body.faceSignUserId);
+    expect(enrollUserSpy).toHaveBeenCalledWith(response.body.faceSignUserId, "facesign-users");
 
     expect(agentSpy).toHaveBeenCalledWith("pinocchio-new-user", {
       identifier: response.body.faceSignUserId,
@@ -113,7 +101,7 @@ describe("Pinocchio Login API", () => {
       didError: true,
     } as any);
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => { });
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
     const response = await request(app).post("/pinocchio").send({
       requestBlob: "test-face-scan",
@@ -160,7 +148,7 @@ describe("Pinocchio Login API", () => {
       insertedId: new ObjectId(),
     });
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => { });
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
     const oldestSpy = vi.spyOn(db, "getOldestFaceSignUserId").mockResolvedValue(resultId);
 
@@ -182,15 +170,9 @@ describe("Pinocchio Login API", () => {
       token: expect.any(String),
     });
 
-    expect(duplicateSpy).toHaveBeenCalledWith(
-      expect.any(String),
-      "facesign-users",
-    );
+    expect(duplicateSpy).toHaveBeenCalledWith(expect.any(String), "facesign-users");
 
-    expect(enrollmentSpy).toHaveBeenCalledWith(
-      expect.any(String),
-      "test-face-scan",
-    );
+    expect(enrollmentSpy).toHaveBeenCalledWith(expect.any(String), "test-face-scan");
 
     expect(enrollUserSpy).not.toHaveBeenCalled();
 
@@ -234,7 +216,7 @@ describe("Pinocchio Login API", () => {
       insertedId: new ObjectId(),
     });
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => { });
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
     const oldestSpy = vi.spyOn(db, "getOldestFaceSignUserId").mockResolvedValue(resultId3);
 
@@ -256,15 +238,9 @@ describe("Pinocchio Login API", () => {
     const decoded = jwt.verify(response.body.token, publicKey, { algorithms: ["ES512"] });
     expect(decoded.sub).toBe(resultId3);
 
-    expect(duplicateSpy).toHaveBeenCalledWith(
-      expect.any(String),
-      "facesign-users",
-    );
+    expect(duplicateSpy).toHaveBeenCalledWith(expect.any(String), "facesign-users");
 
-    expect(enrollmentSpy).toHaveBeenCalledWith(
-      expect.any(String),
-      "test-face-scan",
-    );
+    expect(enrollmentSpy).toHaveBeenCalledWith(expect.any(String), "test-face-scan");
 
     expect(enrollUserSpy).not.toHaveBeenCalled();
 
