@@ -9,7 +9,6 @@ const namespace = `Enclave${process.env.PREFIX}/Metrics`;
 
 const debugEnabled = process.env.DEBUG === "true";
 
-
 // {"type":"os","data":{"loadavg":0,"memUsed":21461041152,"memTotal":37063122944}}
 export interface OsMetrics {
   type: "os";
