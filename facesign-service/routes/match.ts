@@ -1,48 +1,43 @@
 import type { Request, Response } from "express";
-import { match3d3d } from "../providers/api.ts";
 import agent from "../providers/agent.ts";
+import { match3d3d } from "../providers/api.ts";
 
 export default async function handler(req: Request, res: Response) {
-  const {
-    faceScan,
-    key,
-    userAgent,
-    auditTrailImage,
-    lowQualityAuditTrailImage,
-    sessionId,
-    externalUserId,
-  } = req.body;
+  const { faceScan, externalUserId } = req.body;
 
   try {
     // First check if liveness is proven
-    const {
-      success,
-      livenessProven,
-      matchLevel,
-    } = await match3d3d(
-      externalUserId,
-      faceScan,
-    );
+    const { success, result, responseBlob, didError } = await match3d3d(externalUserId, faceScan);
 
-    if (!success || !livenessProven) {
-      agent.writeLog("match-3d-3d-failed", { success, livenessProven, externalUserId });
-    } else {
-      agent.writeLog("match-3d-3d-done", {
-        identifier: externalUserId,
-        matchLevel,
+    // If there is "just" a response blob, we should return it to client
+    // this is used when session starts or it's wrong image.
+    // This looks like a replacement of the previous "challenge" mechanism.
+    if (responseBlob && success === undefined) {
+      agent.writeLog("match-response-blob", {});
+
+      return res.status(200).json({
+        responseBlob,
       });
     }
 
-    return res.status(200).json({
-      // Success can be false even if wasProcessed is true (e.g. failed match)
+    // Always return required fields for SDK
+    const alwaysToReturn = {
       success,
-      // We have to differentiate between failed match and failed liveness
-      // in the UI we want user to repeat liveness check if this fails
-      livenessProven,
-      error: false,
-      // 0-15
-      matchLevel,
-    });
+      responseBlob,
+      didError,
+      result,
+    };
+
+    if (!success || !result.livenessProven) {
+      agent.writeLog("match-3d-3d-failed", { success, result, externalUserId });
+    } else {
+      agent.writeLog("match-3d-3d-done", {
+        identifier: externalUserId,
+        matchLevel: result.matchLevel,
+      });
+    }
+
+    return res.status(200).json(alwaysToReturn);
   } catch (error) {
     if (!(error instanceof Error)) {
       agent.writeLog("match-error", { message: "Unknown error in /match", error });
@@ -52,7 +47,9 @@ export default async function handler(req: Request, res: Response) {
 
     return res.status(500).json({
       success: false,
-      message: "Match process failed, check server logs.",
+      didError: true,
+      error: true,
+      errorMessage: "Match process failed, check server logs.",
     });
   }
 }

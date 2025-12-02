@@ -30,10 +30,7 @@ async function checkDuplicates() {
 
       i++;
 
-      const searchResult = await searchForDuplicates(
-        externalDatabaseRefID,
-        GROUP_NAME,
-      );
+      const searchResult = await searchForDuplicates(externalDatabaseRefID, GROUP_NAME);
 
       if (searchResult.success && searchResult.results.length > 1) {
         searchResult.results.forEach((item) => {

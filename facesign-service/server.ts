@@ -4,14 +4,11 @@ import express from "express";
 import helmet from "helmet";
 import morgan from "morgan";
 
-import {
-  HOST,
-  KEY_1_MULTIBASE_PUBLIC_PATH,
-} from "./env.ts";
-
+import { HOST, KEY_1_MULTIBASE_PUBLIC_PATH } from "./env.ts";
+import { getStatus } from "./providers/api.ts";
 import login from "./routes/login.ts";
-import pinnochio from "./routes/pinnochio.ts";
 import match from "./routes/match.ts";
+import pinnochio from "./routes/pinnochio.ts";
 
 const app = express();
 
@@ -22,6 +19,11 @@ app.use(express.json({ limit: "50mb" }));
 
 app.get("/", (_req, res) => {
   res.json({ message: "FaceSign Service is running" });
+});
+
+app.get("/health", async (_req, res) => {
+  const status = await getStatus();
+  res.status(200).json({ status: "ok", version: status.serverInfo.facetecServerWebserviceVersion });
 });
 
 app.post("/login", login);

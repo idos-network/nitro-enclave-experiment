@@ -21,7 +21,7 @@ export default async function handler(req: Request, res: Response) {
 
   try {
     // First check if liveness is proven
-    const { success, livenessProven, responseBlob } = await enrollment3d(
+    const { success, result, responseBlob, didError } = await enrollment3d(
       faceSignUserId,
       requestBlob,
     );
@@ -37,15 +37,26 @@ export default async function handler(req: Request, res: Response) {
       });
     }
 
-    if (!success || !livenessProven) {
-      agent.writeLog("pinocchio-enrollment-failed", { success, livenessProven });
+    // Always return required fields for SDK
+    const alwaysToReturn = {
+      success,
+      responseBlob,
+      didError,
+      result,
+    };
+
+    if (!success || !result.livenessProven || didError) {
+      agent.writeLog("pinocchio-enrollment-failed", { success, result, didError });
 
       return res.status(400).json({
-        success,
-        livenessProven,
-        error: true,
+        ...alwaysToReturn,
         errorMessage: "Liveness check or enrollment 3D failed and was not processed.",
       });
+    }
+
+    // Convert to facevector if requested
+    if (faceVector) {
+      await convertToVector(faceSignUserId);
     }
 
     // Search for 3d-db duplicates
@@ -77,10 +88,6 @@ export default async function handler(req: Request, res: Response) {
       // Brand new user, let's enroll in 3d-db#users
       agent.writeLog("pinocchio-new-user", { identifier: faceSignUserId });
 
-      if (faceVector) {
-        await convertToVector(faceSignUserId);
-      }
-
       await enrollUser(faceSignUserId, GROUP_NAME);
       await insertMember(GROUP_NAME, faceSignUserId);
     } else {
@@ -103,9 +110,7 @@ export default async function handler(req: Request, res: Response) {
     );
 
     return res.status(200).json({
-      success,
-      livenessProven,
-      error: false,
+      ...alwaysToReturn,
       faceSignUserId,
       token,
     });
@@ -119,6 +124,7 @@ export default async function handler(req: Request, res: Response) {
     return res.status(500).json({
       success: false,
       livenessProven: false,
+      didError: true,
       error: true,
       // biome-ignore lint/suspicious/noExplicitAny: We want to show the message even if error is not an instance of Error
       errorMessage: `Login process failed, check server logs: ${(error as any).message}`,

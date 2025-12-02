@@ -18,9 +18,10 @@ if [[ "${S3_SECRETS_BUCKET:-null}" == "null" ]]; then
   exit 1
 fi
 
+sed -i "s/INSERT_S3_BUCKET_HERE/$S3_SECRETS_BUCKET/g" ~ec2-user/entropy-service/Dockerfile
+
 # Build origin Docker image
 docker build \
-    --build-arg S3_SECRETS_BUCKET="$S3_SECRETS_BUCKET" \
     -t "$TARGET_DOCKER_IMAGE" \
     -f ~ec2-user/entropy-service/Dockerfile \
     ~ec2-user/entropy-service/ \

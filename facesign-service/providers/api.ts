@@ -1,5 +1,14 @@
 import { FACETEC_SERVER } from "../env.ts";
 
+export interface StatusResponse {
+  coreServerSDKVersion: string;
+  facetecServerWebserviceVersion: string;
+  uptime: number;
+  machineID: string;
+  instanceID: string;
+  notice: string;
+}
+
 export async function getStatus() {
   // https://dev.facetec.com/api-guide#status
   const response = await fetch(`${FACETEC_SERVER}status`, {
@@ -10,15 +19,50 @@ export async function getStatus() {
     throw new Error(`Failed to get status, status: ${response.status}`);
   }
 
-  const data = (await response.json()) as { running: boolean, success: boolean, error?: string, serverInfo: any };
+  const data = (await response.json()) as {
+    running: boolean;
+    success: boolean;
+    error?: string;
+    serverInfo: StatusResponse;
+  };
 
   return data;
 }
 
-export async function enrollment3d(
-  externalDatabaseRefID: string,
-  requestBlob: string,
-) {
+export interface ProcessRequestResponse {
+  externalDatabaseRefID: string;
+  additionalSessionData: {
+    platform: string;
+    appID: string;
+    installationID: string;
+    deviceModel: string;
+    deviceSDKVersion: string;
+    userAgent: string;
+    sessionID: string;
+  };
+  success: boolean;
+  responseBlob: string;
+  result: {
+    livenessProven: boolean;
+    ageV2GroupEnumInt?: number;
+    matchLevel?: number;
+  };
+  isLikelyOnFraudList: boolean;
+  isLikelyDuplicate: boolean;
+  enrollForSearchAllUserListResult: boolean;
+  launchId: string;
+  httpCallInfo: {
+    tid: string;
+    path: "/process-request";
+    date: string;
+    epochSecond: number;
+    requestMethod: "POST";
+  };
+  didError: boolean;
+  serverInfo: StatusResponse;
+}
+
+export async function enrollment3d(externalDatabaseRefID: string, requestBlob: string) {
   const enrollmentResponse = await fetch(`${FACETEC_SERVER}process-request`, {
     method: "POST",
     headers: {
@@ -37,11 +81,7 @@ export async function enrollment3d(
     throw new Error("Failed to enroll, check for logs.");
   }
 
-  return enrollmentResponse.json() as Promise<{
-    livenessProven: boolean,
-    success: boolean;
-    responseBlob: string;
-  }>;
+  return enrollmentResponse.json() as Promise<ProcessRequestResponse>;
 }
 
 export async function convertToVector(externalDatabaseRefID: string) {
@@ -66,10 +106,7 @@ export async function convertToVector(externalDatabaseRefID: string) {
   }>;
 }
 
-export async function match3d3d(
-  externalDatabaseRefID: string,
-  requestBlob: string,
-) {
+export async function match3d3d(externalDatabaseRefID: string, requestBlob: string) {
   const matchResponse = await fetch(`${FACETEC_SERVER}process-request`, {
     method: "POST",
     headers: {
@@ -87,17 +124,10 @@ export async function match3d3d(
     throw new Error("Failed to match, check for logs.");
   }
 
-  return matchResponse.json() as Promise<{
-    livenessProven: boolean;
-    matchLevel?: number;
-    success: boolean;
-  }>;
+  return matchResponse.json() as Promise<ProcessRequestResponse>;
 }
 
-export async function searchForDuplicates(
-  externalDatabaseRefID: string,
-  groupName: string,
-) {
+export async function searchForDuplicates(externalDatabaseRefID: string, groupName: string) {
   const response = await fetch(`${FACETEC_SERVER}3d-db/search`, {
     method: "POST",
     headers: {
