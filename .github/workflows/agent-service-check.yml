@@ -1,0 +1,66 @@
+name: Agent service
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - "agent/**"
+      - ".github/workflows/agent-service-check.yml"
+  pull_request:
+    branches: [master, main, develop]
+    paths:
+      - "agent/**"
+      - ".github/workflows/agent-service-check.yml"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 24.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24.x"
+          cache: "npm"
+          cache-dependency-path: agent/package-lock.json
+
+      - name: Install dependencies
+        working-directory: agent
+        run: npm ci
+
+      - name: Run type check
+        working-directory: agent
+        run: npm run types
+
+      - name: Run lint
+        working-directory: agent
+        run: npm run format:ci
+
+  publish:
+    runs-on: ubuntu-latest
+    needs: check
+    if: github.ref == 'refs/heads/master'
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Docker image
+        run: |
+          docker build -t ghcr.io/${{ github.repository }}/agent:latest ./agent
+
+      - name: Push Docker image
+        run: |
+          docker push ghcr.io/${{ github.repository }}/agent:latest

@@ -1,37 +1,43 @@
-import { CloudWatchLogsClient, PutLogEventsCommand, CreateLogStreamCommand, CreateLogGroupCommand } from "@aws-sdk/client-cloudwatch-logs";
+import {
+  CloudWatchLogsClient,
+  CreateLogGroupCommand,
+  CreateLogStreamCommand,
+  PutLogEventsCommand,
+} from "@aws-sdk/client-cloudwatch-logs";
 
 const logGroupName = "/ec2/nitro/facesign";
 const logStreamName = "agent-stream";
 const cwLogs = new CloudWatchLogsClient({ region: "eu-west-1" });
 
-let sequenceToken;
+let sequenceToken: string | undefined;
 
-async function sendLog(message) {
+// biome-ignore lint/suspicious/noExplicitAny: This is fine for logging
+async function sendLog(message: any) {
   try {
     if (!sequenceToken) {
       try {
         await cwLogs.send(new CreateLogGroupCommand({ logGroupName }));
-      } catch (e) {
+      } catch (_e) {
         // Ignore if already exists
       }
 
       try {
-        await cwLogs.send(new CreateLogStreamCommand({
-          logGroupName,
-          logStreamName,
-        }));
-      } catch (e) {
+        await cwLogs.send(
+          new CreateLogStreamCommand({
+            logGroupName,
+            logStreamName,
+          }),
+        );
+      } catch (_e) {
         // Ignore if already exists
       }
     }
 
     const params = {
-      logEvents: [
-        { message: JSON.stringify(message), timestamp: Date.now() }
-      ],
+      logEvents: [{ message: JSON.stringify(message), timestamp: Date.now() }],
       logGroupName,
       logStreamName,
-      sequenceToken
+      sequenceToken,
     };
 
     const res = await cwLogs.send(new PutLogEventsCommand(params));

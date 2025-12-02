@@ -50,6 +50,7 @@ sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock
 
 # Agent
 sudo docker run --net=host -d --restart unless-stopped --privileged --name vsock-16-7001-tcp-7000         alpine/socat -d -d VSOCK-LISTEN:7001,fork,keepalive TCP-CONNECT:127.0.0.1:7000
+sudo docker run -d --pull always --name enclave-agent -p 7000:7000 ghcr.io/idos-network/nitro-enclave-experiment/agent:latest
 
 cd ~
 wget https://download.libguestfs.org/nbdkit/1.44-stable/nbdkit-1.44.3.tar.gz
@@ -77,24 +78,8 @@ User=root
 WantedBy=multi-user.target
 EOF
 
-cat <<'EOF' | sudo tee /etc/systemd/system/agent-log.service
-[Unit]
-Description=Agent server
-After=network.target
-
-[Service]
-ExecStart=/usr/bin/node /home/ec2-user/agent
-Restart=always
-User=ec2-user
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
 sudo systemctl daemon-reload
 sudo systemctl enable nbdkit.service
-sudo systemctl enable agent-log.service
 sudo systemctl start nbdkit.service
-sudo systemctl start agent-log.service
 
 sudo -u ec2-user mkdir -p ~ec2-user/custom-server
