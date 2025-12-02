@@ -18,7 +18,7 @@ export interface OsMetrics {
     memTotal: number;
     disks?: Array<{
       name: string;
-      free: number;
+      used: number;
       total: number;
     }>;
   };
@@ -54,13 +54,13 @@ async function sendOsMetrics(item: OsMetrics) {
   item.data.disks?.forEach((disk) => {
     metricData.push({
       MetricName: `DiskUtilization${disk.name[0]?.toUpperCase() + disk.name.slice(1)}`,
-      Value: ((disk.total - disk.free) / disk.total) * 100,
+      Value: (disk.used / disk.total) * 100,
       Unit: "Percent",
     });
 
     metricData.push({
       MetricName: `DiskUsed${disk.name[0]?.toUpperCase() + disk.name.slice(1)}`,
-      Value: disk.total - disk.free,
+      Value: disk.used,
       Unit: "Bytes",
     });
 
