@@ -38,7 +38,7 @@ async function sendOsMetrics(item: OsMetrics) {
     MetricName: "MemoryUtilization",
     Value: (item.data.memUsed / item.data.memTotal) * 100,
     Unit: "Percent",
-  })
+  });
 
   metricData.push({
     MetricName: "CPUUtilization",
