@@ -9,14 +9,19 @@ const namespace = `Enclave${process.env.PREFIX}/Metrics`;
 
 const debugEnabled = process.env.DEBUG === "true";
 
-// {"type":"os","data":{"loadavg":0,"memUsed":21461041152,"memTotal":37063122944}}
 
+// {"type":"os","data":{"loadavg":0,"memUsed":21461041152,"memTotal":37063122944}}
 export interface OsMetrics {
   type: "os";
   data: {
     loadavg: number;
     memUsed: number;
     memTotal: number;
+    disks?: Array<{
+      name: string;
+      free: number;
+      total: number;
+    }>;
   };
 }
 
@@ -45,6 +50,26 @@ async function sendOsMetrics(item: OsMetrics) {
     MetricName: "CPUUtilization",
     Value: item.data.loadavg * 100,
     Unit: "Percent",
+  });
+
+  item.data.disks?.forEach((disk) => {
+    metricData.push({
+      MetricName: `DiskUtilization${disk.name[0]?.toUpperCase() + disk.name.slice(1)}`,
+      Value: ((disk.total - disk.free) / disk.total) * 100,
+      Unit: "Percent",
+    });
+
+    metricData.push({
+      MetricName: `DiskUsed${disk.name[0]?.toUpperCase() + disk.name.slice(1)}`,
+      Value: disk.total - disk.free,
+      Unit: "Bytes",
+    });
+
+    metricData.push({
+      MetricName: `DiskTotal${disk.name[0]?.toUpperCase() + disk.name.slice(1)}`,
+      Value: disk.total,
+      Unit: "Bytes",
+    });
   });
 
   if (debugEnabled) {
