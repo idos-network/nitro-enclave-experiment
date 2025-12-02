@@ -1,5 +1,5 @@
 import net from "node:net";
-import os from "node:os";
+import os from "os-utils";
 import pm2 from "pm2";
 
 function pm2Stats() {
@@ -78,12 +78,18 @@ class AgentClient {
     }, 5000);
 
     // send stats
-    this.statsInterval = setInterval(() => {
-      this.writeLog("os", {
-        loadavg: os.loadavg()[0],
-        memUsed: os.totalmem() - os.freemem(),
-        memTotal: os.totalmem(),
+    this.statsInterval = setInterval(async () => {
+      const osData = await new Promise((resolve) => {
+        os.cpuUsage((v) => {
+          resolve({
+            loadavg: v,
+            memUsed: os.totalmem() - os.freemem(),
+            memTotal: os.totalmem(),
+          });
+        });
       });
+
+      this.writeLog("os", osData);
 
       pm2Stats()
         .then((stats) => {
