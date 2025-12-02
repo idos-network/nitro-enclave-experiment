@@ -54,12 +54,16 @@ async function sendOsMetrics(item: OsMetrics) {
   }
 
   try {
-    await cw.send(
+    const response = await cw.send(
       new PutMetricDataCommand({
         Namespace: namespace,
         MetricData: metricData,
       }),
     );
+
+    if (debugEnabled) {
+      console.log("-> [AGENT] CloudWatch response:", response);
+    }
   } catch (err) {
     console.error("CloudWatch metrics error:", err);
   }
@@ -102,12 +106,16 @@ async function sendPm2Metrics(item: Pm2Metrics) {
   }
 
   try {
-    await cw.send(
+    const response = await cw.send(
       new PutMetricDataCommand({
         Namespace: namespace,
         MetricData: metricData,
       }),
     );
+
+    if (debugEnabled) {
+      console.log("-> [AGENT] CloudWatch response:", response);
+    }
   } catch (err) {
     console.error("CloudWatch metrics error:", err);
   }
