@@ -1,13 +1,10 @@
 import crypto from "node:crypto";
 import type { Request, Response } from "express";
-
-import {
-  GROUP_NAME,
-} from "../env.ts";
-
+import { GROUP_NAME } from "../env.ts";
 import agent from "../providers/agent.ts";
 
 import {
+  convertToVector,
   enrollment3d,
   enrollUser,
   searchForDuplicates,
@@ -17,16 +14,11 @@ import { countMembersInGroup, insertMember } from "../providers/db.ts";
 export default async function handler(req: Request, res: Response) {
   let faceSignUserId: string = crypto.randomUUID();
 
-  const {
-    requestBlob,
-    groupName = GROUP_NAME,
-    // Missing this!
-    faceVector = true,
-  } = req.body;
+  const { requestBlob, groupName = GROUP_NAME, faceVector = true } = req.body;
 
   try {
     // First check if liveness is proven
-    const { success, livenessProven, responseBlob } = await enrollment3d(
+    const { success, result, responseBlob, didError } = await enrollment3d(
       faceSignUserId,
       requestBlob,
     );
@@ -42,15 +34,25 @@ export default async function handler(req: Request, res: Response) {
       });
     }
 
-    if (!success || !livenessProven) {
-      agent.writeLog("login-enrollment-failed", { success, livenessProven });
+    // Always return required fields for SDK
+    const alwaysToReturn = {
+      success,
+      responseBlob,
+      didError,
+      result,
+    };
+
+    if (!success || !result.livenessProven) {
+      agent.writeLog("login-enrollment-failed", { success, result, didError });
 
       return res.status(400).json({
-        success,
-        livenessProven,
-        error: true,
+        ...alwaysToReturn,
         errorMessage: "Liveness check or enrollment 3D failed and was not processed.",
       });
+    }
+
+    if (faceVector) {
+      await convertToVector(faceSignUserId);
     }
 
     // Search for 3d-db duplicates
@@ -92,6 +94,7 @@ export default async function handler(req: Request, res: Response) {
         count: results.length,
         groupName,
       });
+
       throw new Error("Multiple users found with the same face-vector.");
     } else {
       agent.writeLog("login-duplicate", {
@@ -105,9 +108,7 @@ export default async function handler(req: Request, res: Response) {
     }
 
     return res.status(200).json({
-      success,
-      livenessProven,
-      error: false,
+      ...alwaysToReturn,
       faceSignUserId,
     });
   } catch (error) {
@@ -119,8 +120,7 @@ export default async function handler(req: Request, res: Response) {
 
     return res.status(500).json({
       success: false,
-      livenessProven: false,
-      error: true,
+      didError: true,
       // biome-ignore lint/suspicious/noExplicitAny: We want to show the message even if error is not an instance of Error
       errorMessage: `Login process failed, check server logs: ${(error as any).message}`,
     });
