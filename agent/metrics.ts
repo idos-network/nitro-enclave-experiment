@@ -43,7 +43,7 @@ async function sendOsMetrics(item: OsMetrics) {
 
   metricData.push({
     MetricName: "CPUUtilization",
-    Value: item.data.loadavg,
+    Value: item.data.loadavg * 100,
     Unit: "Percent",
   });
 
