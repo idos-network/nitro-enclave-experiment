@@ -25,13 +25,13 @@ async function sendOsMetrics(item: OsMetrics) {
   metricData.push({
     MetricName: "MemoryUsed",
     Value: item.data.memUsed,
-    Unit: "Bytes",
+    Unit: "Megabytes",
   });
 
   metricData.push({
     MetricName: "MemoryTotal",
     Value: item.data.memTotal,
-    Unit: "Bytes",
+    Unit: "Megabytes",
   });
 
   metricData.push({
