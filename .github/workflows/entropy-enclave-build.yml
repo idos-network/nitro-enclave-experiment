@@ -20,6 +20,10 @@ jobs:
         run: |
           sed -i 's/INSERT_S3_BUCKET_HERE/'"${{ secrets.STAGING_S3_BUCKET }}"'/g' entropy-service/Dockerfile
 
+      - name: Copy shared scripts
+        run: |
+          cp -a shared ./entropy-service/scripts/
+
       - name: Build EIF
         id: build-eif
         uses: richardfan1126/nitro-enclaves-eif-build-action@v1
