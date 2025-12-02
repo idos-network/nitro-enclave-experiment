@@ -7,6 +7,8 @@ import {
 const cw = new CloudWatchClient({ region: "eu-west-1" });
 const namespace = `Enclave${process.env.PREFIX}/Metrics`;
 
+const debugEnabled = process.env.DEBUG === "true";
+
 // {"type":"os","data":{"loadavg":0,"memUsed":21461041152,"memTotal":37063122944}}
 
 export interface OsMetrics {
@@ -21,7 +23,6 @@ export interface OsMetrics {
 async function sendOsMetrics(item: OsMetrics) {
   const metricData: MetricDatum[] = [];
 
-  // OS metriky
   metricData.push({
     MetricName: "MemoryUsed",
     Value: item.data.memUsed,
@@ -45,6 +46,12 @@ async function sendOsMetrics(item: OsMetrics) {
     Value: item.data.loadavg,
     Unit: "Percent",
   });
+
+  if (debugEnabled) {
+    console.log("-> [AGENT] Sending OS metrics to CloudWatch:");
+    console.log("--> Namespace:", namespace);
+    console.log(JSON.stringify(metricData, null, 2));
+  }
 
   try {
     await cw.send(
@@ -87,6 +94,12 @@ async function sendPm2Metrics(item: Pm2Metrics) {
       Unit: "Bytes",
     });
   });
+
+  if (debugEnabled) {
+    console.log("-> [AGENT] Sending PM2 metrics to CloudWatch:");
+    console.log("--> Namespace:", namespace);
+    console.log(JSON.stringify(metricData, null, 2));
+  }
 
   try {
     await cw.send(
