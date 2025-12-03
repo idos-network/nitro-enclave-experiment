@@ -7,7 +7,12 @@ import * as facetecApi from "../providers/api.ts";
 import app from "../server.ts";
 
 // This is required, otherwise it will fail due to missing DB
-vi.mock("../providers/db.ts");
+vi.mock("../providers/db.ts", () => ({
+  insertMember: vi.fn(),
+  countMembersInGroup: vi.fn(),
+  getMembers: vi.fn(),
+  getOldestFaceSignUserId: vi.fn(),
+}));
 
 describe("Match Login API", () => {
   it("return new session", async () => {
@@ -33,7 +38,7 @@ describe("Match Login API", () => {
       didError: false,
     } as any);
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => { });
 
     const response = await request(app).post("/match").send({
       requestBlob: "test-face-scan",
@@ -63,7 +68,7 @@ describe("Match Login API", () => {
       didError: true,
     } as any);
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => { });
 
     const response = await request(app).post("/match").send({
       requestBlob: "test-face-scan",
@@ -91,7 +96,7 @@ describe("Match Login API", () => {
       message: "Some unexpected error",
     } as any);
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => { });
 
     const response = await request(app).post("/match").send({
       requestBlob: "test-face-scan",
