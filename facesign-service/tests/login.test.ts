@@ -17,6 +17,20 @@ import * as db from "../providers/db.ts";
 import app from "../server.ts";
 
 describe("Login API", () => {
+  it("return new session", async () => {
+    const enrollmentSpy = vi.spyOn(facetecApi, "enrollment3d").mockResolvedValue({
+      responseBlob: "mock-session-result-blob",
+    } as any);
+
+    const response = await request(app).post("/login").send({
+      requestBlob: "test-face-scan",
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.body.responseBlob).toBe("mock-session-result-blob");
+    expect(enrollmentSpy).toHaveBeenCalledWith(expect.any(String), "test-face-scan");
+  });
+
   it("new user", async () => {
     const enrollmentSpy = vi.spyOn(facetecApi, "enrollment3d").mockResolvedValue({
       success: true,

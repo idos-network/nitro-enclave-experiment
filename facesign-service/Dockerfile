@@ -1,11 +1,12 @@
 # ---------- Build stage ----------
 FROM ubuntu:latest AS builder
 
-ARG FACETEC_SDK_VERSION
-RUN if [ -z "$FACETEC_SDK_VERSION" ]; then (echo "FACETEC_SDK_VERSION must be provided as a --build-arg"; exit 1); fi
+ENV FACETEC_SDK_VERSION="INSERT_FACETEC_SDK_VERSION_HERE"
+ENV FACETEC_SDK_BUCKET="INSERT_FACETEC_SDK_BUCKET_HERE"
 
-ARG FACETEC_CUSTOM_SERVER_DIRECTORY=./facetec-sdk/FaceTec-Server-Webservice/FaceTec-Server-Webservice-$FACETEC_SDK_VERSION
-ARG FACETEC_SERVER_CORE_DIRECTORY=./facetec-sdk/FaceTec-Server-Webservice/FaceTecSDK-Server-Core-$FACETEC_SDK_VERSION
+ARG FACETEC_S3_CORE=s3://$FACETEC_SDK_BUCKET/FaceTec-Server-Webservice/FaceTecSDK-Server-Core-$FACETEC_SDK_VERSION
+ARG FACETEC_S3_CUSTOM=s3://$FACETEC_SDK_BUCKET/FaceTec-Server-Webservice/FaceTec-Server-Webservice-$FACETEC_SDK_VERSION
+ARG FACETEC_S3_USAGE_LOGS=s3://$FACETEC_SDK_BUCKET/FaceTec-Usage-Log-Server
 
 # Install build dependencies (Java + Maven + Node.js + libs)
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -15,18 +16,26 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libavcodec-dev libavutil-dev \
     && rm -rf /var/lib/apt/lists/*
 
+# Download aws sdk to fetch FaceTec SDK from S3
+RUN apt-get update && apt-get install -y \
+    curl unzip less groff \
+    && rm -rf /var/lib/apt/lists/* \
+    && curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/awscliv2.zip" \
+    && unzip /tmp/awscliv2.zip -d /tmp \
+    && /tmp/aws/install \
+    && rm -rf /tmp/aws /tmp/awscliv2.zip
     
 # Copy FaceTec Server Core and Webservice into the image.
-COPY $FACETEC_SERVER_CORE_DIRECTORY /home/FaceTec_Server_Core
+RUN aws s3 sync s3://$FACETEC_SDK_BUCKET/FaceTec-Server-Webservice/FaceTecSDK-Server-Core-$FACETEC_SDK_VERSION/libs /home/FaceTec_Server_Core/libs
 
 # Install FaceTec Server Core into Maven
 RUN mvn install:install-file -Dfile=/home/FaceTec_Server_Core/libs/FaceTecSDK-Server-Core-$FACETEC_SDK_VERSION.jar -DgroupId=com.facetec.servercore -DartifactId=server -Dversion=$FACETEC_SDK_VERSION -Dpackaging=jar
 
 # Copy FaceTec Custom Server into the image.
-COPY $FACETEC_CUSTOM_SERVER_DIRECTORY/deploy /home/FaceTec_Custom_Server/deploy
-COPY $FACETEC_CUSTOM_SERVER_DIRECTORY/src /home/FaceTec_Custom_Server/src
-COPY $FACETEC_CUSTOM_SERVER_DIRECTORY/pom.xml /home/FaceTec_Custom_Server/pom.xml
-COPY $FACETEC_CUSTOM_SERVER_DIRECTORY/config.yaml /home/FaceTec_Custom_Server/deploy/config.yaml
+RUN aws s3 sync s3://$FACETEC_SDK_BUCKET/FaceTec-Server-Webservice/FaceTec-Server-Webservice-$FACETEC_SDK_VERSION/deploy /home/FaceTec_Custom_Server/deploy
+RUN aws s3 sync s3://$FACETEC_SDK_BUCKET/FaceTec-Server-Webservice/FaceTec-Server-Webservice-$FACETEC_SDK_VERSION/src /home/FaceTec_Custom_Server/src
+RUN aws s3 cp s3://$FACETEC_SDK_BUCKET/FaceTec-Server-Webservice/FaceTec-Server-Webservice-$FACETEC_SDK_VERSION/pom.xml /home/FaceTec_Custom_Server/pom.xml
+RUN aws s3 cp s3://$FACETEC_SDK_BUCKET/FaceTec-Server-Webservice/FaceTec-Server-Webservice-$FACETEC_SDK_VERSION/config.yaml /home/FaceTec_Custom_Server/deploy/config.yaml
 
 # FaceTec mongo storage modifications (don't store face images, just empty strings)
 RUN sed -i 's#faceScanRequest.auditTrailImage.getBase64()#""#' /home/FaceTec_Custom_Server/src/main/java/com/facetec/facetecserver/database/MongoDatabase.java
@@ -38,12 +47,8 @@ RUN mvn -f /home/FaceTec_Custom_Server/pom.xml clean package -Plinux
 # ---------- Final stage ----------
 FROM ubuntu:latest
 
-ARG FACETEC_SDK_VERSION
-RUN if [ -z "$FACETEC_SDK_VERSION" ]; then (echo "FACETEC_SDK_VERSION must be provided as a --build-arg"; exit 1); fi
-
-ARG FACETEC_CUSTOM_SERVER_DIRECTORY=./facetec-sdk/FaceTec-Server-Webservice/FaceTec-Server-Webservice-$FACETEC_SDK_VERSION
-ARG FACETEC_SERVER_CORE_DIRECTORY=./facetec-sdk/FaceTec-Server-Webservice/FaceTecSDK-Server-Core-$FACETEC_SDK_VERSION
-ARG FACETEC_USAGE_LOGS_DIRECTORY=./facetec-sdk/FaceTec-Usage-Log-Server
+ENV FACETEC_SDK_VERSION="INSERT_FACETEC_SDK_VERSION_HERE"
+ENV FACETEC_SDK_BUCKET="INSERT_FACETEC_SDK_BUCKET_HERE"
 
 # Install dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends --no-install-suggests \
@@ -97,12 +102,8 @@ ENV HOME_FACETEC_SERVER_CORE=/home/FaceTec_Server_Core
 ENV HOME_FACETEC_USAGE_LOGS=/home/FaceTec_Usage_Logs_Server
 ENV HOME_FACESIGN_SERVICE=/home/FaceSign_Service
 
-# Setup & build FaceTec Server Core
-COPY $FACETEC_CUSTOM_SERVER_DIRECTORY/URCTemplates /home/URCTemplates
-COPY $FACETEC_CUSTOM_SERVER_DIRECTORY/OCRTemplates /home/OCRTemplates
-
+# Don't copy server core, ocr or urc templates they will be fetched from S3 at runtime
 COPY --from=builder /home/FaceTec_Custom_Server $HOME_FACETEC_CUSTOM_SERVER
-# Don't copy server core, it will be fetched from S3 at runtime
 
 WORKDIR $HOME_FACETEC_CUSTOM_SERVER/deploy/
 RUN sed -i 's#serverPort: 8080#serverPort: 5000#' ./config.yaml
@@ -124,9 +125,9 @@ RUN echo "searchDatabaseExportRootDirectory: /mnt/encrypted/facetec/search-3d-3d
 
 # Setup FaceTec Usage Logs Server
 WORKDIR $HOME_FACETEC_USAGE_LOGS
-COPY $FACETEC_USAGE_LOGS_DIRECTORY/package.json ./package.json
+RUN aws s3 cp s3://$FACETEC_SDK_BUCKET/FaceTec-Usage-Log-Server/package.json ./package.json
 RUN npm install
-COPY $FACETEC_USAGE_LOGS_DIRECTORY/ .
+RUN aws s3 sync s3://$FACETEC_SDK_BUCKET/FaceTec-Usage-Log-Server/ ./
 RUN sed -i 's/54.70.182.147/logs.facetec.com/' ./utils/logUploader.js
 RUN sed -i 's#usageLogsDirectory: ""#usageLogsDirectory: "/mnt/encrypted/usage-logs"#' ./config.yml
 
@@ -143,13 +144,10 @@ RUN npm install -g pm2
 COPY ./facesign-service/scripts/ecosystem.config.js ./ecosystem.config.js
 
 # Support boot.ash scripts
-COPY ./facesign-service/authorized_keys /root/.ssh/authorized_keys
 COPY ./facesign-service/scripts/run.ash ./
 COPY ./facesign-service/scripts/shared ./shared/
 
-ARG S3_SECRETS_BUCKET
-RUN if [ -z "$S3_SECRETS_BUCKET" ]; then (echo "S3_SECRETS_BUCKET must be provided as a --build-arg"; exit 1); fi
-RUN echo $S3_SECRETS_BUCKET > ./s3_secrets_bucket.txt
+ENV S3_SECRETS_BUCKET="INSERT_S3_SECRETS_BUCKET_HERE"
 
 EXPOSE 8080
 CMD ["/bin/bash", "/home/deploy/run.ash"]

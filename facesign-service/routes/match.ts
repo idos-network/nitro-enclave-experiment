@@ -3,11 +3,14 @@ import agent from "../providers/agent.ts";
 import { match3d3d } from "../providers/api.ts";
 
 export default async function handler(req: Request, res: Response) {
-  const { faceScan, externalUserId } = req.body;
+  const { requestBlob, externalUserId } = req.body;
 
   try {
     // First check if liveness is proven
-    const { success, result, responseBlob, didError } = await match3d3d(externalUserId, faceScan);
+    const { success, result, responseBlob, didError } = await match3d3d(
+      externalUserId,
+      requestBlob,
+    );
 
     // If there is "just" a response blob, we should return it to client
     // this is used when session starts or it's wrong image.
@@ -30,12 +33,16 @@ export default async function handler(req: Request, res: Response) {
 
     if (!success || !result.livenessProven) {
       agent.writeLog("match-3d-3d-failed", { success, result, externalUserId });
-    } else {
-      agent.writeLog("match-3d-3d-done", {
-        identifier: externalUserId,
-        matchLevel: result.matchLevel,
+
+      return res.status(400).json({
+        ...alwaysToReturn,
+        errorMessage: "Liveness check or enrollment 3D failed and was not processed.",
       });
     }
+    agent.writeLog("match-3d-3d-done", {
+      identifier: externalUserId,
+      matchLevel: result.matchLevel,
+    });
 
     return res.status(200).json(alwaysToReturn);
   } catch (error) {

@@ -3,12 +3,10 @@ set -ueo pipefail
 
 cd /home/deploy/
 
-# Configure minimal S3 networking setup to get vsock.json and config.env
-S3_SECRETS_BUCKET=$(cat ./s3_secrets_bucket.txt)
-
 # Script dir for sourcing shared scripts
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Configure minimal networking to reach S3
 source "$SCRIPT_DIR/shared/basic.ash"
 configure_basic_networking "$S3_SECRETS_BUCKET"
 
@@ -59,7 +57,9 @@ sed -i "s#export const MONGO_URI = \"INSERT YOUR MONGO URL HERE\";#export const 
 sed -i "s#export const HOST = \"INSERT YOUR HOST HERE\";#export const HOST = \"${HOST//&/\\&}\";#" $HOME_FACESIGN_SERVICE/env.ts
 
 echo "Fetching FaceTec SDK server core jar from S3"
-aws s3 sync "s3://$S3_SECRETS_BUCKET/FaceTec_Server_Core/" /home/FaceTec_Server_Core/  --region eu-west-1
+aws s3 sync "s3://$FACETEC_SDK_BUCKET/FaceTec-Server-Webservice/FaceTecSDK-Server-Core-$FACETEC_SDK_VERSION/libs/" /home/FaceTec_Server_Core/libs  --region eu-west-1
+aws s3 sync s3://$FACETEC_SDK_BUCKET/FaceTec-Server-Webservice/FaceTec-Server-Webservice-$FACETEC_SDK_VERSION/URCTemplates /home/URCTemplates
+aws s3 sync s3://$FACETEC_SDK_BUCKET/FaceTec-Server-Webservice/FaceTec-Server-Webservice-$FACETEC_SDK_VERSION/OCRTemplates /home/OCRTemplates
 
 echo "Fetching facetec private key from S3"
 FACETEC_PRIVATE_ENC_FILE=facetec_private_key.pem.enc
@@ -90,26 +90,17 @@ aws s3 cp "s3://$S3_SECRETS_BUCKET/facesign/$FACETEC_PUBLIC_FILE" "$HOME_FACESIG
 sed -i "s|^faceMapEncryptionKey:.*|faceMapEncryptionKey: \"$(tr -d '\n' < "$FACETEC_PRIVATE_PLAIN_FILE")\"|" $HOME_FACETEC_CUSTOM_SERVER/deploy/config.yaml
 
 # Ensure there are 3d-db and logs directories
-if [ ! -d /mnt/encrypted/facetec/search-3d-3d-database ]; then
-  echo "Creating /mnt/encrypted/facetec directories..."
-  mkdir -p \
-      /mnt/encrypted/facetec/search-3d-3d-database \
-      /mnt/encrypted/facetec/search-3d-3d-database-export \
-      /mnt/encrypted/facetec/search-3d-3d-accessibility \
-      /mnt/encrypted/facetec/search-3d-2d-face-portrait \
-      /mnt/encrypted/facetec/search-3d-2d-kiosk \
-      /mnt/encrypted/facetec/search-2d-2d-id-scan \
-      /mnt/encrypted/facetec/search-2d-2d-profile-pic \
-      /mnt/encrypted/facetec/search-2d-2d-face-portrait
-
-  # Running repopulate?!
-  # node facesign-service/repopulate.js
-fi
-
-if [ ! -d /mnt/encrypted/logs ]; then
-  echo "Creating /mnt/encrypted/logs directory..."
-  mkdir -p /mnt/encrypted/logs
-fi
+echo "Creating /mnt/encrypted/facetec directories..."
+mkdir -p \
+    /mnt/encrypted/facetec/search-3d-3d-database \
+    /mnt/encrypted/facetec/search-3d-3d-database-export \
+    /mnt/encrypted/facetec/search-3d-3d-accessibility \
+    /mnt/encrypted/facetec/search-3d-2d-face-portrait \
+    /mnt/encrypted/facetec/search-3d-2d-kiosk \
+    /mnt/encrypted/facetec/search-2d-2d-id-scan \
+    /mnt/encrypted/facetec/search-2d-2d-profile-pic \
+    /mnt/encrypted/facetec/search-2d-2d-face-portrait \
+    /mnt/encrypted/logs
 
 # Set-up facesing service
 echo "Fetching key 1 public multibase from S3"

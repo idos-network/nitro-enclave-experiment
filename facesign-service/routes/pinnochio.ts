@@ -19,9 +19,11 @@ export default async function handler(req: Request, res: Response) {
 
   const { requestBlob, faceVector = true } = req.body;
 
+  console.log("Starting query with: ", { faceSignUserId });
+
   try {
     // First check if liveness is proven
-    const { success, result, responseBlob, didError } = await enrollment3d(
+    const { success, result, responseBlob, didError, externalDatabaseRefID } = await enrollment3d(
       faceSignUserId,
       requestBlob,
     );
@@ -36,6 +38,8 @@ export default async function handler(req: Request, res: Response) {
         responseBlob,
       });
     }
+
+    console.log("Response enrollment with: ", { externalDatabaseRefID, faceSignUserId });
 
     // Always return required fields for SDK
     const alwaysToReturn = {
