@@ -1,7 +1,7 @@
 import net from "node:net";
+import checkDiskSpace from "check-disk-space";
 import os from "os-utils";
 import pm2 from "pm2";
-import checkDiskSpace from "check-disk-space";
 
 function pm2Stats() {
   return new Promise((resolve, reject) => {
@@ -105,7 +105,7 @@ class AgentClient {
       // @ts-expect-error check-disk-space types are broken
       const spaceMntEncrypted = await checkDiskSpace("/mnt/encrypted");
 
-      osData["disks"] = [
+      osData.disks = [
         {
           name: "root",
           used: spaceRoot.size - spaceRoot.free,
@@ -169,10 +169,7 @@ class AgentClient {
   scheduleReconnect() {
     console.log(`[AGENT] Reconnecting in ${this.reconnectDelay / 1000}s...`);
     setTimeout(() => this.connect(), this.reconnectDelay);
-    this.reconnectDelay = Math.min(
-      this.reconnectDelay * 2,
-      this.maxReconnectDelay,
-    );
+    this.reconnectDelay = Math.min(this.reconnectDelay * 2, this.maxReconnectDelay);
   }
 
   writeLog(type: string, data: unknown) {
