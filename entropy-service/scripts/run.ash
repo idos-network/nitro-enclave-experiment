@@ -5,9 +5,6 @@ set -ueo pipefail
 # Go to app dir
 cd /app
 
-# Configure minimal S3 networking setup to get vsock.json and config.env
-S3_SECRETS_BUCKET=$(cat ./s3_secrets_bucket.txt)
-
 # Script dir for sourcing shared scripts
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 

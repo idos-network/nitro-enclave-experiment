@@ -61,7 +61,7 @@ COPY scripts/ecosystem.config.cjs .
 
 # S3 buckets contains configurations and aws keys arn
 # This will be replaced during the CI/CD process from secrets
-RUN echo "INSERT_S3_BUCKET_HERE" > ./s3_secrets_bucket.txt
+ENV S3_SECRETS_BUCKET="INSERT_S3_SECRETS_BUCKET_HERE"
 
 # Expose port (default 8000, configurable via PORT env var)
 EXPOSE 8000
