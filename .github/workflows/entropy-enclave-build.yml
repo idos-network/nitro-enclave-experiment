@@ -20,7 +20,7 @@ jobs:
 
       - name: Replace S3 bucket name
         run: |
-          sed -i 's/INSERT_S3_BUCKET_HERE/'"${{ secrets.STAGING_S3_BUCKET }}"'/g' entropy-service/Dockerfile
+          sed -i 's/INSERT_S3_SECRETS_BUCKET_HERE/'"${{ secrets.STAGING_S3_BUCKET }}"'/g' entropy-service/Dockerfile
 
       - name: Copy shared scripts
         run: |
