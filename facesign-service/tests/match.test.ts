@@ -33,7 +33,7 @@ describe("Match Login API", () => {
       didError: false,
     } as any);
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => { });
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
     const response = await request(app).post("/match").send({
       requestBlob: "test-face-scan",
@@ -63,7 +63,7 @@ describe("Match Login API", () => {
       didError: true,
     } as any);
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => { });
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
     const response = await request(app).post("/match").send({
       requestBlob: "test-face-scan",
@@ -91,7 +91,7 @@ describe("Match Login API", () => {
       message: "Some unexpected error",
     } as any);
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => { });
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
     const response = await request(app).post("/match").send({
       requestBlob: "test-face-scan",
