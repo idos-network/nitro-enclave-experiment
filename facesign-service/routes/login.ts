@@ -17,7 +17,7 @@ export default async function handler(req: Request, res: Response) {
   const { requestBlob, groupName = GROUP_NAME, faceVector = true } = req.body;
 
   // First check if liveness is proven
-  const { success, result, responseBlob, didError } = await enrollment3d(
+  const { success, result, responseBlob, didError, additionalSessionData } = await enrollment3d(
     faceSignUserId,
     requestBlob,
   );
@@ -27,6 +27,7 @@ export default async function handler(req: Request, res: Response) {
     success,
     responseBlob,
     didError,
+    additionalSessionData, // This can be used for POU credentials
     result,
   };
 
