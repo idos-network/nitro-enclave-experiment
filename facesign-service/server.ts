@@ -1,11 +1,12 @@
 import { readFileSync } from "node:fs";
 import cors from "cors";
-import express from "express";
+import express, { type NextFunction, type Request, type RequestHandler, type Response } from "express";
 import helmet from "helmet";
 import morgan from "morgan";
 
 import { HOST, KEY_1_MULTIBASE_PUBLIC_PATH } from "./env.ts";
-import { getStatus } from "./providers/api.ts";
+import agent from "./providers/agent.ts";
+import { FaceTecError, getStatus, SessionStartError } from "./providers/api.ts";
 import login from "./routes/login.ts";
 import match from "./routes/match.ts";
 import pinnochio from "./routes/pinnochio.ts";
@@ -26,9 +27,17 @@ app.get("/health", async (_req, res) => {
   res.status(200).json({ status: "ok", version: status.serverInfo.facetecServerWebserviceVersion });
 });
 
-app.post("/login", login);
-app.post("/pinocchio", pinnochio);
-app.post("/match", match);
+export const asyncHandler = (
+  fn: (req: Request, res: Response, next: NextFunction) => Promise<any>
+): RequestHandler => {
+  return (req, res, next) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
+};
+
+app.post("/login", asyncHandler(login));
+app.post("/pinocchio", asyncHandler(pinnochio));
+app.post("/match", asyncHandler(match));
 
 // idOS issuer informations for VCs
 app.get("/idos/issuers/1", (_req, res) => {
@@ -43,6 +52,35 @@ app.get("/idos/issuers/1", (_req, res) => {
 app.get("/idos/keys/1", (_req, res) => {
   const publicKeyMultibase = readFileSync(KEY_1_MULTIBASE_PUBLIC_PATH, "utf-8").trim();
   res.status(200).send(publicKeyMultibase);
+});
+
+app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+  if (err instanceof SessionStartError) {
+    agent.writeLog("session-start-response-blob", {});
+    return res.status(200).json({
+      responseBlob: err.responseBody,
+      sessionStart: true,
+    });
+  }
+
+  if (err instanceof FaceTecError) {
+    agent.writeLog("facetec-api-error", {
+      methodName: err.methodName,
+      response: err.response,
+      others: err.others,
+    });
+
+    return res.status(500).json({
+      success: false,
+      didError: true,
+      methodName: err.methodName,
+      errorMessage: `FaceTec API Error in ${err.methodName}, status code: ${err.response.code}`,
+    });
+  }
+
+  console.error(err);
+  agent.writeLog("general-error", { message: err.message, stack: err.stack });
+  res.status(500).json({ error: "Internal server error" });
 });
 
 export default app;

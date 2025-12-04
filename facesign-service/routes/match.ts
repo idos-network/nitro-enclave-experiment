@@ -5,58 +5,29 @@ import { match3d3d } from "../providers/api.ts";
 export default async function handler(req: Request, res: Response) {
   const { requestBlob, externalUserId } = req.body;
 
-  try {
-    // First check if liveness is proven
-    const { success, result, responseBlob, didError } = await match3d3d(
-      externalUserId,
-      requestBlob,
-    );
+  const { success, result, responseBlob, didError } = await match3d3d(externalUserId, requestBlob);
 
-    // If there is "just" a response blob, we should return it to client
-    // this is used when session starts or it's wrong image.
-    // This looks like a replacement of the previous "challenge" mechanism.
-    if (responseBlob && success === undefined) {
-      agent.writeLog("match-response-blob", {});
+  // Always return required fields for SDK
+  const alwaysToReturn = {
+    success,
+    responseBlob,
+    didError,
+    result,
+  };
 
-      return res.status(200).json({
-        responseBlob,
-      });
-    }
+  if (!success || !result.livenessProven) {
+    agent.writeLog("match-3d-3d-failed", { success, result, externalUserId });
 
-    // Always return required fields for SDK
-    const alwaysToReturn = {
-      success,
-      responseBlob,
-      didError,
-      result,
-    };
-
-    if (!success || !result.livenessProven) {
-      agent.writeLog("match-3d-3d-failed", { success, result, externalUserId });
-
-      return res.status(400).json({
-        ...alwaysToReturn,
-        errorMessage: "Liveness check or enrollment 3D failed and was not processed.",
-      });
-    }
-    agent.writeLog("match-3d-3d-done", {
-      identifier: externalUserId,
-      matchLevel: result.matchLevel,
-    });
-
-    return res.status(200).json(alwaysToReturn);
-  } catch (error) {
-    if (!(error instanceof Error)) {
-      agent.writeLog("match-error", { message: "Unknown error in /match", error });
-    } else {
-      agent.writeLog("match-error", { message: error.message, stack: error.stack });
-    }
-
-    return res.status(500).json({
-      success: false,
-      didError: true,
-      error: true,
-      errorMessage: "Match process failed, check server logs.",
+    return res.status(400).json({
+      ...alwaysToReturn,
+      errorMessage: "Liveness check or enrollment 3D failed and was not processed.",
     });
   }
+
+  agent.writeLog("match-3d-3d-done", {
+    identifier: externalUserId,
+    matchLevel: result.matchLevel,
+  });
+
+  return res.status(200).json(alwaysToReturn);
 }

@@ -35,8 +35,11 @@ import app from "../server.ts";
 
 describe("Pinocchio Login API", () => {
   it("return new session", async () => {
-    const enrollmentSpy = vi.spyOn(facetecApi, "enrollment3d").mockResolvedValue({
-      responseBlob: "mock-session-result-blob",
+    const spyFetch = vi.spyOn(global, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        responseBlob: "mock-session-result-blob",
+      }),
     } as any);
 
     const response = await request(app).post("/pinocchio").send({
@@ -45,7 +48,12 @@ describe("Pinocchio Login API", () => {
 
     expect(response.status).toBe(200);
     expect(response.body.responseBlob).toBe("mock-session-result-blob");
-    expect(enrollmentSpy).toHaveBeenCalledWith(expect.any(String), "test-face-scan");
+    expect(response.body.sessionStart).toBe(true);
+    expect(spyFetch).toHaveBeenCalledWith(expect.stringContaining("/process-request"), {
+      method: "POST",
+      headers: expect.any(Object),
+      body: expect.stringContaining("test-face-scan"),
+    });
   });
 
   it("new user", async () => {

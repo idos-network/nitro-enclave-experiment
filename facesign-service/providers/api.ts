@@ -9,6 +9,44 @@ export interface StatusResponse {
   notice: string;
 }
 
+export class SessionStartError extends Error {
+  public readonly responseBody: string;
+
+  constructor(responseBody: string) {
+    super("Session Start Response");
+    this.responseBody = responseBody;
+  }
+}
+
+export class FaceTecError extends Error {
+  public readonly methodName: string;
+  public readonly response: {
+    code: number;
+    body: string;
+  };
+  public readonly others: Record<string, unknown> = {};
+
+  constructor(
+    methodName: string,
+    response: {
+      code: number;
+      body: string;
+    },
+    others: Record<string, unknown> = {},
+  ) {
+    super("Unexpected FaceTec API Error");
+    this.methodName = methodName;
+    this.response = response;
+    this.others = others;
+  }
+}
+
+function checkSessionStartResponse(response: ProcessRequestResponse) {
+  if (response.success === undefined && response.responseBlob !== undefined) {
+    throw new SessionStartError(response.responseBlob);
+  }
+}
+
 export async function getStatus() {
   // https://dev.facetec.com/api-guide#status
   const response = await fetch(`${FACETEC_SERVER}status`, {
@@ -76,12 +114,25 @@ export async function enrollment3d(externalDatabaseRefID: string, requestBlob: s
   });
 
   if (!enrollmentResponse.ok) {
-    console.error("Failed to enroll, status:", enrollmentResponse.status);
-    console.error("Response text:", await enrollmentResponse.text());
-    throw new Error("Failed to enroll, check for logs.");
+    throw new FaceTecError(
+      "enrollment3d",
+      {
+        code: enrollmentResponse.status,
+        body: await enrollmentResponse.text(),
+      },
+      {
+        externalDatabaseRefID,
+      },
+    );
   }
 
-  return enrollmentResponse.json() as Promise<ProcessRequestResponse>;
+  const response = (await enrollmentResponse.json()) as ProcessRequestResponse;
+
+  checkSessionStartResponse(response);
+
+  console.log(response);
+
+  return response;
 }
 
 export async function convertToVector(externalDatabaseRefID: string) {
@@ -96,9 +147,16 @@ export async function convertToVector(externalDatabaseRefID: string) {
   });
 
   if (!convertToVectorResponse.ok) {
-    console.error("Failed to convert to vector, status:", convertToVectorResponse.status);
-    console.error("Response text:", await convertToVectorResponse.text());
-    throw new Error("Failed to enroll, check for logs.");
+    throw new FaceTecError(
+      "convertToVector",
+      {
+        code: convertToVectorResponse.status,
+        body: await convertToVectorResponse.text(),
+      },
+      {
+        externalDatabaseRefID,
+      },
+    );
   }
 
   return convertToVectorResponse.json() as Promise<{
@@ -119,12 +177,23 @@ export async function match3d3d(externalDatabaseRefID: string, requestBlob: stri
   });
 
   if (!matchResponse.ok) {
-    console.error("Failed to match, status:", matchResponse.status);
-    console.error("Response text:", await matchResponse.text());
-    throw new Error("Failed to match, check for logs.");
+    throw new FaceTecError(
+      "match3d3d",
+      {
+        code: matchResponse.status,
+        body: await matchResponse.text(),
+      },
+      {
+        externalDatabaseRefID,
+      },
+    );
   }
 
-  return matchResponse.json() as Promise<ProcessRequestResponse>;
+  const response = (await matchResponse.json()) as ProcessRequestResponse;
+
+  checkSessionStartResponse(response);
+
+  return response;
 }
 
 export async function searchForDuplicates(externalDatabaseRefID: string, groupName: string) {
@@ -141,7 +210,17 @@ export async function searchForDuplicates(externalDatabaseRefID: string, groupNa
   });
 
   if (!response.ok) {
-    throw new Error("Failed to search for duplicates, check application logs.");
+    throw new FaceTecError(
+      "search-3d-db",
+      {
+        code: response.status,
+        body: await response.text(),
+      },
+      {
+        externalDatabaseRefID,
+        groupName,
+      },
+    );
   }
 
   return response.json() as Promise<{
@@ -165,7 +244,17 @@ export async function enrollUser(externalDatabaseRefID: string, groupName: strin
   });
 
   if (!response.ok) {
-    throw new Error("Failed to enroll user into 3d-db, check application logs.");
+    throw new FaceTecError(
+      "enroll-user",
+      {
+        code: response.status,
+        body: await response.text(),
+      },
+      {
+        externalDatabaseRefID,
+        groupName,
+      },
+    );
   }
 
   return response.json();
