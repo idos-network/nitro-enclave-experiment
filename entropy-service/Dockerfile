@@ -60,9 +60,8 @@ COPY scripts/shared ./scripts/
 COPY scripts/ecosystem.config.cjs .
 
 # S3 buckets contains configurations and aws keys arn
-ARG S3_SECRETS_BUCKET
-RUN if [ -z "$S3_SECRETS_BUCKET" ]; then (echo "S3_SECRETS_BUCKET must be provided as a --build-arg"; exit 1); fi
-RUN echo $S3_SECRETS_BUCKET > ./s3_secrets_bucket.txt
+# This will be replaced during the CI/CD process from secrets
+ENV S3_SECRETS_BUCKET="INSERT_S3_SECRETS_BUCKET_HERE"
 
 # Expose port (default 8000, configurable via PORT env var)
 EXPOSE 8000

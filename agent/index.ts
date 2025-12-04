@@ -2,8 +2,15 @@ import net from "node:net";
 import { sendLog } from "./logs.ts";
 import { sendOsMetrics, sendPm2Metrics } from "./metrics.ts";
 
+const debugEnabled = process.env.DEBUG === "true";
+
 const server = net.createServer((socket) => {
   console.log("[AGENT] client connected");
+
+  if (debugEnabled) {
+    console.log("-> [AGENT] enabling debug mode");
+  }
+
   let acc = "";
   socket.on("data", (chunk) => {
     acc += chunk.toString();
@@ -16,17 +23,25 @@ const server = net.createServer((socket) => {
       if (line) {
         // Heartbeat
         if (line.trim() === "ping") {
-          console.log("[AGENT] heartbeat ping received, sending pong");
+          if (debugEnabled) {
+            console.log("[AGENT] heartbeat ping received, sending pong");
+          }
           socket.write("pong\n");
           continue;
         }
 
         const obj = JSON.parse(line);
         if (obj.type === "os") {
+          if (debugEnabled) {
+            console.log("[AGENT] Received OS metrics:", obj.data);
+          }
           sendOsMetrics(obj).catch((err) =>
             console.error("[AGENT] Failed to send OS metrics", err),
           );
         } else if (obj.type === "pm2") {
+          if (debugEnabled) {
+            console.log("[AGENT] Received PM2 metrics:", obj.data);
+          }
           sendPm2Metrics(obj).catch((err) =>
             console.error("[AGENT] Failed to send PM2 metrics", err),
           );

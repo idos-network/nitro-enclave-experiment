@@ -1,5 +1,6 @@
 import net from "node:net";
-import os from "node:os";
+import checkDiskSpace from "check-disk-space";
+import os from "os-utils";
 import pm2 from "pm2";
 
 function pm2Stats() {
@@ -78,12 +79,46 @@ class AgentClient {
     }, 5000);
 
     // send stats
-    this.statsInterval = setInterval(() => {
-      this.writeLog("os", {
-        loadavg: os.loadavg()[0],
-        memUsed: os.totalmem() - os.freemem(),
-        memTotal: os.totalmem(),
+    this.statsInterval = setInterval(async () => {
+      const osData = await new Promise<{
+        loadavg: number;
+        memUsed: number;
+        memTotal: number;
+        disks?: Array<{
+          name: string;
+          used: number;
+          total: number;
+        }>;
+      }>((resolve) => {
+        os.cpuUsage((v) => {
+          resolve({
+            loadavg: v,
+            memUsed: os.totalmem() - os.freemem(),
+            memTotal: os.totalmem(),
+          });
+        });
       });
+
+      // Load disk space
+      // @ts-expect-error check-disk-space types are broken
+      const spaceRoot = await checkDiskSpace("/");
+      // @ts-expect-error check-disk-space types are broken
+      const spaceMntEncrypted = await checkDiskSpace("/mnt/encrypted");
+
+      osData.disks = [
+        {
+          name: "root",
+          used: spaceRoot.size - spaceRoot.free,
+          total: spaceRoot.size,
+        },
+        {
+          name: "encrypted",
+          used: spaceMntEncrypted.size - spaceMntEncrypted.free,
+          total: spaceMntEncrypted.size,
+        },
+      ];
+
+      this.writeLog("os", osData);
 
       pm2Stats()
         .then((stats) => {
@@ -150,6 +185,6 @@ class AgentClient {
   }
 }
 
-const agent = new AgentClient("127.0.0.7", 7001);
+const agent = new AgentClient("127.0.0.1", 7001);
 agent.connect();
 export default agent;
