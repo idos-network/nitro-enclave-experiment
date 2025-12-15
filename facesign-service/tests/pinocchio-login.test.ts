@@ -220,9 +220,7 @@ describe("Pinocchio Login API", () => {
           ok: true,
           json: async () => ({
             success: true,
-            results: [
-              { identifier: resultId, matchLevel: 15 },
-            ],
+            results: [{ identifier: resultId, matchLevel: 15 }],
           }),
         } as any;
       }
