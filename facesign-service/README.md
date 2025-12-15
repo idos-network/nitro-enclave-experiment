@@ -15,7 +15,7 @@ All methods are using `/process-request` of FaceTec SDK.
 
 1. SessionStarted (status: **200**) - FaceTec internals, no success, just responseBlob
 
-```json
+```javascript
 {
   responseBlob: "string"
 }
@@ -25,7 +25,7 @@ All methods are using `/process-request` of FaceTec SDK.
 
 - this is a happy path scenario
 
-```json
+```javascript
 {
   // FaceTec standard response
   success: true,
@@ -49,7 +49,7 @@ All methods are using `/process-request` of FaceTec SDK.
 
 - this is a recoverable error, the user have to start again
 
-```json
+```javascript
 {
   // FaceTec standard response
   success: true,
@@ -75,7 +75,7 @@ All methods are using `/process-request` of FaceTec SDK.
 - the 409 response has been chosed, to not conflict with 500 from facetec
 - this is non-recoverable error
 
-```json
+```javascript
 {
   // FaceTec standard response
   success: true,
@@ -99,7 +99,7 @@ All methods are using `/process-request` of FaceTec SDK.
 
 1. SessionStarted (status: **200**) - FaceTec internals, no success, just responseBlob
 
-```json
+```javascript
 {
   responseBlob: "string"
 }
@@ -109,7 +109,7 @@ All methods are using `/process-request` of FaceTec SDK.
 
 - this is a recoverable error, the user have to start again
 
-```json
+```javascript
 {
   // FaceTec standard response
   success: true,
@@ -133,7 +133,7 @@ All methods are using `/process-request` of FaceTec SDK.
 
 - this is a correct response
 
-```json
+```javascript
 {
   // FaceTec standard response
   success: true,
@@ -149,12 +149,13 @@ All methods are using `/process-request` of FaceTec SDK.
     matchLevel: number,
   },
 }
+```
 
 ### POST /pinnochio
 
 1. SessionStarted (status: **200**) - FaceTec internals, no success, just responseBlob
 
-```json
+```javascript
 {
   responseBlob: "string"
 }
@@ -164,7 +165,7 @@ All methods are using `/process-request` of FaceTec SDK.
 
 - this is a happy path scenario
 
-```json
+```javascript
 {
   // FaceTec standard response
   success: true,
@@ -189,7 +190,7 @@ All methods are using `/process-request` of FaceTec SDK.
 
 - this is a recoverable error, the user have to start again
 
-```json
+```javascript
 {
   // FaceTec standard response
   success: true,
