@@ -166,7 +166,7 @@ All methods are using `/process-request` of FaceTec SDK.
   },
   result: {
     livenessProven: true,
-    matchLevel: 0,
+    matchLevel: 0, // not sure about this
   },
 }
 ```
