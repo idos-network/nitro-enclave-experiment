@@ -151,6 +151,26 @@ All methods are using `/process-request` of FaceTec SDK.
 }
 ```
 
+4. Liveness proven, but no match (status: **409**)
+
+```javascript
+{
+  // FaceTec standard response
+  success: false,
+  didError: false,
+  responseBlob: "string",
+  additionalSessionData: {
+    platform: "string",
+    deviceModel: "string",
+    userAgent: "string",
+  },
+  result: {
+    livenessProven: true,
+    matchLevel: 0,
+  },
+}
+```
+
 ### POST /pinnochio
 
 1. SessionStarted (status: **200**) - FaceTec internals, no success, just responseBlob
