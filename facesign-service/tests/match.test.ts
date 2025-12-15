@@ -116,6 +116,44 @@ describe("Match Login API", () => {
     });
   });
 
+  it("liveness done, but no match", async () => {
+    vi.spyOn(global, "fetch").mockImplementation(async (url) => {
+      if (url.toString().endsWith("/process-request")) {
+        return {
+          ok: true,
+          json: async () => ({
+            success: false,
+            result: { livenessProven: true },
+            didError: false,
+            responseBlob: "invalid-result-blob",
+          }),
+        } as any;
+      }
+    });
+
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+
+    const response = await request(app).post("/match").send({
+      requestBlob: "test-face-scan",
+      externalUserId: "test-user-id",
+    });
+
+    expect(response.status).toBe(409);
+    expect(response.body).toEqual({
+      errorMessage: "No match found for the provided face scan.",
+      success: false,
+      didError: false,
+      responseBlob: "invalid-result-blob",
+      result: { livenessProven: true },
+    });
+
+    expect(agentSpy).toHaveBeenCalledWith("match-3d-3d-no-match", {
+      success: false,
+      externalUserId: "test-user-id",
+      result: { livenessProven: true },
+    });
+  });
+
   it("match error", async () => {
     vi.spyOn(global, "fetch").mockImplementation(async (url) => {
       if (url.toString().endsWith("/process-request")) {

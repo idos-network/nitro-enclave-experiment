@@ -19,7 +19,15 @@ export default async function handler(req: Request, res: Response) {
     additionalSessionData,
   };
 
-  if (!success || !result.livenessProven || didError) {
+  if (!success && result.livenessProven) {
+    // Liveness proved, but no match found
+    agent.writeLog("match-3d-3d-no-match", { success, result, externalUserId });
+
+    return res.status(409).json({
+      ...alwaysToReturn,
+      errorMessage: "No match found for the provided face scan.",
+    });
+  } else if (!result.livenessProven || didError) {
     agent.writeLog("match-3d-3d-failed", { success, result, externalUserId });
 
     return res.status(400).json({
