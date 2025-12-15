@@ -5,7 +5,10 @@ import { match3d3d } from "../providers/api.ts";
 export default async function handler(req: Request, res: Response) {
   const { requestBlob, externalUserId } = req.body;
 
-  const { success, result, responseBlob, didError } = await match3d3d(externalUserId, requestBlob);
+  const { success, result, responseBlob, didError, additionalSessionData } = await match3d3d(
+    externalUserId,
+    requestBlob,
+  );
 
   // Always return required fields for SDK
   const alwaysToReturn = {
@@ -13,9 +16,10 @@ export default async function handler(req: Request, res: Response) {
     responseBlob,
     didError,
     result,
+    additionalSessionData,
   };
 
-  if (!success || !result.livenessProven) {
+  if (!success || !result.livenessProven || didError) {
     agent.writeLog("match-3d-3d-failed", { success, result, externalUserId });
 
     return res.status(400).json({
@@ -29,5 +33,5 @@ export default async function handler(req: Request, res: Response) {
     matchLevel: result.matchLevel,
   });
 
-  return res.status(200).json(alwaysToReturn);
+  return res.status(201).json(alwaysToReturn);
 }

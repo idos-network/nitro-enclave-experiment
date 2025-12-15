@@ -3,12 +3,7 @@ import type { Request, Response } from "express";
 import { GROUP_NAME } from "../env.ts";
 import agent from "../providers/agent.ts";
 
-import {
-  convertToVector,
-  enrollment3d,
-  enrollUser,
-  searchForDuplicates,
-} from "../providers/api.ts";
+import { enrollment3d, enrollUser, searchForDuplicates } from "../providers/api.ts";
 import { countMembersInGroup, insertMember } from "../providers/db.ts";
 
 export default async function handler(req: Request, res: Response) {
@@ -20,6 +15,7 @@ export default async function handler(req: Request, res: Response) {
   const { success, result, responseBlob, didError, additionalSessionData } = await enrollment3d(
     faceSignUserId,
     requestBlob,
+    faceVector,
   );
 
   // Always return required fields for SDK
@@ -31,17 +27,13 @@ export default async function handler(req: Request, res: Response) {
     result,
   };
 
-  if (!success || !result.livenessProven) {
+  if (!success || !result.livenessProven || didError) {
     agent.writeLog("login-enrollment-failed", { success, result, didError });
 
     return res.status(400).json({
       ...alwaysToReturn,
       errorMessage: "Liveness check or enrollment 3D failed and was not processed.",
     });
-  }
-
-  if (faceVector) {
-    await convertToVector(faceSignUserId);
   }
 
   // Search for 3d-db duplicates
@@ -84,10 +76,10 @@ export default async function handler(req: Request, res: Response) {
       groupName,
     });
 
-    return res.status(500).json({
-      didError: true,
-      success: false,
-      errorMessage: "Login process failed, check server logs: Multiple users found with the same face-vector.",
+    return res.status(409).json({
+      ...alwaysToReturn,
+      errorMessage:
+        "Login process failed, check server logs: Multiple users found with the same face-vector.",
     });
   } else {
     agent.writeLog("login-duplicate", {
@@ -100,7 +92,7 @@ export default async function handler(req: Request, res: Response) {
     faceSignUserId = results[0]?.identifier!;
   }
 
-  return res.status(200).json({
+  return res.status(201).json({
     ...alwaysToReturn,
     faceSignUserId,
   });

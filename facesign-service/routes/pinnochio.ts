@@ -3,31 +3,23 @@ import { readFileSync } from "node:fs";
 import type { Request, Response } from "express";
 import jwt from "jsonwebtoken";
 
-import { GROUP_NAME, JWT_PRIVATE_KEY } from "../env.ts";
+import { JWT_PRIVATE_KEY, PINOCCHIO_GROUP_NAME } from "../env.ts";
 import agent from "../providers/agent.ts";
-import {
-  convertToVector,
-  enrollment3d,
-  enrollUser,
-  searchForDuplicates,
-} from "../providers/api.ts";
+import { enrollment3d, enrollUser, searchForDuplicates } from "../providers/api.ts";
 import { countMembersInGroup, getOldestFaceSignUserId, insertMember } from "../providers/db.ts";
 
 // Pinocchio 3D Login
 export default async function handler(req: Request, res: Response) {
   let faceSignUserId: string = crypto.randomUUID();
 
-  const { requestBlob, faceVector = true } = req.body;
-
-  console.log("Starting query with: ", { faceSignUserId });
+  const { requestBlob, faceVector = false } = req.body;
 
   // First check if liveness is proven
-  const { success, result, responseBlob, didError, externalDatabaseRefID } = await enrollment3d(
+  const { success, result, responseBlob, didError, additionalSessionData } = await enrollment3d(
     faceSignUserId,
     requestBlob,
+    faceVector,
   );
-
-  console.log("Response enrollment with: ", { externalDatabaseRefID, faceSignUserId });
 
   // Always return required fields for SDK
   const alwaysToReturn = {
@@ -35,6 +27,7 @@ export default async function handler(req: Request, res: Response) {
     responseBlob,
     didError,
     result,
+    additionalSessionData,
   };
 
   if (!success || !result.livenessProven || didError) {
@@ -46,15 +39,10 @@ export default async function handler(req: Request, res: Response) {
     });
   }
 
-  // Convert to facevector if requested
-  if (faceVector) {
-    await convertToVector(faceSignUserId);
-  }
-
   // Search for 3d-db duplicates
   let results: { identifier: string; matchLevel: number }[] = [];
 
-  const searchResult = await searchForDuplicates(faceSignUserId, GROUP_NAME);
+  const searchResult = await searchForDuplicates(faceSignUserId, PINOCCHIO_GROUP_NAME);
 
   if (searchResult.success) {
     results = searchResult.results;
@@ -63,7 +51,7 @@ export default async function handler(req: Request, res: Response) {
     searchResult.errorMessage?.includes("groupName when that groupName does not exist")
   ) {
     // Check if group exists in DB, if yes, we have a problem (most likely recovery from corrupted FS)
-    const memberCount = await countMembersInGroup(GROUP_NAME);
+    const memberCount = await countMembersInGroup(PINOCCHIO_GROUP_NAME);
     if (memberCount > 0) {
       throw new Error("Group exists in our DB, but not in 3d-db, this should never happen.");
     }
@@ -80,8 +68,8 @@ export default async function handler(req: Request, res: Response) {
     // Brand new user, let's enroll in 3d-db#users
     agent.writeLog("pinocchio-new-user", { identifier: faceSignUserId });
 
-    await enrollUser(faceSignUserId, GROUP_NAME);
-    await insertMember(GROUP_NAME, faceSignUserId);
+    await enrollUser(faceSignUserId, PINOCCHIO_GROUP_NAME);
+    await insertMember(PINOCCHIO_GROUP_NAME, faceSignUserId);
   } else {
     // This is a difference from normal /login route
     agent.writeLog("pinocchio-duplicate", {
@@ -101,7 +89,7 @@ export default async function handler(req: Request, res: Response) {
     { algorithm: "ES512" }, // Token contains "iat" which is used in entropy-service to check token age
   );
 
-  return res.status(200).json({
+  return res.status(201).json({
     ...alwaysToReturn,
     faceSignUserId,
     token,

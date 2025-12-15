@@ -1,6 +1,6 @@
 # AWS Nitro Enclave Kernel
 
-This repository contains a customized kernel configuration for AWS Nitro Enclaves with FUSE filesystem support enabled.
+This repository contains a customized kernel configuration for AWS Nitro Enclaves with NBD support enabled.
 
 ## Prerequisites
 
@@ -13,7 +13,6 @@ This repository contains a customized kernel configuration for AWS Nitro Enclave
 
 ```bash
 git clone https://github.com/aws/aws-nitro-enclaves-sdk-bootstrap.git
-git checkout ed24913346a34d719afa2031299253160a2e3460 # this is the version from Feb 22
 ```
 
 
@@ -21,7 +20,7 @@ git checkout ed24913346a34d719afa2031299253160a2e3460 # this is the version from
 
 Modify the kernel configuration file to enable FUSE support:
 
-**File:** `configs/microvm-kernel-config-x86_64` (or *appropriate* architecture-specific config)
+**File:** `kernel/microvm-kernel-config-x86_64` (or *appropriate* architecture-specific config)
 
 **Change:**
 ```diff
@@ -42,14 +41,14 @@ Modify the kernel configuration file to enable FUSE support:
 Execute the build process using Nix:
 
 ```bash
-docker build -t kernel_builder --build-arg BUILD_ARCH=x86_64 .
+docker build -t blobs_all .
 ```
 
 ### 4. Extract Build Artifacts
 
 ```
-docker create --name extract_blobs kernel_builder
-docker cp extract_blobs:/build/blobs ./blobs
+docker create --name extract_blobs blobs_all
+docker cp extract_blobs:/blobs ./blobs
 docker rm extract_blobs
 ```
 
