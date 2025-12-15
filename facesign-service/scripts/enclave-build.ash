@@ -13,7 +13,7 @@ sudo rm -f "$NITRO_CLI_ARTIFACTS/$TARGET_DOCKER_IMAGE.eif"
 set -e
 
 # Load building configuration
-FACETEC_SDK_VERSION="10.0.25"
+FACETEC_SDK_VERSION="10.0.27"
 
 S3_SECRETS_BUCKET=$(aws s3api list-buckets --query "Buckets[?contains(Name, 'facesign') && contains(Name, 'secrets')].Name" --output text)
 if [[ "${S3_SECRETS_BUCKET:-null}" == "null" ]]; then

@@ -121,6 +121,7 @@ RUN printf "#!/bin/bash\njava -cp $HOME_FACETEC_SERVER_CORE/libs/FaceTecSDK-Serv
 # This is in config.yaml but it's not loaded
 RUN sed -i 's#search3D3DDatabaseExportRootDirectory: .*#search3D3DDatabaseExportRootDirectory: /mnt/encrypted/facetec/search-3d-3d-database-export#' ./config.yaml
 # This is missing in config.yaml, but server tries to load that
+RUN echo "" >> ./config.yaml
 RUN echo "searchDatabaseExportRootDirectory: /mnt/encrypted/facetec/search-3d-3d-database-export" >> ./config.yaml
 
 # Setup FaceTec Usage Logs Server

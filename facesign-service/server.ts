@@ -1,6 +1,11 @@
 import { readFileSync } from "node:fs";
 import cors from "cors";
-import express, { type NextFunction, type Request, type RequestHandler, type Response } from "express";
+import express, {
+  type NextFunction,
+  type Request,
+  type RequestHandler,
+  type Response,
+} from "express";
 import helmet from "helmet";
 import morgan from "morgan";
 
@@ -28,7 +33,8 @@ app.get("/health", async (_req, res) => {
 });
 
 export const asyncHandler = (
-  fn: (req: Request, res: Response, next: NextFunction) => Promise<any>
+  // biome-ignore lint/suspicious/noExplicitAny: any is needed here
+  fn: (req: Request, res: Response, next: NextFunction) => Promise<any>,
 ): RequestHandler => {
   return (req, res, next) => {
     Promise.resolve(fn(req, res, next)).catch(next);

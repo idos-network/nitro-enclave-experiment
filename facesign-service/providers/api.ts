@@ -100,16 +100,20 @@ export interface ProcessRequestResponse {
   serverInfo: StatusResponse;
 }
 
-export async function enrollment3d(externalDatabaseRefID: string, requestBlob: string) {
+export async function enrollment3d(
+  externalDatabaseRefID: string,
+  requestBlob: string,
+  storeAsVector: boolean,
+) {
   const enrollmentResponse = await fetch(`${FACETEC_SERVER}process-request`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      // TODO: MISSING STORE AS VECTOR!
       externalDatabaseRefID,
       requestBlob,
+      storeAsVector,
     }),
   });
 
@@ -122,6 +126,7 @@ export async function enrollment3d(externalDatabaseRefID: string, requestBlob: s
       },
       {
         externalDatabaseRefID,
+        storeAsVector,
       },
     );
   }
@@ -130,38 +135,7 @@ export async function enrollment3d(externalDatabaseRefID: string, requestBlob: s
 
   checkSessionStartResponse(response);
 
-  console.log(response);
-
   return response;
-}
-
-export async function convertToVector(externalDatabaseRefID: string) {
-  const convertToVectorResponse = await fetch(`${FACETEC_SERVER}convert-facemap-to-face-vector`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      externalDatabaseRefID,
-    }),
-  });
-
-  if (!convertToVectorResponse.ok) {
-    throw new FaceTecError(
-      "convertToVector",
-      {
-        code: convertToVectorResponse.status,
-        body: await convertToVectorResponse.text(),
-      },
-      {
-        externalDatabaseRefID,
-      },
-    );
-  }
-
-  return convertToVectorResponse.json() as Promise<{
-    success: boolean;
-  }>;
 }
 
 export async function match3d3d(externalDatabaseRefID: string, requestBlob: string) {

@@ -55,7 +55,7 @@ describe("Login API", () => {
   });
 
   it("new user", async () => {
-    const spyFetch = vi.spyOn(global, "fetch").mockImplementation(async (url, options) => {
+    const spyFetch = vi.spyOn(global, "fetch").mockImplementation(async (url) => {
       if (url.toString().endsWith("/process-request")) {
         return {
           ok: true,
@@ -78,12 +78,12 @@ describe("Login API", () => {
         } as any;
       }
 
-        return {
-          ok: true,
-          json: async () => ({
-            success: true,
-          }),
-        } as any;
+      return {
+        ok: true,
+        json: async () => ({
+          success: true,
+        }),
+      } as any;
     });
 
     const insertMemberSpy = vi.spyOn(db, "insertMember").mockResolvedValue({
@@ -97,7 +97,7 @@ describe("Login API", () => {
       requestBlob: "test-face-scan",
     });
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(201);
     expect(response.body).toEqual({
       didError: false,
       faceSignUserId: expect.any(String),
@@ -113,16 +113,22 @@ describe("Login API", () => {
 
     expect(insertMemberSpy).toHaveBeenCalledWith("facesign-users", response.body.faceSignUserId);
 
-    expect(spyFetch).toHaveBeenCalledTimes(4);
-    expect(spyFetch).toHaveBeenNthCalledWith(1, expect.stringContaining("/process-request"), {
-      method: "POST",
-      headers: expect.any(Object),
-      body: expect.stringContaining(`"externalDatabaseRefID":"${response.body.faceSignUserId}"`),
-    });
+    expect(spyFetch).toHaveBeenCalledTimes(3);
+
+    const processRequestCall = spyFetch.mock.calls.find((call) =>
+      call[0].toString().endsWith("/process-request"),
+    );
+
+    expect(processRequestCall).toBeDefined();
+    const body = JSON.parse(processRequestCall?.[1]?.body as string);
+
+    expect(body.externalDatabaseRefID).toBe(response.body.faceSignUserId);
+    expect(body.storeAsVector).toBe(true);
+    expect(body.requestBlob).toBe("test-face-scan");
   });
 
   it("new user (different group and faceMap instead of vectors)", async () => {
-    const spyFetch = vi.spyOn(global, "fetch").mockImplementation(async (url, options) => {
+    const spyFetch = vi.spyOn(global, "fetch").mockImplementation(async (url) => {
       if (url.toString().endsWith("/process-request")) {
         return {
           ok: true,
@@ -145,12 +151,12 @@ describe("Login API", () => {
         } as any;
       }
 
-        return {
-          ok: true,
-          json: async () => ({
-            success: true,
-          }),
-        } as any;
+      return {
+        ok: true,
+        json: async () => ({
+          success: true,
+        }),
+      } as any;
     });
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
@@ -161,7 +167,7 @@ describe("Login API", () => {
       faceVector: false,
     });
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(201);
     expect(response.body).toEqual({
       didError: false,
       faceSignUserId: expect.any(String),
@@ -170,7 +176,16 @@ describe("Login API", () => {
       result: { livenessProven: true },
     });
 
-    expect(spyFetch).not.toHaveBeenCalledWith(expect.stringContaining("convert-to-vector"), expect.any(Object));
+    const processRequestCall = spyFetch.mock.calls.find((call) =>
+      call[0].toString().endsWith("/process-request"),
+    );
+
+    expect(processRequestCall).toBeDefined();
+    const body = JSON.parse(processRequestCall?.[1]?.body as string);
+
+    expect(body.externalDatabaseRefID).toBe(response.body.faceSignUserId);
+    expect(body.storeAsVector).toBe(false);
+    expect(body.requestBlob).toBe("test-face-scan");
 
     expect(agentSpy).toHaveBeenCalledWith("login-new-user", {
       identifier: response.body.faceSignUserId,
@@ -179,7 +194,7 @@ describe("Login API", () => {
   });
 
   it("failing liveness", async () => {
-    const spyFetch = vi.spyOn(global, "fetch").mockImplementation(async (url, options) => {
+    const spyFetch = vi.spyOn(global, "fetch").mockImplementation(async (url) => {
       if (url.toString().endsWith("/process-request")) {
         return {
           ok: true,
@@ -222,7 +237,7 @@ describe("Login API", () => {
   it("duplicate (normal)", async () => {
     const resultId = crypto.randomUUID();
 
-    vi.spyOn(global, "fetch").mockImplementation(async (url, options) => {
+    vi.spyOn(global, "fetch").mockImplementation(async (url) => {
       if (url.toString().endsWith("/process-request")) {
         return {
           ok: true,
@@ -245,12 +260,12 @@ describe("Login API", () => {
         } as any;
       }
 
-        return {
-          ok: true,
-          json: async () => ({
-            success: true,
-          }),
-        } as any;
+      return {
+        ok: true,
+        json: async () => ({
+          success: true,
+        }),
+      } as any;
     });
 
     const insertMemberSpy = vi.spyOn(db, "insertMember").mockResolvedValue({
@@ -264,7 +279,7 @@ describe("Login API", () => {
       requestBlob: "test-face-scan",
     });
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(201);
     expect(response.body).toEqual({
       faceSignUserId: resultId,
       responseBlob: "mock-scan-result-blob",
@@ -286,7 +301,7 @@ describe("Login API", () => {
     const resultId = crypto.randomUUID();
     const resultId2 = crypto.randomUUID();
 
-    const spyFetch = vi.spyOn(global, "fetch").mockImplementation(async (url, options) => {
+    const spyFetch = vi.spyOn(global, "fetch").mockImplementation(async (url) => {
       if (url.toString().endsWith("/process-request")) {
         return {
           ok: true,
@@ -304,20 +319,20 @@ describe("Login API", () => {
           ok: true,
           json: async () => ({
             success: true,
-      results: [
-        { identifier: resultId, matchLevel: 15 },
-        { identifier: resultId2, matchLevel: 15 },
-      ],
+            results: [
+              { identifier: resultId, matchLevel: 15 },
+              { identifier: resultId2, matchLevel: 15 },
+            ],
           }),
         } as any;
       }
 
-        return {
-          ok: true,
-          json: async () => ({
-            success: true,
-          }),
-        } as any;
+      return {
+        ok: true,
+        json: async () => ({
+          success: true,
+        }),
+      } as any;
     });
 
     const insertMemberSpy = vi.spyOn(db, "insertMember").mockResolvedValue({
@@ -331,12 +346,14 @@ describe("Login API", () => {
       requestBlob: "test-face-scan",
     });
 
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(409);
     expect(response.body).toEqual({
-      didError: true,
+      success: true,
+      didError: false,
+      responseBlob: "mock-scan-result-blob",
+      result: { livenessProven: true },
       errorMessage:
         "Login process failed, check server logs: Multiple users found with the same face-vector.",
-      success: false,
     });
 
     expect(agentSpy).toBeCalledWith("login-duplicate-error", {
@@ -346,6 +363,9 @@ describe("Login API", () => {
     });
 
     expect(insertMemberSpy).not.toHaveBeenCalled();
-    expect(spyFetch).not.toHaveBeenCalledWith(expect.stringContaining("convert-to-vector"), expect.any(Object));
+    expect(spyFetch).not.toHaveBeenCalledWith(
+      expect.stringContaining("convert-to-vector"),
+      expect.any(Object),
+    );
   });
 });
