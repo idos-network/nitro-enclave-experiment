@@ -127,6 +127,7 @@ All methods are using `/process-request` of FaceTec SDK.
   // FaceSign service customs
   errorMessage: "Liveness check or enrollment 3D failed and was not processed."
 }
+```
 
 3. 3d-3d match has been done (status: **201**)
 
