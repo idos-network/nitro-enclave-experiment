@@ -14,7 +14,7 @@ import agent from "./providers/agent.ts";
 import { FaceTecError, getStatus, SessionStartError } from "./providers/api.ts";
 import login from "./routes/login.ts";
 import match from "./routes/match.ts";
-import pinnochio from "./routes/pinnochio.ts";
+import pinocchio from "./routes/pinocchio.ts";
 
 const app = express();
 
@@ -42,10 +42,10 @@ export const asyncHandler = (
 };
 
 app.post("/login", asyncHandler(login));
-app.post("/pinocchio", asyncHandler(pinnochio));
+app.post("/pinocchio", asyncHandler(pinocchio));
 app.post("/match", asyncHandler(match));
 
-// idOS issuer informations for VCs
+// idOS issuer information for VCs
 app.get("/idos/issuers/1", (_req, res) => {
   res.status(200).json({
     "@context": "https://w3id.org/security/v2",

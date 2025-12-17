@@ -102,7 +102,7 @@ mkdir -p \
     /mnt/encrypted/facetec/search-2d-2d-face-portrait \
     /mnt/encrypted/logs
 
-# Set-up facesing service
+# Set-up facesign service
 echo "Fetching key 1 public multibase from S3"
 KEY_1_MULTIBASE_PUBLIC_FILE=multibase_key_1_public.txt
 aws s3 cp "s3://$S3_SECRETS_BUCKET/$KEY_1_MULTIBASE_PUBLIC_FILE" "$HOME_FACESIGN_SERVICE/$KEY_1_MULTIBASE_PUBLIC_FILE" --region eu-west-1

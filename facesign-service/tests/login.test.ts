@@ -123,7 +123,7 @@ describe("Login API", () => {
     const body = JSON.parse(processRequestCall?.[1]?.body as string);
 
     expect(body.externalDatabaseRefID).toBe(response.body.faceSignUserId);
-    expect(body.storeAsVector).toBe(true);
+    expect(body.storeAsFaceVector).toBe(true);
     expect(body.requestBlob).toBe("test-face-scan");
   });
 
@@ -184,7 +184,7 @@ describe("Login API", () => {
     const body = JSON.parse(processRequestCall?.[1]?.body as string);
 
     expect(body.externalDatabaseRefID).toBe(response.body.faceSignUserId);
-    expect(body.storeAsVector).toBe(false);
+    expect(body.storeAsFaceVector).toBe(false);
     expect(body.requestBlob).toBe("test-face-scan");
 
     expect(agentSpy).toHaveBeenCalledWith("login-new-user", {

@@ -32,7 +32,7 @@ import { ObjectId } from "mongodb";
 import * as db from "../providers/db.ts";
 import app from "../server.ts";
 
-describe("Pinocchio Login API", () => {
+describe("PINOCCHIO Login API", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -139,7 +139,7 @@ describe("Pinocchio Login API", () => {
     expect(processRequestCall).toBeDefined();
     expect(JSON.parse(processRequestCall?.[1]?.body as string)).toMatchObject({
       externalDatabaseRefID: response.body.faceSignUserId,
-      storeAsVector: false,
+      storeAsFaceVector: false,
       requestBlob: "test-face-scan",
     });
 

@@ -21,7 +21,7 @@ vi.mock("fs", async () => {
 
 // Mock modules before importing the app
 vi.mock("../providers/db.ts", () => ({
-	fetchOrCreatePinocchioEntropy: vi.fn(),
+	fetchOrCreatePINOCCHIOEntropy: vi.fn(),
 }));
 
 import * as db from "../providers/db.ts";
@@ -39,7 +39,7 @@ describe("Entropy API", () => {
 	it("new user no entropy", async () => {
 		const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 		const entropySpy = vi
-			.spyOn(db, "fetchOrCreatePinocchioEntropy")
+			.spyOn(db, "fetchOrCreatePINOCCHIOEntropy")
 			.mockResolvedValue({
 				insert: true,
 				entropy: "mock test entropy",
@@ -76,7 +76,7 @@ describe("Entropy API", () => {
 	it("user with existing entropy", async () => {
 		const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 		const entropySpy = vi
-			.spyOn(db, "fetchOrCreatePinocchioEntropy")
+			.spyOn(db, "fetchOrCreatePINOCCHIOEntropy")
 			.mockResolvedValue({
 				insert: false,
 				entropy: "mock test entropy",

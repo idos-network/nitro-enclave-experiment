@@ -103,7 +103,7 @@ export interface ProcessRequestResponse {
 export async function enrollment3d(
   externalDatabaseRefID: string,
   requestBlob: string,
-  storeAsVector: boolean,
+  storeAsFaceVector: boolean,
 ) {
   const enrollmentResponse = await fetch(`${FACETEC_SERVER}process-request`, {
     method: "POST",
@@ -113,7 +113,7 @@ export async function enrollment3d(
     body: JSON.stringify({
       externalDatabaseRefID,
       requestBlob,
-      storeAsVector,
+      storeAsFaceVector,
     }),
   });
 
@@ -126,7 +126,7 @@ export async function enrollment3d(
       },
       {
         externalDatabaseRefID,
-        storeAsVector,
+        storeAsFaceVector,
       },
     );
   }
