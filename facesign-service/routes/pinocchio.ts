@@ -5,7 +5,7 @@ import jwt from "jsonwebtoken";
 
 import { JWT_PRIVATE_KEY, PINOCCHIO_GROUP_NAME } from "../env.ts";
 import agent from "../providers/agent.ts";
-import { enrollment3d, enrollUser, searchForDuplicates } from "../providers/api.ts";
+import { convertToFaceVector, enrollment3d, enrollUser, searchForDuplicates } from "../providers/api.ts";
 import { countMembersInGroup, getOldestFaceSignUserId, insertMember } from "../providers/db.ts";
 
 // PINOCCHIO 3D Login
@@ -18,7 +18,6 @@ export default async function handler(req: Request, res: Response) {
   const { success, result, responseBlob, didError, additionalSessionData } = await enrollment3d(
     faceSignUserId,
     requestBlob,
-    faceVector,
   );
 
   // Always return required fields for SDK
@@ -37,6 +36,11 @@ export default async function handler(req: Request, res: Response) {
       ...alwaysToReturn,
       errorMessage: "Liveness check or enrollment 3D failed and was not processed.",
     });
+  }
+
+  if (faceVector) {
+    agent.writeLog("login-face-vector-convert", { identifier: faceSignUserId });
+    await convertToFaceVector(faceSignUserId);
   }
 
   // Search for 3d-db duplicates
