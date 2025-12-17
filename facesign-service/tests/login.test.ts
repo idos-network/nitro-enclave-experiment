@@ -54,7 +54,7 @@ describe("Login API", () => {
     });
   });
 
-  it("new user", async () => {
+  it("new user (default group and face vector)", async () => {
     const spyFetch = vi.spyOn(global, "fetch").mockImplementation(async (url) => {
       if (url.toString().endsWith("/process-request")) {
         return {
@@ -113,7 +113,7 @@ describe("Login API", () => {
 
     expect(insertMemberSpy).toHaveBeenCalledWith("facesign-users", response.body.faceSignUserId);
 
-    expect(spyFetch).toHaveBeenCalledTimes(3);
+    expect(spyFetch).toHaveBeenCalledTimes(4);
 
     const processRequestCall = spyFetch.mock.calls.find((call) =>
       call[0].toString().endsWith("/process-request"),
@@ -123,8 +123,15 @@ describe("Login API", () => {
     const body = JSON.parse(processRequestCall?.[1]?.body as string);
 
     expect(body.externalDatabaseRefID).toBe(response.body.faceSignUserId);
-    expect(body.storeAsFaceVector).toBe(true);
     expect(body.requestBlob).toBe("test-face-scan");
+
+    const convertToVectorCall = spyFetch.mock.calls.find((call) =>
+      call[0].toString().endsWith("convert-facemap-to-face-vector"),
+    );
+    
+    expect(convertToVectorCall).toBeDefined();
+    const convertToVectorBody = JSON.parse(convertToVectorCall?.[1]?.body as string);
+    expect(convertToVectorBody.externalDatabaseRefID).toBe(response.body.faceSignUserId);
   });
 
   it("new user (different group and faceMap instead of vectors)", async () => {
@@ -184,7 +191,6 @@ describe("Login API", () => {
     const body = JSON.parse(processRequestCall?.[1]?.body as string);
 
     expect(body.externalDatabaseRefID).toBe(response.body.faceSignUserId);
-    expect(body.storeAsFaceVector).toBe(false);
     expect(body.requestBlob).toBe("test-face-scan");
 
     expect(agentSpy).toHaveBeenCalledWith("login-new-user", {

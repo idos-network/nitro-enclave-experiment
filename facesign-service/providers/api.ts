@@ -103,7 +103,6 @@ export interface ProcessRequestResponse {
 export async function enrollment3d(
   externalDatabaseRefID: string,
   requestBlob: string,
-  storeAsFaceVector: boolean,
 ) {
   const enrollmentResponse = await fetch(`${FACETEC_SERVER}process-request`, {
     method: "POST",
@@ -113,7 +112,6 @@ export async function enrollment3d(
     body: JSON.stringify({
       externalDatabaseRefID,
       requestBlob,
-      storeAsFaceVector,
     }),
   });
 
@@ -126,7 +124,6 @@ export async function enrollment3d(
       },
       {
         externalDatabaseRefID,
-        storeAsFaceVector,
       },
     );
   }
@@ -203,6 +200,33 @@ export async function searchForDuplicates(externalDatabaseRefID: string, groupNa
     error?: string;
     errorMessage?: string;
   }>;
+}
+
+export async function convertToFaceVector(externalDatabaseRefID: string) {
+  const response = await fetch(`${FACETEC_SERVER}convert-facemap-to-face-vector`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      externalDatabaseRefID,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new FaceTecError(
+      "convert-to-face-vector",
+      {
+        code: response.status,
+        body: await response.text(),
+      },
+      {
+        externalDatabaseRefID,
+      },
+    );
+  }
+
+  return response.json();
 }
 
 export async function enrollUser(externalDatabaseRefID: string, groupName: string) {
