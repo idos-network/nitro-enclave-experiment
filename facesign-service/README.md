@@ -72,7 +72,7 @@ All methods are using `/process-request` of FaceTec SDK.
 4. Login duplicate error (multiple results - status: **409**)
 
 - this is a FAR issue, nothing much we can do about
-- the 409 response has been chosed, to not conflict with 500 from facetec
+- the 409 response has been chosen, to not conflict with 500 from facetec
 - this is non-recoverable error
 
 ```javascript
@@ -171,7 +171,7 @@ All methods are using `/process-request` of FaceTec SDK.
 }
 ```
 
-### POST /pinnochio
+### POST /pinocchio
 
 1. SessionStarted (status: **200**) - FaceTec internals, no success, just responseBlob
 

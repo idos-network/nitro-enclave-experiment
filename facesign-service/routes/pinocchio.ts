@@ -8,7 +8,7 @@ import agent from "../providers/agent.ts";
 import { enrollment3d, enrollUser, searchForDuplicates } from "../providers/api.ts";
 import { countMembersInGroup, getOldestFaceSignUserId, insertMember } from "../providers/db.ts";
 
-// Pinocchio 3D Login
+// PINOCCHIO 3D Login
 export default async function handler(req: Request, res: Response) {
   let faceSignUserId: string = crypto.randomUUID();
 
