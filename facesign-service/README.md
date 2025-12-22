@@ -3,6 +3,13 @@
 ## API description
 
 All methods are using `/process-request` of FaceTec SDK.
+Methods are mapped to status response codes in this favor:
+
+* 200 - standard session from facetec
+* 201 - success response
+* 400 - recoverable error
+* 409 - non-recoverable error
+* 500 - facetec error
 
 ### POST /login
 
@@ -71,7 +78,7 @@ All methods are using `/process-request` of FaceTec SDK.
 
 4. Login duplicate error (multiple results - status: **409**)
 
-- this is a FAR issue, nothing much we can do about
+- this is a FFR issue during deduplication, nothing much we can do about
 - the 409 response has been chosen, to not conflict with 500 from facetec
 - this is non-recoverable error
 
@@ -105,7 +112,29 @@ All methods are using `/process-request` of FaceTec SDK.
 }
 ```
 
-2. User verification failed or liveness was not proven (status: **400**)
+2. 3d-3d match has been done (status: **201**)
+
+- this is a correct response
+
+```javascript
+{
+  // FaceTec standard response
+  success: true,
+  didError: false,
+  responseBlob: "string",
+  additionalSessionData: {
+    platform: "string",
+    deviceModel: "string",
+    userAgent: "string",
+  },
+  result: {
+    livenessProven: boolean,
+    matchLevel: number,
+  },
+}
+```
+
+3. User verification failed or liveness was not proven (status: **400**)
 
 - this is a recoverable error, the user have to start again
 
@@ -129,29 +158,9 @@ All methods are using `/process-request` of FaceTec SDK.
 }
 ```
 
-3. 3d-3d match has been done (status: **201**)
-
-- this is a correct response
-
-```javascript
-{
-  // FaceTec standard response
-  success: true,
-  didError: false,
-  responseBlob: "string",
-  additionalSessionData: {
-    platform: "string",
-    deviceModel: "string",
-    userAgent: "string",
-  },
-  result: {
-    livenessProven: boolean,
-    matchLevel: number,
-  },
-}
-```
-
 4. Liveness proven, but no match (status: **409**)
+
+- this is non recoverable error, matching has been done, but with no success
 
 ```javascript
 {
