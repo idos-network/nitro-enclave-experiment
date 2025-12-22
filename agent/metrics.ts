@@ -7,46 +7,87 @@ import {
 const cw = new CloudWatchClient({ region: "eu-west-1" });
 const namespace = `Enclave${process.env.PREFIX}/Metrics`;
 
-// {"type":"os","data":{"loadavg":0,"memUsed":21461041152,"memTotal":37063122944}}
+const debugEnabled = process.env.DEBUG === "true";
 
+// {"type":"os","data":{"loadavg":0,"memUsed":21461041152,"memTotal":37063122944}}
 export interface OsMetrics {
   type: "os";
   data: {
     loadavg: number;
     memUsed: number;
     memTotal: number;
+    disks?: Array<{
+      name: string;
+      used: number;
+      total: number;
+    }>;
   };
 }
 
 async function sendOsMetrics(item: OsMetrics) {
   const metricData: MetricDatum[] = [];
 
-  // OS metriky
   metricData.push({
     MetricName: "MemoryUsed",
     Value: item.data.memUsed,
-    Unit: "Bytes",
+    Unit: "Megabytes",
   });
 
   metricData.push({
     MetricName: "MemoryTotal",
     Value: item.data.memTotal,
-    Unit: "Bytes",
+    Unit: "Megabytes",
   });
 
   metricData.push({
-    MetricName: "LoadAvg",
-    Value: item.data.loadavg,
-    Unit: "Count",
+    MetricName: "MemoryUtilization",
+    Value: (item.data.memUsed / item.data.memTotal) * 100,
+    Unit: "Percent",
   });
 
+  metricData.push({
+    MetricName: "CPUUtilization",
+    Value: item.data.loadavg * 100,
+    Unit: "Percent",
+  });
+
+  item.data.disks?.forEach((disk) => {
+    metricData.push({
+      MetricName: `DiskUtilization${disk.name[0]?.toUpperCase() + disk.name.slice(1)}`,
+      Value: (disk.used / disk.total) * 100,
+      Unit: "Percent",
+    });
+
+    metricData.push({
+      MetricName: `DiskUsed${disk.name[0]?.toUpperCase() + disk.name.slice(1)}`,
+      Value: disk.used,
+      Unit: "Bytes",
+    });
+
+    metricData.push({
+      MetricName: `DiskTotal${disk.name[0]?.toUpperCase() + disk.name.slice(1)}`,
+      Value: disk.total,
+      Unit: "Bytes",
+    });
+  });
+
+  if (debugEnabled) {
+    console.log("-> [AGENT] Sending OS metrics to CloudWatch:");
+    console.log("--> Namespace:", namespace);
+    console.log(JSON.stringify(metricData, null, 2));
+  }
+
   try {
-    await cw.send(
+    const response = await cw.send(
       new PutMetricDataCommand({
         Namespace: namespace,
         MetricData: metricData,
       }),
     );
+
+    if (debugEnabled) {
+      console.log("-> [AGENT] CloudWatch response:", response);
+    }
   } catch (err) {
     console.error("CloudWatch metrics error:", err);
   }
@@ -82,13 +123,23 @@ async function sendPm2Metrics(item: Pm2Metrics) {
     });
   });
 
+  if (debugEnabled) {
+    console.log("-> [AGENT] Sending PM2 metrics to CloudWatch:");
+    console.log("--> Namespace:", namespace);
+    console.log(JSON.stringify(metricData, null, 2));
+  }
+
   try {
-    await cw.send(
+    const response = await cw.send(
       new PutMetricDataCommand({
         Namespace: namespace,
         MetricData: metricData,
       }),
     );
+
+    if (debugEnabled) {
+      console.log("-> [AGENT] CloudWatch response:", response);
+    }
   } catch (err) {
     console.error("CloudWatch metrics error:", err);
   }

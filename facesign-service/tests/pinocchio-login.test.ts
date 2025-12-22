@@ -1,9 +1,9 @@
+// biome-ignore-all lint/suspicious/noExplicitAny: Test files often need any
 import { generateKeyPairSync } from "node:crypto";
 import jwt from "jsonwebtoken";
 import request from "supertest";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import agent from "../providers/agent.ts";
-import * as facetecApi from "../providers/api.ts";
 
 const { privateKey, publicKey } = generateKeyPairSync("ec", {
   namedCurve: "secp521r1",
@@ -30,24 +30,81 @@ vi.mock("../providers/db.ts", () => ({
 
 import { ObjectId } from "mongodb";
 import * as db from "../providers/db.ts";
-
 import app from "../server.ts";
 
 describe("Pinocchio Login API", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("return new session", async () => {
+    vi.spyOn(global, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        responseBlob: "mock-session-result-blob",
+      }),
+    } as any);
+
+    const response = await request(app).post("/pinocchio").send({
+      requestBlob: "test-face-scan",
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.body.responseBlob).toBe("mock-session-result-blob");
+    expect(response.body.sessionStart).toBe(true);
+  });
+
+  it("fail with error", async () => {
+    vi.spyOn(global, "fetch").mockResolvedValue({
+      ok: false,
+      status: 500,
+      statusText: "Internal Server Error",
+      text: async () => "Server error",
+    } as any);
+
+    const response = await request(app).post("/pinocchio").send({
+      requestBlob: "test-face-scan",
+    });
+
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({
+      success: false,
+      didError: true,
+      errorMessage: "FaceTec API Error in enrollment3d, status code: 500",
+      methodName: "enrollment3d",
+    });
+  });
+
   it("new user", async () => {
-    const enrollmentSpy = vi.spyOn(facetecApi, "enrollment3d").mockResolvedValue({
-      success: true,
-      wasProcessed: true,
-      scanResultBlob: "mock-scan-result-blob",
-    });
+    const spyFetch = vi.spyOn(global, "fetch").mockImplementation(async (url) => {
+      if (url.toString().endsWith("/process-request")) {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            result: { livenessProven: true },
+            didError: false,
+            responseBlob: "mock-scan-result-blob",
+          }),
+        } as any;
+      }
 
-    const enrollUserSpy = vi.spyOn(facetecApi, "enrollUser").mockResolvedValue({
-      success: true,
-    });
+      if (url.toString().endsWith("3d-db/search")) {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            results: [],
+          }),
+        } as any;
+      }
 
-    const duplicateSpy = vi.spyOn(facetecApi, "searchForDuplicates").mockResolvedValue({
-      success: true,
-      results: [],
+      return {
+        ok: true,
+        json: async () => ({
+          success: true,
+        }),
+      } as any;
     });
 
     const insertMemberSpy = vi.spyOn(db, "insertMember").mockResolvedValue({
@@ -57,22 +114,17 @@ describe("Pinocchio Login API", () => {
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
-    const response = await request(app).post("/pinocchio-login").send({
-      faceScan: "test-face-scan",
-      key: "test-key",
-      userAgent: "test-user-agent",
-      auditTrailImage: "test-audit-trail-image",
-      lowQualityAuditTrailImage: "test-low-quality-audit-trail-image",
-      sessionId: "test-session-id",
+    const response = await request(app).post("/pinocchio").send({
+      requestBlob: "test-face-scan",
     });
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(201);
     expect(response.body).toEqual({
-      error: false,
+      didError: false,
       faceSignUserId: expect.any(String),
-      scanResultBlob: "mock-scan-result-blob",
+      responseBlob: "mock-scan-result-blob",
+      result: { livenessProven: true },
       success: true,
-      wasProcessed: true,
       token: expect.any(String),
     });
 
@@ -80,134 +132,126 @@ describe("Pinocchio Login API", () => {
     const decoded = jwt.verify(response.body.token, publicKey, { algorithms: ["ES512"] });
     expect(decoded.sub).toBe(response.body.faceSignUserId);
 
-    expect(duplicateSpy).toHaveBeenCalledWith(
-      response.body.faceSignUserId,
-      "test-key",
-      "facesign-users",
-      "test-user-agent",
+    // Enrollment spy
+    const processRequestCall = spyFetch.mock.calls.find((call) =>
+      call[0].toString().endsWith("/process-request"),
     );
+    expect(processRequestCall).toBeDefined();
+    expect(JSON.parse(processRequestCall?.[1]?.body as string)).toMatchObject({
+      externalDatabaseRefID: response.body.faceSignUserId,
+      requestBlob: "test-face-scan",
+    });
 
-    expect(enrollmentSpy).toHaveBeenCalledWith(
-      response.body.faceSignUserId,
-      "test-face-scan",
-      "test-audit-trail-image",
-      "test-low-quality-audit-trail-image",
-      "test-key",
-      "test-user-agent",
-      "test-session-id",
-      true,
+    // Search 3d-db duplicate spy
+    const duplicateCall = spyFetch.mock.calls.find((call) =>
+      call[0].toString().endsWith("3d-db/search"),
     );
-    expect(enrollUserSpy).toHaveBeenCalledWith(
-      response.body.faceSignUserId,
-      "facesign-users",
-      "test-key",
-    );
+    expect(duplicateCall).toBeDefined();
+    expect(JSON.parse(duplicateCall?.[1]?.body as string)).toMatchObject({
+      externalDatabaseRefID: response.body.faceSignUserId,
+      groupName: "pinocchio-users",
+      minMatchLevel: 15,
+    });
+
     expect(agentSpy).toHaveBeenCalledWith("pinocchio-new-user", {
       identifier: response.body.faceSignUserId,
     });
-    expect(insertMemberSpy).toHaveBeenCalledWith("facesign-users", response.body.faceSignUserId);
+
+    expect(insertMemberSpy).toHaveBeenCalledWith("pinocchio-users", response.body.faceSignUserId);
   });
 
   it("failing liveness", async () => {
-    vi.spyOn(facetecApi, "enrollment3d").mockResolvedValue({
-      success: false,
-      wasProcessed: true,
+    vi.spyOn(global, "fetch").mockImplementation(async (url) => {
+      if (url.toString().endsWith("/process-request")) {
+        return {
+          ok: true,
+          json: async () => ({
+            success: false,
+            result: { livenessProven: false },
+            didError: true,
+            responseBlob: "mock-scan-result-blob",
+          }),
+        } as any;
+      }
     });
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
-    const response = await request(app).post("/pinocchio-login").send({
-      faceScan: "test-face-scan",
-      key: "test-key",
-      userAgent: "test-user-agent",
-      auditTrailImage: "test-audit-trail-image",
-      lowQualityAuditTrailImage: "test-low-quality-audit-trail-image",
-      sessionId: "test-session-id",
+    const response = await request(app).post("/pinocchio").send({
+      requestBlob: "test-face-scan",
     });
 
     expect(response.status).toBe(400);
     expect(response.body).toEqual({
       errorMessage: "Liveness check or enrollment 3D failed and was not processed.",
       success: false,
-      wasProcessed: true,
+      didError: true,
+      responseBlob: "mock-scan-result-blob",
+      result: { livenessProven: false },
     });
 
     expect(agentSpy).toHaveBeenCalledWith("pinocchio-enrollment-failed", {
       success: false,
-      wasProcessed: true,
+      didError: true,
       error: undefined,
+      result: { livenessProven: false },
     });
   });
 
   it("duplicate (normal)", async () => {
-    const enrollmentSpy = vi.spyOn(facetecApi, "enrollment3d").mockResolvedValue({
-      success: true,
-      wasProcessed: true,
-      scanResultBlob: "mock-scan-result-blob",
-    });
-
-    const enrollUserSpy = vi.spyOn(facetecApi, "enrollUser").mockResolvedValue({
-      success: true,
-    });
-
     const resultId = crypto.randomUUID();
 
-    const duplicateSpy = vi.spyOn(facetecApi, "searchForDuplicates").mockResolvedValue({
-      success: true,
-      results: [{ identifier: resultId, matchLevel: 15 }],
-    });
+    vi.spyOn(global, "fetch").mockImplementation(async (url) => {
+      if (url.toString().endsWith("/process-request")) {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            result: { livenessProven: true },
+            didError: false,
+            responseBlob: "mock-scan-result-blob",
+          }),
+        } as any;
+      }
 
-    const insertMemberSpy = vi.spyOn(db, "insertMember").mockResolvedValue({
-      acknowledged: true,
-      insertedId: new ObjectId(),
+      if (url.toString().endsWith("3d-db/search")) {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            results: [{ identifier: resultId, matchLevel: 15 }],
+          }),
+        } as any;
+      }
+
+      return {
+        ok: true,
+        json: async () => ({
+          success: true,
+        }),
+      } as any;
     });
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
-
     const oldestSpy = vi.spyOn(db, "getOldestFaceSignUserId").mockResolvedValue(resultId);
 
-    const response = await request(app).post("/pinocchio-login").send({
-      faceScan: "test-face-scan",
-      key: "test-key",
-      userAgent: "test-user-agent",
-      auditTrailImage: "test-audit-trail-image",
-      lowQualityAuditTrailImage: "test-low-quality-audit-trail-image",
-      sessionId: "test-session-id",
+    const response = await request(app).post("/pinocchio").send({
+      requestBlob: "test-face-scan",
     });
 
     // Verify the JWT token
     const decoded = jwt.verify(response.body.token, publicKey, { algorithms: ["ES512"] });
     expect(decoded.sub).toBe(resultId);
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(201);
     expect(response.body).toEqual({
-      error: false,
       faceSignUserId: resultId,
-      scanResultBlob: "mock-scan-result-blob",
+      responseBlob: "mock-scan-result-blob",
       success: true,
-      wasProcessed: true,
+      didError: false,
+      result: { livenessProven: true },
       token: expect.any(String),
     });
-
-    expect(duplicateSpy).toHaveBeenCalledWith(
-      expect.any(String),
-      "test-key",
-      "facesign-users",
-      "test-user-agent",
-    );
-
-    expect(enrollmentSpy).toHaveBeenCalledWith(
-      expect.any(String),
-      "test-face-scan",
-      "test-audit-trail-image",
-      "test-low-quality-audit-trail-image",
-      "test-key",
-      "test-user-agent",
-      "test-session-id",
-      true,
-    );
-
-    expect(enrollUserSpy).not.toHaveBeenCalled();
 
     expect(oldestSpy).toHaveBeenCalledWith([resultId]);
 
@@ -216,31 +260,47 @@ describe("Pinocchio Login API", () => {
       identifiers: [resultId],
     });
 
-    expect(insertMemberSpy).not.toHaveBeenCalled();
+    expect(db.insertMember).not.toHaveBeenCalled();
   });
 
   it("duplicate (more than 1, choose oldest)", async () => {
-    const enrollmentSpy = vi.spyOn(facetecApi, "enrollment3d").mockResolvedValue({
-      success: true,
-      wasProcessed: true,
-      scanResultBlob: "mock-scan-result-blob",
-    });
-
-    const enrollUserSpy = vi.spyOn(facetecApi, "enrollUser").mockResolvedValue({
-      success: true,
-    });
-
     const resultId = crypto.randomUUID();
     const resultId2 = crypto.randomUUID();
     const resultId3 = crypto.randomUUID();
 
-    const duplicateSpy = vi.spyOn(facetecApi, "searchForDuplicates").mockResolvedValue({
-      success: true,
-      results: [
-        { identifier: resultId, matchLevel: 15 },
-        { identifier: resultId2, matchLevel: 15 },
-        { identifier: resultId3, matchLevel: 15 },
-      ],
+    const spyFetch = vi.spyOn(global, "fetch").mockImplementation(async (url) => {
+      if (url.toString().endsWith("/process-request")) {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            result: { livenessProven: true },
+            didError: false,
+            responseBlob: "mock-scan-result-blob",
+          }),
+        } as any;
+      }
+
+      if (url.toString().endsWith("3d-db/search")) {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            results: [
+              { identifier: resultId, matchLevel: 15 },
+              { identifier: resultId2, matchLevel: 15 },
+              { identifier: resultId3, matchLevel: 15 },
+            ],
+          }),
+        } as any;
+      }
+
+      return {
+        ok: true,
+        json: async () => ({
+          success: true,
+        }),
+      } as any;
     });
 
     const insertMemberSpy = vi.spyOn(db, "insertMember").mockResolvedValue({
@@ -252,22 +312,17 @@ describe("Pinocchio Login API", () => {
 
     const oldestSpy = vi.spyOn(db, "getOldestFaceSignUserId").mockResolvedValue(resultId3);
 
-    const response = await request(app).post("/pinocchio-login").send({
-      faceScan: "test-face-scan",
-      key: "test-key",
-      userAgent: "test-user-agent",
-      auditTrailImage: "test-audit-trail-image",
-      lowQualityAuditTrailImage: "test-low-quality-audit-trail-image",
-      sessionId: "test-session-id",
+    const response = await request(app).post("/pinocchio").send({
+      requestBlob: "test-face-scan",
     });
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(201);
     expect(response.body).toEqual({
-      error: false,
       faceSignUserId: resultId3, // 3 is the oldest
-      scanResultBlob: "mock-scan-result-blob",
+      responseBlob: "mock-scan-result-blob",
       success: true,
-      wasProcessed: true,
+      result: { livenessProven: true },
+      didError: false,
       token: expect.any(String),
     });
 
@@ -275,23 +330,18 @@ describe("Pinocchio Login API", () => {
     const decoded = jwt.verify(response.body.token, publicKey, { algorithms: ["ES512"] });
     expect(decoded.sub).toBe(resultId3);
 
-    expect(duplicateSpy).toHaveBeenCalledWith(
-      expect.any(String),
-      "test-key",
-      "facesign-users",
-      "test-user-agent",
+    const duplicateRequestCall = spyFetch.mock.calls.find((call) =>
+      call[0].toString().endsWith("3d-db/search"),
     );
-    expect(enrollmentSpy).toHaveBeenCalledWith(
-      expect.any(String),
-      "test-face-scan",
-      "test-audit-trail-image",
-      "test-low-quality-audit-trail-image",
-      "test-key",
-      "test-user-agent",
-      "test-session-id",
-      true,
-    );
-    expect(enrollUserSpy).not.toHaveBeenCalled();
+    expect(duplicateRequestCall).toBeDefined();
+    // @ts-expect-error This is fine for tests
+    expect(JSON.parse(duplicateRequestCall?.[1]?.body ?? "{}")).toMatchObject({
+      externalDatabaseRefID: expect.any(String),
+      groupName: "pinocchio-users",
+      minMatchLevel: 15,
+    });
+
+    expect(db.insertMember).not.toHaveBeenCalled();
 
     expect(agentSpy).toBeCalledWith("pinocchio-duplicate", {
       count: 3,
@@ -299,7 +349,6 @@ describe("Pinocchio Login API", () => {
     });
 
     expect(oldestSpy).toHaveBeenCalledWith([resultId, resultId2, resultId3]);
-
     expect(insertMemberSpy).not.toHaveBeenCalled();
   });
 });

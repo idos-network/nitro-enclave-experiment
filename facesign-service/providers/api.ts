@@ -1,79 +1,177 @@
 import { FACETEC_SERVER } from "../env.ts";
 
-export async function getSessionToken(key: string, deviceIdentifier: string) {
-  const response = await fetch(`${FACETEC_SERVER}session-token`, {
-    method: "GET",
-    headers: {
-      "X-Device-Key": key,
-      "X-Device-Identifier": deviceIdentifier,
+export interface StatusResponse {
+  coreServerSDKVersion: string;
+  facetecServerWebserviceVersion: string;
+  uptime: number;
+  machineID: string;
+  instanceID: string;
+  notice: string;
+}
+
+export class SessionStartError extends Error {
+  public readonly responseBody: string;
+
+  constructor(responseBody: string) {
+    super("Session Start Response");
+    this.responseBody = responseBody;
+  }
+}
+
+export class FaceTecError extends Error {
+  public readonly methodName: string;
+  public readonly response: {
+    code: number;
+    body: string;
+  };
+  public readonly others: Record<string, unknown> = {};
+
+  constructor(
+    methodName: string,
+    response: {
+      code: number;
+      body: string;
     },
+    others: Record<string, unknown> = {},
+  ) {
+    super("Unexpected FaceTec API Error");
+    this.methodName = methodName;
+    this.response = response;
+    this.others = others;
+  }
+}
+
+function checkSessionStartResponse(response: ProcessRequestResponse) {
+  if (response.success === undefined && response.responseBlob !== undefined) {
+    throw new SessionStartError(response.responseBlob);
+  }
+}
+
+export async function getStatus() {
+  // https://dev.facetec.com/api-guide#status
+  const response = await fetch(`${FACETEC_SERVER}status`, {
+    method: "GET",
   });
 
   if (!response.ok) {
-    console.error("Failed to get session token, status:", response.status);
-    console.error("Response text:", response.text);
-    throw new Error(`Failed to get session token, status: ${response.status}`);
+    throw new Error(`Failed to get status, status: ${response.status}`);
   }
 
-  const { sessionToken } = (await response.json()) as { sessionToken: string };
+  const data = (await response.json()) as {
+    running: boolean;
+    success: boolean;
+    error?: string;
+    serverInfo: StatusResponse;
+  };
 
-  return sessionToken;
+  return data;
+}
+
+export interface ProcessRequestResponse {
+  externalDatabaseRefID: string;
+  additionalSessionData: {
+    platform: string;
+    appID: string;
+    installationID: string;
+    deviceModel: string;
+    deviceSDKVersion: string;
+    userAgent: string;
+    sessionID: string;
+  };
+  success: boolean;
+  responseBlob: string;
+  result: {
+    livenessProven: boolean;
+    ageV2GroupEnumInt?: number;
+    matchLevel?: number;
+  };
+  isLikelyOnFraudList: boolean;
+  isLikelyDuplicate: boolean;
+  enrollForSearchAllUserListResult: boolean;
+  launchId: string;
+  httpCallInfo: {
+    tid: string;
+    path: "/process-request";
+    date: string;
+    epochSecond: number;
+    requestMethod: "POST";
+  };
+  didError: boolean;
+  serverInfo: StatusResponse;
 }
 
 export async function enrollment3d(
   externalDatabaseRefID: string,
-  faceScan: string,
-  auditTrailImage: string,
-  lowQualityAuditTrailImage: string,
-  key: string,
-  deviceIdentifier: string,
-  sessionId: string,
-  storeAsFaceVector: boolean,
+  requestBlob: string,
 ) {
-  const enrollmentResponse = await fetch(`${FACETEC_SERVER}enrollment-3d`, {
+  const enrollmentResponse = await fetch(`${FACETEC_SERVER}process-request`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Device-Key": key,
-      "X-Device-Identifier": deviceIdentifier,
     },
     body: JSON.stringify({
-      faceScan,
-      auditTrailImage,
-      lowQualityAuditTrailImage,
       externalDatabaseRefID,
-      sessionId,
-      storeAsFaceVector,
+      requestBlob,
     }),
   });
 
   if (!enrollmentResponse.ok) {
-    console.error("Failed to enroll, status:", enrollmentResponse.status);
-    console.error("Response text:", await enrollmentResponse.text());
-    throw new Error("Failed to enroll, check for logs.");
+    throw new FaceTecError(
+      "enrollment3d",
+      {
+        code: enrollmentResponse.status,
+        body: await enrollmentResponse.text(),
+      },
+      {
+        externalDatabaseRefID,
+      },
+    );
   }
 
-  return enrollmentResponse.json() as Promise<{
-    success: boolean;
-    wasProcessed: boolean;
-    scanResultBlob?: string;
-    error?: string;
-    errorMessage?: string;
-  }>;
+  const response = (await enrollmentResponse.json()) as ProcessRequestResponse;
+
+  checkSessionStartResponse(response);
+
+  return response;
 }
 
-export async function searchForDuplicates(
-  externalDatabaseRefID: string,
-  key: string,
-  groupName: string,
-  deviceIdentifier?: string,
-) {
+export async function match3d3d(externalDatabaseRefID: string, requestBlob: string) {
+  const matchResponse = await fetch(`${FACETEC_SERVER}process-request`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      externalDatabaseRefID,
+      requestBlob,
+    }),
+  });
+
+  if (!matchResponse.ok) {
+    throw new FaceTecError(
+      "match3d3d",
+      {
+        code: matchResponse.status,
+        body: await matchResponse.text(),
+      },
+      {
+        externalDatabaseRefID,
+      },
+    );
+  }
+
+  const response = (await matchResponse.json()) as ProcessRequestResponse;
+
+  checkSessionStartResponse(response);
+
+  return response;
+}
+
+export async function searchForDuplicates(externalDatabaseRefID: string, groupName: string) {
   const response = await fetch(`${FACETEC_SERVER}3d-db/search`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Device-Key": key,
-      "X-Device-Identifier": deviceIdentifier,
     },
     body: JSON.stringify({
       externalDatabaseRefID,
@@ -83,7 +181,17 @@ export async function searchForDuplicates(
   });
 
   if (!response.ok) {
-    throw new Error("Failed to search for duplicates, check application logs.");
+    throw new FaceTecError(
+      "search-3d-db",
+      {
+        code: response.status,
+        body: await response.text(),
+      },
+      {
+        externalDatabaseRefID,
+        groupName,
+      },
+    );
   }
 
   return response.json() as Promise<{
@@ -94,12 +202,38 @@ export async function searchForDuplicates(
   }>;
 }
 
-export async function enrollUser(externalDatabaseRefID: string, groupName: string, key: string) {
+export async function convertToFaceVector(externalDatabaseRefID: string) {
+  const response = await fetch(`${FACETEC_SERVER}convert-facemap-to-face-vector`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      externalDatabaseRefID,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new FaceTecError(
+      "convert-to-face-vector",
+      {
+        code: response.status,
+        body: await response.text(),
+      },
+      {
+        externalDatabaseRefID,
+      },
+    );
+  }
+
+  return response.json();
+}
+
+export async function enrollUser(externalDatabaseRefID: string, groupName: string) {
   const response = await fetch(`${FACETEC_SERVER}3d-db/enroll`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Device-Key": key,
     },
     body: JSON.stringify({
       externalDatabaseRefID,
@@ -108,7 +242,17 @@ export async function enrollUser(externalDatabaseRefID: string, groupName: strin
   });
 
   if (!response.ok) {
-    throw new Error("Failed to enroll user into 3d-db, check application logs.");
+    throw new FaceTecError(
+      "enroll-user",
+      {
+        code: response.status,
+        body: await response.text(),
+      },
+      {
+        externalDatabaseRefID,
+        groupName,
+      },
+    );
   }
 
   return response.json();

@@ -12,20 +12,8 @@ sudo rm -f "$NITRO_CLI_ARTIFACTS/$TARGET_DOCKER_IMAGE.eif"
 
 set -e
 
-MONGO_HOST="$(aws docdb describe-db-clusters --region eu-west-1 | jq -r .DBClusters[0].Endpoint)"
-if [ "${MONGO_HOST:-null}" = "null" ]; then
-    echo >&2 "Couldn't determine MONGO_HOST"
-    exit 1
-fi
-
-# Get the FaceTec SDK version
-FACETEC_SDK_VERSION="$(find ~ec2-user/server/facetec-sdk/ -name 'FaceTecSDK-custom-server-*' | sed -E 's#.*/FaceTecSDK-custom-server-([[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+)#\1#')"
-AWS_KMS_SECRETS_KEY_ID="$(aws kms describe-key --key-id alias/secretsEncryption --query 'KeyMetadata.Arn' --output text --region eu-west-1)"
-AWS_KMS_SECRETS_FACETEC_KEY_ID="$(aws kms describe-key --key-id alias/secretsFacetecEncryption --query 'KeyMetadata.Arn' --output text --region eu-west-1)"
-AWS_KMS_JWT_KEY_ID="$(aws kms describe-key --key-id alias/jwtEncryption --query 'KeyMetadata.Arn' --output text --region eu-west-1)"
-
-sudo cp ~ec2-user/.ssh/authorized_keys ~ec2-user/server/facesign-service/
-sudo chown ec2-user:ec2-user ~ec2-user/server/facesign-service/authorized_keys
+# Load building configuration
+FACETEC_SDK_VERSION="10.0.27"
 
 S3_SECRETS_BUCKET=$(aws s3api list-buckets --query "Buckets[?contains(Name, 'facesign') && contains(Name, 'secrets')].Name" --output text)
 if [[ "${S3_SECRETS_BUCKET:-null}" == "null" ]]; then
@@ -33,14 +21,19 @@ if [[ "${S3_SECRETS_BUCKET:-null}" == "null" ]]; then
     exit 1
 fi
 
+FACETEC_SDK_BUCKET=$(aws s3api list-buckets --query "Buckets[?contains(Name, 'facesign') && contains(Name, 'facetec-sdk')].Name" --output text)
+if [[ "${FACETEC_SDK_BUCKET:-null}" == "null" ]]; then
+    echo >&2 "Couldn't determine FACETEC_SDK_BUCKET"
+    exit 1
+fi
+
+# Replace placeholders in Dockerfile
+sed -i "s/INSERT_FACETEC_SDK_VERSION_HERE/$FACETEC_SDK_VERSION/g" ~ec2-user/server/facesign-service/Dockerfile
+sed -i "s/INSERT_S3_SECRETS_BUCKET_HERE/$S3_SECRETS_BUCKET/g" ~ec2-user/server/facesign-service/Dockerfile
+sed -i "s/INSERT_FACETEC_SDK_BUCKET_HERE/$FACETEC_SDK_BUCKET/g" ~ec2-user/server/facesign-service/Dockerfile
+
 # Build origin Docker image
 docker build \
-    --build-arg MONGO_HOST="$MONGO_HOST" \
-    --build-arg FACETEC_SDK_VERSION="$FACETEC_SDK_VERSION" \
-    --build-arg AWS_KMS_SECRETS_KEY_ID="$AWS_KMS_SECRETS_KEY_ID" \
-    --build-arg AWS_KMS_SECRETS_FACETEC_KEY_ID="$AWS_KMS_SECRETS_FACETEC_KEY_ID" \
-    --build-arg AWS_KMS_JWT_KEY_ID="$AWS_KMS_JWT_KEY_ID" \
-    --build-arg S3_SECRETS_BUCKET="$S3_SECRETS_BUCKET" \
     -t "$TARGET_DOCKER_IMAGE" \
     -f ~ec2-user/server/facesign-service/Dockerfile \
     ~ec2-user/server/ \

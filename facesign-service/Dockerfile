@@ -1,11 +1,12 @@
 # ---------- Build stage ----------
 FROM ubuntu:latest AS builder
 
-ARG FACETEC_SDK_VERSION
-RUN if [ -z "$FACETEC_SDK_VERSION" ]; then (echo "FACETEC_SDK_VERSION must be provided as a --build-arg"; exit 1); fi
+ENV FACETEC_SDK_VERSION="INSERT_FACETEC_SDK_VERSION_HERE"
+ENV FACETEC_SDK_BUCKET="INSERT_FACETEC_SDK_BUCKET_HERE"
 
-ARG FACETEC_CUSTOM_SERVER_DIRECTORY=./facetec-sdk/FaceTecSDK-custom-server-$FACETEC_SDK_VERSION
-ARG FACETEC_SERVER_CORE_DIRECTORY=./facetec-sdk/FaceTecSDK-server-core-java-$FACETEC_SDK_VERSION
+ARG FACETEC_S3_CORE=s3://$FACETEC_SDK_BUCKET/FaceTec-Server-Webservice/FaceTecSDK-Server-Core-$FACETEC_SDK_VERSION
+ARG FACETEC_S3_CUSTOM=s3://$FACETEC_SDK_BUCKET/FaceTec-Server-Webservice/FaceTec-Server-Webservice-$FACETEC_SDK_VERSION
+ARG FACETEC_S3_USAGE_LOGS=s3://$FACETEC_SDK_BUCKET/FaceTec-Usage-Log-Server
 
 # Install build dependencies (Java + Maven + Node.js + libs)
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -15,18 +16,39 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libavcodec-dev libavutil-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY $FACETEC_CUSTOM_SERVER_DIRECTORY /home/FaceTec_Custom_Server
-COPY $FACETEC_SERVER_CORE_DIRECTORY /home/FaceTec_Server_Core
+# Download aws sdk to fetch FaceTec SDK from S3
+RUN apt-get update && apt-get install -y \
+    curl unzip less groff \
+    && rm -rf /var/lib/apt/lists/* \
+    && curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/awscliv2.zip" \
+    && unzip /tmp/awscliv2.zip -d /tmp \
+    && /tmp/aws/install \
+    && rm -rf /tmp/aws /tmp/awscliv2.zip
+    
+# Copy FaceTec Server Core and Webservice into the image.
+RUN aws s3 sync s3://$FACETEC_SDK_BUCKET/FaceTec-Server-Webservice/FaceTecSDK-Server-Core-$FACETEC_SDK_VERSION/libs /home/FaceTec_Server_Core/libs
+
+# Install FaceTec Server Core into Maven
+RUN mvn install:install-file -Dfile=/home/FaceTec_Server_Core/libs/FaceTecSDK-Server-Core-$FACETEC_SDK_VERSION.jar -DgroupId=com.facetec.servercore -DartifactId=server -Dversion=$FACETEC_SDK_VERSION -Dpackaging=jar
+
+# Copy FaceTec Custom Server into the image.
+RUN aws s3 sync s3://$FACETEC_SDK_BUCKET/FaceTec-Server-Webservice/FaceTec-Server-Webservice-$FACETEC_SDK_VERSION/deploy /home/FaceTec_Custom_Server/deploy
+RUN aws s3 sync s3://$FACETEC_SDK_BUCKET/FaceTec-Server-Webservice/FaceTec-Server-Webservice-$FACETEC_SDK_VERSION/src /home/FaceTec_Custom_Server/src
+RUN aws s3 cp s3://$FACETEC_SDK_BUCKET/FaceTec-Server-Webservice/FaceTec-Server-Webservice-$FACETEC_SDK_VERSION/pom.xml /home/FaceTec_Custom_Server/pom.xml
+RUN aws s3 cp s3://$FACETEC_SDK_BUCKET/FaceTec-Server-Webservice/FaceTec-Server-Webservice-$FACETEC_SDK_VERSION/config.yaml /home/FaceTec_Custom_Server/deploy/config.yaml
 
 # FaceTec mongo storage modifications (don't store face images, just empty strings)
-RUN sed -i 's#faceScanRequest.auditTrailImage.getBase64()#""#' /home/FaceTec_Custom_Server/src/main/java/com/facetec/customserver/database/MongoDatabase.java
-RUN sed -i 's#faceScanRequest.lowQualityAuditTrailImage.getBase64()#""#' /home/FaceTec_Custom_Server/src/main/java/com/facetec/customserver/database/MongoDatabase.java
+RUN sed -i 's#faceScanRequest.auditTrailImage.getBase64()#""#' /home/FaceTec_Custom_Server/src/main/java/com/facetec/facetecserver/database/MongoDatabase.java
+RUN sed -i 's#faceScanRequest.lowQualityAuditTrailImage.getBase64()#""#' /home/FaceTec_Custom_Server/src/main/java/com/facetec/facetecserver/database/MongoDatabase.java
 
-RUN mvn install:install-file -Dfile=/home/FaceTec_Server_Core/libs/FaceTecSDK-$FACETEC_SDK_VERSION.jar -DgroupId=com.facetec.servercore -DartifactId=server -Dversion=$FACETEC_SDK_VERSION -Dpackaging=jar
+WORKDIR /home/FaceTec_Custom_Server/deploy
 RUN mvn -f /home/FaceTec_Custom_Server/pom.xml clean package -Plinux
 
 # ---------- Final stage ----------
 FROM ubuntu:latest
+
+ENV FACETEC_SDK_VERSION="INSERT_FACETEC_SDK_VERSION_HERE"
+ENV FACETEC_SDK_BUCKET="INSERT_FACETEC_SDK_BUCKET_HERE"
 
 # Install dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends --no-install-suggests \
@@ -41,6 +63,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends --no-install-su
     libnbd-bin \
     nbd-client \
     cryptsetup \
+    vim \
+    jq \
 && rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
 
 # Install AWS CLI v2
@@ -72,76 +96,59 @@ RUN mkdir -p /etc/apt/keyrings \
 
 RUN apt-get update && apt-get install -y nodejs && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Setup & build FaceTec Server Core
-COPY --from=builder /home/FaceTec_Custom_Server /home/FaceTec_Custom_Server
-COPY --from=builder /home/FaceTec_Server_Core /home/FaceTec_Server_Core
-COPY ./facetec-sdk/OCRTemplates /home/OCRTemplates
+# Destination directories
+ENV HOME_FACETEC_CUSTOM_SERVER=/home/FaceTec_Custom_Server
+ENV HOME_FACETEC_SERVER_CORE=/home/FaceTec_Server_Core
+ENV HOME_FACETEC_USAGE_LOGS=/home/FaceTec_Usage_Logs_Server
+ENV HOME_FACESIGN_SERVICE=/home/FaceSign_Service
 
-RUN cp /home/FaceTec_Custom_Server/config.yaml /home/FaceTec_Custom_Server/deploy
+# Don't copy server core, ocr or urc templates they will be fetched from S3 at runtime
+COPY --from=builder /home/FaceTec_Custom_Server $HOME_FACETEC_CUSTOM_SERVER
 
-COPY ./facetec-sdk/facetec_usage_logs_server/package.json /home/FaceTec_Custom_Server/deploy/facetec_usage_logs_server/package.json
-COPY ./facesign-service/ /home/FaceTec_Custom_Server/deploy/facesign-service/
-COPY ./facesign-service/scripts/ecosystem.config.js /home/FaceTec_Custom_Server/deploy/ecosystem.config.js
-
-WORKDIR /home/FaceTec_Custom_Server/deploy
-RUN cd ./facetec_usage_logs_server && npm install
-RUN cd ./facesign-service && npm install
-
-ARG AWS_KMS_SECRETS_KEY_ID
-RUN if [ -z "$AWS_KMS_SECRETS_KEY_ID" ]; then (echo "AWS_KMS_SECRETS_KEY_ID must be provided as a --build-arg"; exit 1); fi
-RUN echo $AWS_KMS_SECRETS_KEY_ID > ./secrets_key.arn
-
-ARG AWS_KMS_SECRETS_FACETEC_KEY_ID
-RUN if [ -z "$AWS_KMS_SECRETS_FACETEC_KEY_ID" ]; then (echo "AWS_KMS_SECRETS_FACETEC_KEY_ID must be provided as a --build-arg"; exit 1); fi
-RUN echo $AWS_KMS_SECRETS_FACETEC_KEY_ID > ./secrets_facetec_key.arn
-
-ARG AWS_KMS_JWT_KEY_ID
-RUN if [ -z "$AWS_KMS_JWT_KEY_ID" ]; then (echo "AWS_KMS_JWT_KEY_ID must be provided as a --build-arg"; exit 1); fi
-RUN echo $AWS_KMS_JWT_KEY_ID > ./jwt_key.arn
-
-RUN npm install -g pm2
-
-COPY ./facetec-sdk/facetec_usage_logs_server/ ./facetec_usage_logs_server/
-RUN sed -i 's/54.70.182.147/logs.facetec.com/' ./facetec_usage_logs_server/utils/logUploader.js
-
-COPY ./facesign-service/authorized_keys /root/.ssh/authorized_keys
-COPY ./facesign-service/scripts/run.sh ./
-COPY ./facesign-service/scripts/boot.ash ./
-
-ARG MONGO_HOST
-RUN if [ -z "$MONGO_HOST" ]; then (echo "MONGO_HOST must be provided as a --build-arg"; exit 1); fi
-
-RUN echo "127.0.0.1 $MONGO_HOST" | tee -a /root/extra_hosts
-RUN echo "127.0.0.1 $(echo "$MONGO_HOST" | sed 's#-cluster.cluster-#-cluster.#')" | tee -a /root/extra_hosts
-RUN echo "127.0.0.1 logs.facetec.com" | tee -a /root/extra_hosts
-
-# AWS kms (AWS identity are on ip tables forwarded to 127.0.0.2!)
-RUN echo "127.0.0.3 kms.eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
-
-ARG S3_SECRETS_BUCKET
-RUN if [ -z "$S3_SECRETS_BUCKET" ]; then (echo "S3_SECRETS_BUCKET must be provided as a --build-arg"; exit 1); fi
-RUN echo $S3_SECRETS_BUCKET > ./s3_secrets_bucket.txt
-
-# AWS secrets S3
-RUN echo "127.0.0.4 $S3_SECRETS_BUCKET.s3.eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
-RUN echo "127.0.0.5 $S3_SECRETS_BUCKET.s3-eu-west-1.amazonaws.com" | tee -a /root/extra_hosts
-
-# Let's encrypt acme lookup
-RUN echo "127.0.0.6 acme-v02.api.letsencrypt.org" | tee -a /root/extra_hosts
-
-# FaceTec Server configuration
+WORKDIR $HOME_FACETEC_CUSTOM_SERVER/deploy/
 RUN sed -i 's#serverPort: 8080#serverPort: 5000#' ./config.yaml
 RUN sed -i 's#enableSearch: false#enableSearch: true#' ./config.yaml
 RUN sed -i 's#search3D3DDatabaseRootDirectory: .*#search3D3DDatabaseRootDirectory: /mnt/encrypted/facetec/search-3d-3d-database#' ./config.yaml
-RUN sed -i 's#search3D3DDatabaseExportRootDirectory: .*#search3D3DDatabaseExportRootDirectory: /mnt/encrypted/facetec/search-3d-3d-database-export#' ./config.yaml
-RUN sed -i 's#search3D3DOneEyeCoveredDatabaseRootDirectory: .*#search3D3DOneEyeCoveredDatabaseRootDirectory: /mnt/encrypted/facetec/search-3d-3d-eye-covered#' ./config.yaml
+RUN sed -i 's#search3D3DAccessibilityDatabaseRootDirectory: .*#search3D3DAccessibilityDatabaseRootDirectory: /mnt/encrypted/facetec/search-3d-3d-accessibility#' ./config.yaml
 RUN sed -i 's#search3D2DFacePortraitDatabaseRootDirectory: .*#search3D2DFacePortraitDatabaseRootDirectory: /mnt/encrypted/facetec/search-3d-2d-face-portrait#' ./config.yaml
 RUN sed -i 's#search3D2DKioskPOSDatabaseRootDirectory: .*#search3D2DKioskPOSDatabaseRootDirectory: /mnt/encrypted/facetec/search-3d-2d-kiosk#' ./config.yaml
 RUN sed -i 's#search2D2DIDScanPhotoDatabaseRootDirectory: .*#search2D2DIDScanPhotoDatabaseRootDirectory: /mnt/encrypted/facetec/search-2d-2d-id-scan#' ./config.yaml
+RUN sed -i 's#search2D2DProfilePicDatabaseRootDirectory: .*#search2D2DProfilePicDatabaseRootDirectory: /mnt/encrypted/facetec/search-2d-2d-profile-pic#' ./config.yaml
+RUN sed -i 's#search2D2DFacePortraitDatabaseRootDirectory: .*#search2D2DFacePortraitDatabaseRootDirectory: /mnt/encrypted/facetec/search-2d-2d-face-portrait#' ./config.yaml
+RUN sed -i 's#usageLogServerUri: .*#usageLogServerUri: http://localhost:3000/#' ./config.yaml
+RUN printf "#!/bin/bash\njava -cp $HOME_FACETEC_SERVER_CORE/libs/FaceTecSDK-Server-Core-$FACETEC_SDK_VERSION.jar:FaceTec-Server-Webservice.jar com.facetec.facetecserver.app.App" > ./run.ash
 
-# FaceTec Usage Logs configuration
-RUN echo "usageLogsDirectory: /mnt/encrypted/usage-logs" >> ./facetec_usage_logs_server/config.yml
+# This is in config.yaml but it's not loaded
+RUN sed -i 's#search3D3DDatabaseExportRootDirectory: .*#search3D3DDatabaseExportRootDirectory: /mnt/encrypted/facetec/search-3d-3d-database-export#' ./config.yaml
+# This is missing in config.yaml, but server tries to load that
+RUN echo "" >> ./config.yaml
+RUN echo "searchDatabaseExportRootDirectory: /mnt/encrypted/facetec/search-3d-3d-database-export" >> ./config.yaml
+
+# Setup FaceTec Usage Logs Server
+WORKDIR $HOME_FACETEC_USAGE_LOGS
+RUN aws s3 cp s3://$FACETEC_SDK_BUCKET/FaceTec-Usage-Log-Server/package.json ./package.json
+RUN npm install
+RUN aws s3 sync s3://$FACETEC_SDK_BUCKET/FaceTec-Usage-Log-Server/ ./
+RUN sed -i 's/54.70.182.147/logs.facetec.com/' ./utils/logUploader.js
+RUN sed -i 's#usageLogsDirectory: ""#usageLogsDirectory: "/mnt/encrypted/usage-logs"#' ./config.yml
+
+# Setup FaceSign Service
+WORKDIR $HOME_FACESIGN_SERVICE
+COPY ./facesign-service/ .
+RUN npm install
+
+# Download or copy all required secrets and setup environment
+WORKDIR /home/deploy
+
+# Setup PM2
+RUN npm install -g pm2
+COPY ./facesign-service/scripts/ecosystem.config.js ./ecosystem.config.js
+
+# Support boot.ash scripts
+COPY ./facesign-service/scripts/run.ash ./
+COPY ./facesign-service/scripts/shared ./shared/
+
+ENV S3_SECRETS_BUCKET="INSERT_S3_SECRETS_BUCKET_HERE"
 
 EXPOSE 8080
-
-CMD ["/bin/bash", "/home/FaceTec_Custom_Server/deploy/boot.ash"]
+CMD ["/bin/bash", "/home/deploy/run.ash"]
