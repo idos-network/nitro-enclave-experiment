@@ -142,7 +142,6 @@ WORKDIR $HOME_FACETEC_USAGE_LOGS
 RUN aws s3 cp s3://$FACETEC_SDK_BUCKET/FaceTec-Usage-Log-Server/package.json ./package.json
 RUN npm install
 RUN aws s3 sync s3://$FACETEC_SDK_BUCKET/FaceTec-Usage-Log-Server/ ./
-RUN sed -i 's/54.70.182.147/logs.facetec.com/' ./utils/logUploader.js
 RUN sed -i 's#usageLogsDirectory: ""#usageLogsDirectory: "/mnt/encrypted/usage-logs"#' ./config.yml
 
 # Setup FaceSign Service
