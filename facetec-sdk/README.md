@@ -4,8 +4,8 @@
     - Wizard config
         - MongoDB
         - No debug logging
-        - SFTP usage logs
+        - HTTPS usage logs
         - No postman init
-2. On `facetec-sdk/FaceTec-Usage-Log-Server/config.yml`, set the `sftpConfig.privateKey` field to the right key (that needs to have been configured in FaceTec beforehand).
-3. Run `bash sync.sh` in `facetec-sdk` to prepare templates on S3.
-4. Update `FACETEC_SDK_VERSION` variable in `facesign-service/scripts/enclave-build.ash`
+2. Run `bash sync.sh` in `facetec-sdk` to prepare templates on S3.
+3. Update `FACETEC_SDK_VERSION` variable in `facesign-service/scripts/enclave-build.ash`
+4. Follow next steps in `facesign` repo to create patches for FLE and other required stuff.

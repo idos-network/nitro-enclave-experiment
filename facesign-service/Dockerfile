@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     default-jdk \
     libgomp1 \
     maven \
+    patch \
     libavcodec-dev libavutil-dev \
     && rm -rf /var/lib/apt/lists/*
 
@@ -37,9 +38,9 @@ RUN aws s3 sync s3://$FACETEC_SDK_BUCKET/FaceTec-Server-Webservice/FaceTec-Serve
 RUN aws s3 cp s3://$FACETEC_SDK_BUCKET/FaceTec-Server-Webservice/FaceTec-Server-Webservice-$FACETEC_SDK_VERSION/pom.xml /home/FaceTec_Custom_Server/pom.xml
 RUN aws s3 cp s3://$FACETEC_SDK_BUCKET/FaceTec-Server-Webservice/FaceTec-Server-Webservice-$FACETEC_SDK_VERSION/config.yaml /home/FaceTec_Custom_Server/deploy/config.yaml
 
-# FaceTec mongo storage modifications (don't store face images, just empty strings)
-RUN sed -i 's#faceScanRequest.auditTrailImage.getBase64()#""#' /home/FaceTec_Custom_Server/src/main/java/com/facetec/facetecserver/database/MongoDatabase.java
-RUN sed -i 's#faceScanRequest.lowQualityAuditTrailImage.getBase64()#""#' /home/FaceTec_Custom_Server/src/main/java/com/facetec/facetecserver/database/MongoDatabase.java
+# Patch FaceTec server for field level encryption support
+COPY ./facetec-sdk/main.patch /tmp/main.patch
+RUN cd /home/FaceTec_Custom_Server && patch -p1 < /tmp/main.patch
 
 WORKDIR /home/FaceTec_Custom_Server/deploy
 RUN mvn -f /home/FaceTec_Custom_Server/pom.xml clean package -Plinux
@@ -96,6 +97,15 @@ RUN mkdir -p /etc/apt/keyrings \
 
 RUN apt-get update && apt-get install -y nodejs && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Install libmongocrypt0 1.17.x for FLE (according to readme.md)
+RUN curl -s --location https://pgp.mongodb.com/libmongocrypt.asc \
+    | gpg --dearmor \
+    >/etc/apt/trusted.gpg.d/libmongocrypt.gpg
+RUN echo "deb https://libmongocrypt.s3.amazonaws.com/apt/ubuntu jammy/libmongocrypt/1.17 universe" \
+    | tee /etc/apt/sources.list.d/libmongocrypt.list
+RUN apt-get update && apt-get install -y libmongocrypt-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 # Destination directories
 ENV HOME_FACETEC_CUSTOM_SERVER=/home/FaceTec_Custom_Server
 ENV HOME_FACETEC_SERVER_CORE=/home/FaceTec_Server_Core
@@ -104,6 +114,9 @@ ENV HOME_FACESIGN_SERVICE=/home/FaceSign_Service
 
 # Don't copy server core, ocr or urc templates they will be fetched from S3 at runtime
 COPY --from=builder /home/FaceTec_Custom_Server $HOME_FACETEC_CUSTOM_SERVER
+
+# Remove sources, we don't need them in final image
+RUN rm -rf $HOME_FACETEC_CUSTOM_SERVER/src
 
 WORKDIR $HOME_FACETEC_CUSTOM_SERVER/deploy/
 RUN sed -i 's#serverPort: 8080#serverPort: 5000#' ./config.yaml
