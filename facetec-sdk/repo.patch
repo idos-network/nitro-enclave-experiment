@@ -1,0 +1,344 @@
+diff --git a/.gitignore b/.gitignore
+index 485dee6..ee44a96 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -1 +1,2 @@
+ .idea
++target
+diff --git a/pom.xml b/pom.xml
+index 3bbe185..8aaf9b1 100644
+--- a/pom.xml
++++ b/pom.xml
+@@ -94,13 +94,32 @@
+     <dependency>
+       <groupId>org.mongodb</groupId>
+       <artifactId>mongodb-driver-core</artifactId>
+-      <version>5.1.0</version>
++      <version>5.2.1</version>
+     </dependency>
+ 
+     <dependency>
+       <groupId>org.mongodb</groupId>
+       <artifactId>mongodb-driver-sync</artifactId>
+-      <version>5.1.0</version>
++      <version>5.2.1</version>
++    </dependency>
++
++    <!-- MongoDB FLE -->
++    <dependency>
++      <groupId>org.mongodb</groupId>
++      <artifactId>mongodb-crypt</artifactId>
++      <version>5.2.1</version>
++    </dependency>
++
++    <dependency>
++      <groupId>software.amazon.awssdk</groupId>
++      <artifactId>auth</artifactId>
++      <version>2.40.12</version>
++    </dependency>
++
++    <dependency>
++      <groupId>software.amazon.awssdk</groupId>
++      <artifactId>regions</artifactId>
++      <version>2.40.12</version>
+     </dependency>
+ 
+     <dependency>
+diff --git a/src/main/java/com/facetec/facetecserver/database/MongoDatabase.java b/src/main/java/com/facetec/facetecserver/database/MongoDatabase.java
+index 526f4b7..2abc6ac 100644
+--- a/src/main/java/com/facetec/facetecserver/database/MongoDatabase.java
++++ b/src/main/java/com/facetec/facetecserver/database/MongoDatabase.java
+@@ -13,10 +13,15 @@ import com.mongodb.client.MongoClient;
+ import com.mongodb.client.MongoClients;
+ import com.mongodb.client.MongoCollection;
+ import com.mongodb.client.model.*;
++import com.mongodb.client.model.vault.DataKeyOptions;
++import com.mongodb.client.model.vault.EncryptOptions;
+ import com.mongodb.client.result.UpdateResult;
++import com.mongodb.client.vault.ClientEncryption;
++import com.mongodb.client.vault.ClientEncryptions;
+ import org.apache.commons.codec.binary.Hex;
+-import org.bson.Document;
++import org.bson.*;
+ import org.bson.conversions.Bson;
++import org.bson.types.Binary;
+ import org.bson.types.ObjectId;
+ import org.json.JSONObject;
+ 
+@@ -55,6 +60,14 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
+     private static final String IDScanSessionIDKey = "idScanSessionId";
+     private static final String EnrollmentSessionKey = "enrollmentSession";
+ 
++    // Mongo DB FLE
++    private static ClientEncryption clientEncryption = null;
++
++    public static final String KEY_DB = "facetec-server-encryption";
++    public static final String KEY_COLLECTION = "__keyVault";
++    public static final String KEY_VAULT_NAMESPACE = KEY_DB + "." + KEY_COLLECTION;
++    public static final String KEY_ALIAS = "fle-images-encryption";
++
+     public MongoDatabase(ServerConfig serverConfig) {
+         this.serverConfig = serverConfig;
+     }
+@@ -81,6 +94,7 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
+             collection.find(query).first();
+ 
+             ensureIndexes();
++            ensureFleKey();
+ 
+             return true;
+         }
+@@ -782,12 +796,46 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
+ 
+                 ByteWrapper faceMapWrapper = new ByteWrapper(faceMapString);
+ 
+-                String auditTrailImageString = (String) data.get("auditTrailImage");
+-                if (auditTrailImageString == null) {
++                Object auditTrailImageEncryptedRaw = data.get("auditTrailImage");
++                if (auditTrailImageEncryptedRaw == null) {
+                     throw new FaceTecServerExpectedException("auditTrailImage property did not exist or was not a String.");
+                 }
+ 
+-                ByteWrapper auditTrailImageWrapper = new ByteWrapper(auditTrailImageString);
++                BsonBinary encrypted;
++
++                if (auditTrailImageEncryptedRaw instanceof Binary) {
++                    Binary bin = (Binary) auditTrailImageEncryptedRaw;
++                    encrypted = new BsonBinary(bin.getType(), bin.getData());
++                } else if (auditTrailImageEncryptedRaw instanceof BsonBinary) {
++                    encrypted = (BsonBinary) auditTrailImageEncryptedRaw;
++                } else if (auditTrailImageEncryptedRaw instanceof Document) {
++                    Document doc =  (Document) auditTrailImageEncryptedRaw;
++                    Integer type = doc.getInteger("type");
++
++                    @SuppressWarnings("unchecked")
++                    List<Integer> dataList = (List<Integer>) doc.get("data");
++
++                    byte[] bytes = new byte[dataList.size()];
++                    for (int i = 0; i < dataList.size(); i++) {
++                        bytes[i] = dataList.get(i).byteValue();
++                    }
++
++                    BsonBinarySubType subType = type != null && type == 6
++                            ? BsonBinarySubType.ENCRYPTED
++                            : BsonBinarySubType.BINARY;
++
++                    encrypted = new BsonBinary(subType, bytes);
++                } else {
++                    throw new FaceTecServerExpectedException(
++                            "auditTrailImage has unsupported type: " +
++                                    (auditTrailImageEncryptedRaw == null ? "null" : auditTrailImageEncryptedRaw.getClass().getName())
++                    );
++                }
++
++                // We can have multiple auditTrailImage stored, but we should care
++                // just about BsonBinary one.
++                byte[] auditTrailImage = this.decrypt(encrypted);
++                ByteWrapper auditTrailImageWrapper = new ByteWrapper(auditTrailImage);
+ 
+                 return new EnrollmentRecord(true, externalDatabaseRefID, objectIdStringFromRecord, faceMapWrapper, auditTrailImageWrapper);
+             }
+@@ -903,7 +951,12 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
+ 
+         try {
+             // Create an object that houses the 3D FaceMap and Response Blob.
+-            FaceMapCoreDBDataV10 faceMapCoreDBData = new FaceMapCoreDBDataV10(requestResult.getLiveness3DResult().faceMap, requestResult.getResponseBlob(), requestResult.getLiveness3DResult().auditTrailImage, requestResult.getLiveness3DResult().officialIDPhotoImage);
++            FaceMapCoreMongoDataV10 faceMapCoreDBData = new FaceMapCoreMongoDataV10(
++                    requestResult.getLiveness3DResult().faceMap,
++                    requestResult.getResponseBlob(),
++                    this.encrypt(requestResult.getLiveness3DResult().auditTrailImage),
++                    this.encrypt(requestResult.getLiveness3DResult().officialIDPhotoImage)
++            );
+             Document mainDoc = getMongoDocFromObjectWithSanitization(requestResponse, faceMapCoreDBData, "/liveness-3d");
+ 
+             // Database keys that Dashboard uses for backwards compatibility.
+@@ -947,7 +1000,7 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
+             }
+ 
+             // Create an object that houses the 3D FaceMap and Response Blob.
+-            FaceMapCoreDBDataV10 faceMapCoreDBData = new FaceMapCoreDBDataV10(faceBytes, requestResult.getResponseBlob(), requestResult.getLiveness3DResult().auditTrailImage, null);
++            FaceMapCoreMongoDataV10 faceMapCoreDBData = new FaceMapCoreMongoDataV10(faceBytes, requestResult.getResponseBlob(), this.encrypt(requestResult.getLiveness3DResult().auditTrailImage), null);
+             Document mainDoc = getMongoDocFromObjectWithSanitization(requestResponse, faceMapCoreDBData, "/enrollment-3d");
+ 
+             // Put External Database Ref ID on the record.
+@@ -977,7 +1030,7 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
+ 
+         try {
+             // Create an object that houses the Response Blob.
+-            FaceMapCoreDBDataV10 faceMapCoreDBData = new FaceMapCoreDBDataV10(null, requestResult.getResponseBlob(), requestResult.getMatch3D3DResult().auditTrailImage, null);
++            FaceMapCoreMongoDataV10 faceMapCoreDBData = new FaceMapCoreMongoDataV10(null, requestResult.getResponseBlob(), this.encrypt(requestResult.getMatch3D3DResult().auditTrailImage), null);
+             Document mainDoc = getMongoDocFromObjectWithSanitization(requestResponse, faceMapCoreDBData, "/match-3d-3d");
+ 
+             // Store Launch ID on the record to reference the Session History Data.
+@@ -1139,6 +1192,12 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
+         mongoClient.getDatabase(serverConfig.mongoDBDatabaseName).getCollection(MAIN_COLLECTION_NAME).createIndex(Indexes.ascending("externalDatabaseRefID", "success"), indexOptions);
+         mongoClient.getDatabase(serverConfig.mongoDBDatabaseName).getCollection(MAIN_COLLECTION_NAME).createIndex(Indexes.ascending("launchId"), indexOptions);
+ 
++        // FLE indexes
++        IndexOptions fleIndexOptions = new IndexOptions();
++        fleIndexOptions.unique(true);
++        fleIndexOptions.partialFilterExpression(Filters.exists("keyAltNames"));
++        mongoClient.getDatabase(KEY_DB).getCollection(KEY_COLLECTION).createIndex(Indexes.ascending("keyAltNames"), fleIndexOptions);
++
+         // FaceMap Hash Collection needs an index on the hash property for fast lookup.
+         mongoClient.getDatabase(serverConfig.mongoDBDatabaseName).getCollection(FaceMapHashTable).createIndex(Indexes.ascending(FaceMapHashKey), indexOptions);
+ 
+@@ -1146,6 +1205,84 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
+         mongoClient.getDatabase(serverConfig.mongoDBDatabaseName).getCollection(SessionRequestHashTable).createIndex(Indexes.ascending(SessionRequestHashKey), indexOptions);
+     }
+ 
++    private ClientEncryption getClientEncryption() {
++        if (clientEncryption == null) {
++            FaceTecLogging.info("-> Creating client encryption...");
++
++            MongoClientSettings mcs = MongoClientSettings
++                    .builder()
++                    .applyConnectionString(new ConnectionString(serverConfig.mongoDBURI))
++                    .build();
++
++            // https://www.mongodb.com/docs/manual/core/csfle/tutorials/aws/aws-automatic/?language-no-dependencies=java-sync#create-a-new-data-encryption-key
++            // check Authenticate with IAM Roles in Production
++            Map<String, Map<String, Object>> kmsProviders = new HashMap<>();
++            kmsProviders.put("aws", new HashMap<>());
++
++            ClientEncryptionSettings ces = ClientEncryptionSettings.builder()
++                    .keyVaultMongoClientSettings(mcs)
++                    .keyVaultNamespace(KEY_VAULT_NAMESPACE)
++                    .kmsProviders(kmsProviders)
++                    .build();
++
++            clientEncryption = ClientEncryptions.create(ces);
++        }
++
++        return clientEncryption;
++    }
++
++    private BsonBinary ensureFleKey() throws FaceTecServerExpectedException {
++        @SuppressWarnings("resource")
++        MongoClient mongoClient = createOrGetCachedMongoClient();
++
++        if (mongoClient == null) {
++            throw new FaceTecServerExpectedException("FLE keys can't be saved, because of missing connection.");
++        }
++
++        try {
++            ClientEncryption enc = getClientEncryption();
++
++            BsonDocument existing = enc.getKeyByAltName(KEY_ALIAS);
++
++            if (existing != null) {
++                return existing.getBinary("_id");
++            }
++
++            FaceTecLogging.info("-> Creating fle key " + serverConfig.fleAwsKeyArn);
++            FaceTecLogging.info("-> Creating fle region " + serverConfig.fleAwsRegion);
++
++            DataKeyOptions opts = new DataKeyOptions()
++                    .masterKey(new BsonDocument()
++                            .append("key",
++                                    new BsonString(serverConfig.fleAwsKeyArn))
++                            .append("region",
++                                    new BsonString(serverConfig.fleAwsRegion)))
++                    .keyAltNames(List.of(KEY_ALIAS));
++
++            FaceTecLogging.info("-> Creating a data key...");
++            return enc.createDataKey("aws", opts);
++        } catch (MongoException e) {
++            throw new FaceTecServerExpectedException("FLE keys can't be saved, of mongo exception: " + e.toString());
++        }
++    }
++
++    private BsonBinary encrypt(byte[] value) throws FaceTecServerExpectedException {
++        BsonBinary keyId = this.ensureFleKey();
++
++        return getClientEncryption().encrypt(
++                new BsonBinary(value),
++                new EncryptOptions("AEAD_AES_256_CBC_HMAC_SHA_512-Random")
++                        .keyId(keyId)
++        );
++    }
++
++    private byte[] decrypt(BsonBinary data) {
++        return getClientEncryption()
++                .decrypt(data)
++                .asBinary()
++                .getData();
++    }
++
+     // Wrapper function to insert a document to main collection.
+     public boolean insertDoc(Document collectionDoc) {
+         return insertDoc(collectionDoc, MAIN_COLLECTION_NAME);
+@@ -1416,7 +1553,7 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
+         return mainDoc;
+     }
+ 
+-    public Document getMongoDocFromObjectWithSanitization(SessionRequestResponse requestResponse, FaceMapCoreDBDataV10 faceMapCoreDBDataV10, String dashboardPath) {
++    public Document getMongoDocFromObjectWithSanitization(SessionRequestResponse requestResponse, FaceMapCoreMongoDataV10 faceMapCoreMongoDataV10, String dashboardPath) {
+         // Update path for Dashboard.
+         Document callData = Document.parse(FaceTecServerState.gson.toJson(requestResponse.httpCallInfo));
+         callData.put("path", dashboardPath);
+@@ -1429,7 +1566,7 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
+         sanitizeObjectFromNoticeAndUpdateDate(mainDoc, requestResponse.httpCallInfo);
+ 
+         // Get the JSON serializable object from the faceMapCoreDBData, then get the JSON, then get the document and put it on the mainDoc.
+-        mainDoc.put("data", Document.parse(FaceTecServerState.gson.toJson(faceMapCoreDBDataV10)));
++        mainDoc.put("data", Document.parse(FaceTecServerState.gson.toJson(faceMapCoreMongoDataV10)));
+ 
+         return mainDoc;
+     }
+diff --git a/src/main/java/com/facetec/facetecserver/helpers/ServerConfig.java b/src/main/java/com/facetec/facetecserver/helpers/ServerConfig.java
+index 9a0876a..4d4afce 100644
+--- a/src/main/java/com/facetec/facetecserver/helpers/ServerConfig.java
++++ b/src/main/java/com/facetec/facetecserver/helpers/ServerConfig.java
+@@ -72,6 +72,9 @@ public class ServerConfig {
+ 
+     public final FaceTecMatchLevel minimumMatchLevel3D2DMatching;
+ 
++    public final String fleAwsRegion;
++    public final String fleAwsKeyArn;
++
+     public ServerConfig(
+             String database,
+             String mongoDBURI,
+@@ -212,5 +215,8 @@ public class ServerConfig {
+         ArrayList<String> officialIDPhotoQualityValidationChecksEnabledTemp = new ArrayList<>(officialIDPhotoQualityValidationChecksEnabledStringList);
+         this.officialIDPhotoQualityValidationChecksEnabled = officialIDPhotoQualityValidationChecksEnabledTemp.toArray(new String[0]);
+         this.shouldSaveOriginalSessionRequests = shouldSaveOriginalSessionRequests;
++
++        this.fleAwsKeyArn = System.getenv("AWS_KMS_FLE_ARN");
++        this.fleAwsRegion = System.getenv("AWS_REGION");
+     }
+ }
+diff --git a/src/main/java/com/facetec/facetecserver/jsonobjects/primitives_v10/FaceMapCoreMongoDataV10.java b/src/main/java/com/facetec/facetecserver/jsonobjects/primitives_v10/FaceMapCoreMongoDataV10.java
+new file mode 100644
+index 0000000..2fc5757
+--- /dev/null
++++ b/src/main/java/com/facetec/facetecserver/jsonobjects/primitives_v10/FaceMapCoreMongoDataV10.java
+@@ -0,0 +1,27 @@
++package com.facetec.facetecserver.jsonobjects.primitives_v10;
++
++import com.facetec.facetecserver.helpers.ByteWrapper;
++import org.bson.BsonBinary;
++
++public class FaceMapCoreMongoDataV10 {
++    public String faceMap = null;
++    public String responseBlob;
++    public BsonBinary auditTrailImage;
++    public BsonBinary officialIDPhotoImage = null;
++
++    public FaceMapCoreMongoDataV10(byte[] faceMap, String responseBlob, BsonBinary auditTrailImage, BsonBinary officialIDPhotoImage) {
++        if (faceMap != null) {
++            this.faceMap = new ByteWrapper(faceMap).getBase64();
++        }
++
++        if (auditTrailImage != null) {
++            this.auditTrailImage = auditTrailImage;
++        }
++
++        this.responseBlob = responseBlob;
++
++        if (officialIDPhotoImage != null) {
++            this.officialIDPhotoImage = officialIDPhotoImage;
++        }
++    }
++}
