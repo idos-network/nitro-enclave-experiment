@@ -1,5 +1,5 @@
 import { MongoClient } from "mongodb";
-import { FACETEC_DEVICE_KEY, GROUP_NAME, MONGO_URI } from "../env.ts";
+import { GROUP_NAME, MONGO_URI } from "../env.ts";
 import { searchForDuplicates } from "../providers/api.ts";
 
 const client = new MongoClient(MONGO_URI, {
@@ -17,13 +17,10 @@ async function checkDuplicates() {
 
   const cursor = database
     .collection("Session")
-    .find(
-      { success: true },
-      { projection: { externalDatabaseRefID: 1, _id: 0 } }
-    );
+    .find({ success: true }, { projection: { externalDatabaseRefID: 1, _id: 0 } });
 
   let i = 0;
-  let problematicUserId = new Set();
+  const problematicUserId = new Set();
 
   for await (const { externalDatabaseRefID } of cursor) {
     try {
@@ -33,11 +30,7 @@ async function checkDuplicates() {
 
       i++;
 
-      const searchResult = await searchForDuplicates(
-        externalDatabaseRefID,
-        FACETEC_DEVICE_KEY,
-        GROUP_NAME,
-      );
+      const searchResult = await searchForDuplicates(externalDatabaseRefID, GROUP_NAME);
 
       if (searchResult.success && searchResult.results.length > 1) {
         searchResult.results.forEach((item) => {

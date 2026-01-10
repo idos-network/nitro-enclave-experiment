@@ -6,7 +6,7 @@ import jwt from "jsonwebtoken";
 import morgan from "morgan";
 import { JWT_PUBLIC_KEY } from "./env.ts";
 import agent from "./providers/agent.ts";
-import { fetchOrCreatePinocchioEntropy } from "./providers/db.ts";
+import { fetchOrCreatePINOCCHIOEntropy } from "./providers/db.ts";
 
 const app = express();
 
@@ -59,7 +59,7 @@ app.post("/pinocchio-entropy", async (req, res) => {
 		return res.status(400).json({ error: "Token already expired" });
 	}
 
-	const { insert, entropy } = await fetchOrCreatePinocchioEntropy(
+	const { insert, entropy } = await fetchOrCreatePINOCCHIOEntropy(
 		result.sub as string,
 	);
 

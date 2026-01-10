@@ -47,10 +47,6 @@ async function ensureKmsProviders() {
 }
 
 async function getClientEncryption() {
-	if (cacheClientEncryption) {
-		return cacheClientEncryption;
-	}
-
 	const kmsProviders = await ensureKmsProviders();
 
 	cacheClientEncryption = new ClientEncryption(client, {
@@ -129,7 +125,7 @@ export async function connectDB() {
 	};
 }
 
-export async function fetchOrCreatePinocchioEntropy(
+export async function fetchOrCreatePINOCCHIOEntropy(
 	faceSignUserId: string,
 ): Promise<{ insert: boolean; entropy: string }> {
 	const { db, encrypt, decrypt } = await connectDB();
