@@ -16,9 +16,9 @@ git clone https://github.com/aws/aws-nitro-enclaves-sdk-bootstrap.git
 ```
 
 
-### 2. Enable FUSE Filesystem Support
+### 2. Enable NBD Support
 
-Modify the kernel configuration file to enable FUSE support:
+Modify the kernel configuration file to enable NBD support:
 
 **File:** `kernel/microvm-kernel-config-x86_64` (or *appropriate* architecture-specific config)
 

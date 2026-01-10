@@ -17,13 +17,10 @@ async function checkDuplicates() {
 
   const cursor = database
     .collection("Session")
-    .find(
-      { success: true },
-      { projection: { externalDatabaseRefID: 1, _id: 0 } }
-    );
+    .find({ success: true }, { projection: { externalDatabaseRefID: 1, _id: 0 } });
 
   let i = 0;
-  let problematicUserId = new Set();
+  const problematicUserId = new Set();
 
   for await (const { externalDatabaseRefID } of cursor) {
     try {
