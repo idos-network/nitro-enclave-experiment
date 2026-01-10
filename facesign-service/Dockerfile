@@ -95,6 +95,10 @@ ARG AWS_KMS_SECRETS_FACETEC_KEY_ID
 RUN if [ -z "$AWS_KMS_SECRETS_FACETEC_KEY_ID" ]; then (echo "AWS_KMS_SECRETS_FACETEC_KEY_ID must be provided as a --build-arg"; exit 1); fi
 RUN echo $AWS_KMS_SECRETS_FACETEC_KEY_ID > ./secrets_facetec_key.arn
 
+ARG AWS_KMS_JWT_KEY_ID
+RUN if [ -z "$AWS_KMS_JWT_KEY_ID" ]; then (echo "AWS_KMS_JWT_KEY_ID must be provided as a --build-arg"; exit 1); fi
+RUN echo $AWS_KMS_JWT_KEY_ID > ./jwt_key.arn
+
 RUN npm install -g pm2
 
 COPY ./facetec-sdk/facetec_usage_logs_server/ ./facetec_usage_logs_server/

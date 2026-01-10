@@ -5,7 +5,7 @@ import {
 } from "@aws-sdk/client-cloudwatch";
 
 const cw = new CloudWatchClient({ region: "eu-west-1" });
-const namespace = "Enclave/Metrics";
+const namespace = `Enclave${process.env.PREFIX}/Metrics`;
 
 // {"type":"os","data":{"loadavg":0,"memUsed":21461041152,"memTotal":37063122944}}
 

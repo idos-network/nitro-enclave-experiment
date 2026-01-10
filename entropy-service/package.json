@@ -1,0 +1,42 @@
+{
+	"name": "entropy-service",
+	"version": "1.0.0",
+	"description": "",
+	"license": "ISC",
+	"author": "",
+	"type": "module",
+	"main": "index.js",
+	"scripts": {
+		"start": "node index.ts",
+		"types": "tsc --noEmit",
+		"test": "vitest",
+		"format": "npx @biomejs/biome check --write",
+		"format:ci": "npx @biomejs/biome ci"
+	},
+	"dependencies": {
+		"@aws-sdk/credential-provider-node": "^3.907.0",
+		"@scure/bip39": "^2.0.1",
+		"@types/morgan": "^1.9.10",
+		"cors": "^2.8.5",
+		"express": "^5.1.0",
+		"helmet": "^8.1.0",
+		"jsonwebtoken": "^9.0.2",
+		"mongodb": "^6.19.0",
+		"mongodb-client-encryption": "^6.5.0",
+		"morgan": "^1.10.1",
+		"pm2": "^6.0.13",
+		"save-dev": "^0.0.1-security"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.2.5",
+		"@types/cors": "^2.8.19",
+		"@types/express": "^5.0.3",
+		"@types/jsonwebtoken": "^9.0.10",
+		"@types/mongodb": "^4.0.6",
+		"@types/node": "^24.7.0",
+		"@types/supertest": "^6.0.3",
+		"supertest": "^7.0.0",
+		"typescript": "^5.9.3",
+		"vitest": "^2.1.8"
+	}
+}

@@ -1,6 +1,6 @@
-import { searchForDuplicates } from "../providers/api.ts";
-import { GROUP_NAME, FACETEC_DEVICE_KEY, MONGO_URI } from "../env.ts";
 import { MongoClient } from "mongodb";
+import { FACETEC_DEVICE_KEY, GROUP_NAME, MONGO_URI } from "../env.ts";
+import { searchForDuplicates } from "../providers/api.ts";
 
 const client = new MongoClient(MONGO_URI, {
   maxPoolSize: 10,
