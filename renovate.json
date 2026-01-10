@@ -2,5 +2,26 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended"
-  ]
+  ],
+  "prConcurrentLimit": 5,
+  "baseBranchPatterns": [
+    "master"
+  ],
+  "assignees": [
+    "@strnadj"
+  ],
+  "schedule": [
+    "before 6am on the first day of the month"
+  ],
+  "vulnerabilityAlerts": {
+    "labels": [
+      "dependencies",
+      "security"
+    ],
+    "assignees": [
+      "@strnadj",
+      "@pkoch"
+    ],
+    "schedule": "at any time"
+  },
 }
