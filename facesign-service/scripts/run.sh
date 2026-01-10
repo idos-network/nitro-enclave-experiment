@@ -144,7 +144,7 @@ fi
 
 echo "Ensure folder exists for caddy"
 mkdir -p /mnt/encrypted/caddy
-mkdir -p  /mnt/encrypted/caddy/acme/acme-staging-v02.api.letsencrypt.org-directory/users/deployers@idos.network/
+mkdir -p  /mnt/encrypted/caddy/acme/acme-staging-v02.api.letsencrypt.org-directory/users/deployers@fractal.id/
 
 # Set-up facesing service
 echo "Fetching key 1 public multibase from S3"
@@ -164,6 +164,14 @@ if [ ! -f "./$HOSTNAME_FILE" ]; then
 fi
 HOST=$(cat ./$HOSTNAME_FILE)
 sed -i "s#export const HOST = \"INSERT YOUR HOST HERE\";#export const HOST = \"${HOST//&/\\&}\";#" ./facesign-service/env.ts
+
+echo "Fetching Caddyfile from S3"
+CADDYFILE=Caddyfile
+aws s3 cp "s3://$S3_SECRETS_BUCKET/$CADDYFILE-facesign" "./$CADDYFILE" --region eu-west-1
+if [ ! -f "./$CADDYFILE" ]; then
+  echo "Couldn't download $CADDYFILE from S3, exiting"
+  exit 1
+fi
 
 echo "Running PM2-runtime"
 export HOME=/home/FaceTec_Custom_Server
