@@ -14,7 +14,8 @@ import agent from "./providers/agent.ts";
 import { FaceTecError, getStatus, SessionStartError } from "./providers/api.ts";
 import login from "./routes/login.ts";
 import match from "./routes/match.ts";
-import pinocchio from "./routes/pinocchio.ts";
+import pinocchioEnroll from "./routes/pinocchio-enroll.ts";
+import pinocchioLogin from "./routes/pinocchio-login.ts";
 
 const app = express();
 
@@ -29,7 +30,10 @@ app.get("/", (_req, res) => {
 
 app.get("/health", async (_req, res) => {
   const status = await getStatus();
-  res.status(200).json({ status: "ok", version: status.serverInfo.facetecServerWebserviceVersion });
+  res.status(200).json({
+    status: "ok",
+    version: status.serverInfo.facetecServerWebserviceVersion,
+  });
 });
 
 export const asyncHandler = (
@@ -42,7 +46,8 @@ export const asyncHandler = (
 };
 
 app.post("/login", asyncHandler(login));
-app.post("/pinocchio", asyncHandler(pinocchio));
+app.post("/pinocchio/login", asyncHandler(pinocchioLogin));
+app.post("/pinocchio/enroll", asyncHandler(pinocchioEnroll));
 app.post("/match", asyncHandler(match));
 
 // idOS issuer information for VCs
