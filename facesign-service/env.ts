@@ -1,6 +1,7 @@
 export const GROUP_NAME = "facesign-users";
 export const PINOCCHIO_GROUP_NAME = "pinocchio-users";
-export const FACETEC_SERVER = process.env.FACETEC_SERVER ?? "http://127.0.0.1:5000/";
+export const FACETEC_SERVER =
+  process.env.FACETEC_SERVER ?? "http://127.0.0.1:5000/";
 export const MONGO_URI = "INSERT YOUR MONGO URL HERE";
 export const DB_COLLECTION_NAME = "faceSignGroupMembers";
 export const DB_NAME = "face-sign-data";
@@ -9,3 +10,4 @@ export const FACETEC_SESSION_COLLECTION = "Session";
 export const KEY_1_MULTIBASE_PUBLIC_PATH = "./multibase_key_1_public.txt";
 export const HOST = "INSERT YOUR HOST HERE";
 export const JWT_PRIVATE_KEY = "./jwt_token_private.pem";
+export const JWT_PUBLIC_KEY = "./jwt_token_public.pem";

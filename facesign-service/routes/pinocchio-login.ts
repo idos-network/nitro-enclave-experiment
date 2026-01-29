@@ -6,7 +6,10 @@ import jwt from "jsonwebtoken";
 import { JWT_PRIVATE_KEY, PINOCCHIO_GROUP_NAME } from "../env.ts";
 import agent from "../providers/agent.ts";
 import { enrollment3d, searchForDuplicates } from "../providers/api.ts";
-import { countMembersInGroup, getOldestFaceSignUserId } from "../providers/db.ts";
+import {
+  countMembersInGroup,
+  getOldestFaceSignUserId,
+} from "../providers/db.ts";
 
 // PINOCCHIO Login - Check if user exists and return token for existing users
 export default async function handler(req: Request, res: Response) {
@@ -15,11 +18,8 @@ export default async function handler(req: Request, res: Response) {
   const { requestBlob, faceVector = false } = req.body;
 
   // First check if liveness is proven
-  const { success, result, responseBlob, didError, additionalSessionData } = await enrollment3d(
-    faceSignUserId,
-    requestBlob,
-    faceVector,
-  );
+  const { success, result, responseBlob, didError, additionalSessionData } =
+    await enrollment3d(faceSignUserId, requestBlob, faceVector);
 
   // Always return required fields for SDK
   const alwaysToReturn = {
@@ -39,25 +39,33 @@ export default async function handler(req: Request, res: Response) {
 
     return res.status(400).json({
       ...alwaysToReturn,
-      errorMessage: "Liveness check or enrollment 3D failed and was not processed.",
+      errorMessage:
+        "Liveness check or enrollment 3D failed and was not processed.",
     });
   }
 
   // Search for 3d-db duplicates
   let results: { identifier: string; matchLevel: number }[] = [];
 
-  const searchResult = await searchForDuplicates(faceSignUserId, PINOCCHIO_GROUP_NAME);
+  const searchResult = await searchForDuplicates(
+    faceSignUserId,
+    PINOCCHIO_GROUP_NAME,
+  );
 
   if (searchResult.success) {
     results = searchResult.results;
   } else if (
     searchResult.error &&
-    searchResult.errorMessage?.includes("groupName when that groupName does not exist")
+    searchResult.errorMessage?.includes(
+      "groupName when that groupName does not exist",
+    )
   ) {
     // Check if group exists in DB, if yes, we have a problem (most likely recovery from corrupted FS)
     const memberCount = await countMembersInGroup(PINOCCHIO_GROUP_NAME);
     if (memberCount > 0) {
-      throw new Error("Group exists in our DB, but not in 3d-db, this should never happen.");
+      throw new Error(
+        "Group exists in our DB, but not in 3d-db, this should never happen.",
+      );
     }
 
     console.log("Group does not exist yet, user needs to enroll first.");
@@ -74,9 +82,20 @@ export default async function handler(req: Request, res: Response) {
       identifier: faceSignUserId,
     });
 
+    // Issue a short-lived confirmation token for enrollment
+    const confirmationToken = jwt.sign(
+      { sub: faceSignUserId, purpose: "enrollment_confirmation" },
+      readFileSync(JWT_PRIVATE_KEY, "utf-8"),
+      {
+        algorithm: "ES512",
+        expiresIn: "5m",
+      },
+    );
+
     return res.status(200).json({
       ...alwaysToReturn,
       isNewUser: true,
+      token: confirmationToken,
     });
   }
 
@@ -87,12 +106,18 @@ export default async function handler(req: Request, res: Response) {
   });
 
   // Choose the "first" one (oldest one)
-  const existingUserId = await getOldestFaceSignUserId(results.map((x) => x.identifier));
+  const existingUserId = await getOldestFaceSignUserId(
+    results.map((x) => x.identifier),
+  );
 
   // Issue JWT token
-  const token = jwt.sign({ sub: existingUserId }, readFileSync(JWT_PRIVATE_KEY, "utf-8"), {
-    algorithm: "ES512",
-  });
+  const token = jwt.sign(
+    { sub: existingUserId },
+    readFileSync(JWT_PRIVATE_KEY, "utf-8"),
+    {
+      algorithm: "ES512",
+    },
+  );
 
   return res.status(201).json({
     ...alwaysToReturn,

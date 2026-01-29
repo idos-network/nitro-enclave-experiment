@@ -12,6 +12,7 @@ import morgan from "morgan";
 import { HOST, KEY_1_MULTIBASE_PUBLIC_PATH } from "./env.ts";
 import agent from "./providers/agent.ts";
 import { FaceTecError, getStatus, SessionStartError } from "./providers/api.ts";
+import { verifyEnrollmentToken } from "./middleware/verifyJwt.ts";
 import login from "./routes/login.ts";
 import match from "./routes/match.ts";
 import pinocchioEnroll from "./routes/pinocchio-enroll.ts";
@@ -47,7 +48,11 @@ export const asyncHandler = (
 
 app.post("/login", asyncHandler(login));
 app.post("/pinocchio/login", asyncHandler(pinocchioLogin));
-app.post("/pinocchio/enroll", asyncHandler(pinocchioEnroll));
+app.post(
+  "/pinocchio/enroll",
+  verifyEnrollmentToken,
+  asyncHandler(pinocchioEnroll),
+);
 app.post("/match", asyncHandler(match));
 
 // idOS issuer information for VCs
@@ -61,7 +66,10 @@ app.get("/idos/issuers/1", (_req, res) => {
 });
 
 app.get("/idos/keys/1", (_req, res) => {
-  const publicKeyMultibase = readFileSync(KEY_1_MULTIBASE_PUBLIC_PATH, "utf-8").trim();
+  const publicKeyMultibase = readFileSync(
+    KEY_1_MULTIBASE_PUBLIC_PATH,
+    "utf-8",
+  ).trim();
   res.status(200).send(publicKeyMultibase);
 });
 

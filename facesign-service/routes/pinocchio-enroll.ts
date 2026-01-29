@@ -1,25 +1,30 @@
-import crypto from "node:crypto";
 import { readFileSync } from "node:fs";
 import type { Request, Response } from "express";
 import jwt from "jsonwebtoken";
 
 import { JWT_PRIVATE_KEY, PINOCCHIO_GROUP_NAME } from "../env.ts";
 import agent from "../providers/agent.ts";
-import { enrollment3d, enrollUser, searchForDuplicates } from "../providers/api.ts";
-import { countMembersInGroup, getOldestFaceSignUserId, insertMember } from "../providers/db.ts";
+import {
+  enrollment3d,
+  enrollUser,
+  searchForDuplicates,
+} from "../providers/api.ts";
+import {
+  countMembersInGroup,
+  getOldestFaceSignUserId,
+  insertMember,
+} from "../providers/db.ts";
 
-// PINOCCHIO Enroll - Enroll a new user
+// PINOCCHIO Enroll - Enroll a new user (requires valid enrollment confirmation token)
 export default async function handler(req: Request, res: Response) {
-  const faceSignUserId: string = crypto.randomUUID();
+  // faceSignUserId comes from the verified JWT token (set by middleware)
+  const faceSignUserId = req.user!.sub;
 
   const { requestBlob, faceVector = false } = req.body;
 
   // First check if liveness is proven
-  const { success, result, responseBlob, didError, additionalSessionData } = await enrollment3d(
-    faceSignUserId,
-    requestBlob,
-    faceVector,
-  );
+  const { success, result, responseBlob, didError, additionalSessionData } =
+    await enrollment3d(faceSignUserId, requestBlob, faceVector);
 
   // Always return required fields for SDK
   const alwaysToReturn = {
@@ -39,25 +44,33 @@ export default async function handler(req: Request, res: Response) {
 
     return res.status(400).json({
       ...alwaysToReturn,
-      errorMessage: "Liveness check or enrollment 3D failed and was not processed.",
+      errorMessage:
+        "Liveness check or enrollment 3D failed and was not processed.",
     });
   }
 
   // Search for 3d-db duplicates to check if user already exists
   let results: { identifier: string; matchLevel: number }[] = [];
 
-  const searchResult = await searchForDuplicates(faceSignUserId, PINOCCHIO_GROUP_NAME);
+  const searchResult = await searchForDuplicates(
+    faceSignUserId,
+    PINOCCHIO_GROUP_NAME,
+  );
 
   if (searchResult.success) {
     results = searchResult.results;
   } else if (
     searchResult.error &&
-    searchResult.errorMessage?.includes("groupName when that groupName does not exist")
+    searchResult.errorMessage?.includes(
+      "groupName when that groupName does not exist",
+    )
   ) {
     // Check if group exists in DB, if yes, we have a problem (most likely recovery from corrupted FS)
     const memberCount = await countMembersInGroup(PINOCCHIO_GROUP_NAME);
     if (memberCount > 0) {
-      throw new Error("Group exists in our DB, but not in 3d-db, this should never happen.");
+      throw new Error(
+        "Group exists in our DB, but not in 3d-db, this should never happen.",
+      );
     }
 
     console.log("Group does not exist, creating one by enrolling first user.");
@@ -75,11 +88,17 @@ export default async function handler(req: Request, res: Response) {
       count: results.length,
     });
 
-    const existingUserId = await getOldestFaceSignUserId(results.map((x) => x.identifier));
+    const existingUserId = await getOldestFaceSignUserId(
+      results.map((x) => x.identifier),
+    );
 
-    const token = jwt.sign({ sub: existingUserId }, readFileSync(JWT_PRIVATE_KEY, "utf-8"), {
-      algorithm: "ES512",
-    });
+    const token = jwt.sign(
+      { sub: existingUserId },
+      readFileSync(JWT_PRIVATE_KEY, "utf-8"),
+      {
+        algorithm: "ES512",
+      },
+    );
 
     return res.status(200).json({
       ...alwaysToReturn,
@@ -96,9 +115,13 @@ export default async function handler(req: Request, res: Response) {
   await insertMember(PINOCCHIO_GROUP_NAME, faceSignUserId);
 
   // Issue JWT token
-  const token = jwt.sign({ sub: faceSignUserId }, readFileSync(JWT_PRIVATE_KEY, "utf-8"), {
-    algorithm: "ES512",
-  });
+  const token = jwt.sign(
+    { sub: faceSignUserId },
+    readFileSync(JWT_PRIVATE_KEY, "utf-8"),
+    {
+      algorithm: "ES512",
+    },
+  );
 
   return res.status(201).json({
     ...alwaysToReturn,

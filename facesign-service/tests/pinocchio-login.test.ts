@@ -74,7 +74,7 @@ describe("Pinocchio Login API", () => {
     });
   });
 
-  it("new user returns isNewUser without token", async () => {
+  it("new user returns isNewUser with confirmation token", async () => {
     vi.spyOn(global, "fetch").mockImplementation(async (url) => {
       if (url.toString().endsWith("/process-request")) {
         return {
@@ -120,10 +120,18 @@ describe("Pinocchio Login API", () => {
       result: { livenessProven: true },
       success: true,
       isNewUser: true,
+      token: expect.any(String),
     });
 
-    // Should NOT have token or faceSignUserId
-    expect(response.body.token).toBeUndefined();
+    // Verify the confirmation token
+    const decoded = jwt.verify(response.body.token, publicKey, {
+      algorithms: ["ES512"],
+    }) as { sub: string; purpose: string; exp: number };
+    expect(decoded.sub).toEqual(expect.any(String));
+    expect(decoded.purpose).toBe("enrollment_confirmation");
+    expect(decoded.exp).toBeDefined(); // Token should expire
+
+    // Should NOT have faceSignUserId in response (only in token)
     expect(response.body.faceSignUserId).toBeUndefined();
 
     expect(agentSpy).toHaveBeenCalledWith("pinocchio-login-new-user", {
@@ -157,7 +165,8 @@ describe("Pinocchio Login API", () => {
 
     expect(response.status).toBe(400);
     expect(response.body).toEqual({
-      errorMessage: "Liveness check or enrollment 3D failed and was not processed.",
+      errorMessage:
+        "Liveness check or enrollment 3D failed and was not processed.",
       success: false,
       didError: true,
       responseBlob: "mock-scan-result-blob",
@@ -206,7 +215,9 @@ describe("Pinocchio Login API", () => {
     });
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
-    const oldestSpy = vi.spyOn(db, "getOldestFaceSignUserId").mockResolvedValue(resultId);
+    const oldestSpy = vi
+      .spyOn(db, "getOldestFaceSignUserId")
+      .mockResolvedValue(resultId);
 
     const response = await request(app).post("/pinocchio/login").send({
       requestBlob: "test-face-scan",
@@ -281,7 +292,9 @@ describe("Pinocchio Login API", () => {
 
     const insertMemberSpy = vi.spyOn(db, "insertMember");
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
-    const oldestSpy = vi.spyOn(db, "getOldestFaceSignUserId").mockResolvedValue(resultId3);
+    const oldestSpy = vi
+      .spyOn(db, "getOldestFaceSignUserId")
+      .mockResolvedValue(resultId3);
 
     const response = await request(app).post("/pinocchio/login").send({
       requestBlob: "test-face-scan",

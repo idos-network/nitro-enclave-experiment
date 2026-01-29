@@ -11,12 +11,33 @@ const { privateKey, publicKey } = generateKeyPairSync("ec", {
   publicKeyEncoding: { type: "spki", format: "pem" },
 });
 
+// Helper to create a valid confirmation token for tests
+function createConfirmationToken(
+  faceSignUserId: string,
+  options?: { expired?: boolean },
+) {
+  return jwt.sign(
+    { sub: faceSignUserId, purpose: "enrollment_confirmation" },
+    privateKey,
+    {
+      algorithm: "ES512",
+      expiresIn: options?.expired ? "-1s" : "5m",
+    },
+  );
+}
+
 vi.mock("fs", async () => {
   const actualFs = await vi.importActual<typeof import("fs")>("fs");
 
   return {
     ...actualFs,
-    readFileSync: vi.fn(() => privateKey),
+    readFileSync: vi.fn((path: string) => {
+      // Return public key for verification, private key for signing
+      if (path.includes("public")) {
+        return publicKey;
+      }
+      return privateKey;
+    }),
   };
 });
 
@@ -45,13 +66,85 @@ describe("Pinocchio Enroll API", () => {
       }),
     } as any);
 
-    const response = await request(app).post("/pinocchio/enroll").send({
-      requestBlob: "test-face-scan",
-    });
+    const faceSignUserId = crypto.randomUUID();
+    const token = createConfirmationToken(faceSignUserId);
+
+    const response = await request(app)
+      .post("/pinocchio/enroll")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        requestBlob: "test-face-scan",
+      });
 
     expect(response.status).toBe(200);
     expect(response.body.responseBlob).toBe("mock-session-result-blob");
     expect(response.body.sessionStart).toBe(true);
+  });
+
+  it("rejects request without authorization header", async () => {
+    const response = await request(app).post("/pinocchio/enroll").send({
+      requestBlob: "test-face-scan",
+    });
+
+    expect(response.status).toBe(401);
+    expect(response.body).toEqual({
+      success: false,
+      errorMessage: "Missing or invalid Authorization header",
+    });
+  });
+
+  it("rejects request with invalid token", async () => {
+    const response = await request(app)
+      .post("/pinocchio/enroll")
+      .set("Authorization", "Bearer invalid-token")
+      .send({
+        requestBlob: "test-face-scan",
+      });
+
+    expect(response.status).toBe(401);
+    expect(response.body).toEqual({
+      success: false,
+      errorMessage: "Invalid token",
+    });
+  });
+
+  it("rejects request with expired token", async () => {
+    const faceSignUserId = crypto.randomUUID();
+    const token = createConfirmationToken(faceSignUserId, { expired: true });
+
+    const response = await request(app)
+      .post("/pinocchio/enroll")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        requestBlob: "test-face-scan",
+      });
+
+    expect(response.status).toBe(401);
+    expect(response.body).toEqual({
+      success: false,
+      errorMessage: "Token has expired",
+    });
+  });
+
+  it("rejects request with wrong token purpose", async () => {
+    // Create a token without the enrollment_confirmation purpose
+    const faceSignUserId = crypto.randomUUID();
+    const wrongPurposeToken = jwt.sign({ sub: faceSignUserId }, privateKey, {
+      algorithm: "ES512",
+    });
+
+    const response = await request(app)
+      .post("/pinocchio/enroll")
+      .set("Authorization", `Bearer ${wrongPurposeToken}`)
+      .send({
+        requestBlob: "test-face-scan",
+      });
+
+    expect(response.status).toBe(401);
+    expect(response.body).toEqual({
+      success: false,
+      errorMessage: "Invalid token purpose",
+    });
   });
 
   it("fail with error", async () => {
@@ -62,9 +155,15 @@ describe("Pinocchio Enroll API", () => {
       text: async () => "Server error",
     } as any);
 
-    const response = await request(app).post("/pinocchio/enroll").send({
-      requestBlob: "test-face-scan",
-    });
+    const faceSignUserId = crypto.randomUUID();
+    const token = createConfirmationToken(faceSignUserId);
+
+    const response = await request(app)
+      .post("/pinocchio/enroll")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        requestBlob: "test-face-scan",
+      });
 
     expect(response.status).toBe(500);
     expect(response.body).toEqual({
@@ -76,36 +175,41 @@ describe("Pinocchio Enroll API", () => {
   });
 
   it("new user enrolls and returns token", async () => {
-    const spyFetch = vi.spyOn(global, "fetch").mockImplementation(async (url) => {
-      if (url.toString().endsWith("/process-request")) {
+    const faceSignUserId = crypto.randomUUID();
+    const confirmationToken = createConfirmationToken(faceSignUserId);
+
+    const spyFetch = vi
+      .spyOn(global, "fetch")
+      .mockImplementation(async (url) => {
+        if (url.toString().endsWith("/process-request")) {
+          return {
+            ok: true,
+            json: async () => ({
+              success: true,
+              result: { livenessProven: true },
+              didError: false,
+              responseBlob: "mock-scan-result-blob",
+            }),
+          } as any;
+        }
+
+        if (url.toString().endsWith("3d-db/search")) {
+          return {
+            ok: true,
+            json: async () => ({
+              success: true,
+              results: [],
+            }),
+          } as any;
+        }
+
         return {
           ok: true,
           json: async () => ({
             success: true,
-            result: { livenessProven: true },
-            didError: false,
-            responseBlob: "mock-scan-result-blob",
           }),
         } as any;
-      }
-
-      if (url.toString().endsWith("3d-db/search")) {
-        return {
-          ok: true,
-          json: async () => ({
-            success: true,
-            results: [],
-          }),
-        } as any;
-      }
-
-      return {
-        ok: true,
-        json: async () => ({
-          success: true,
-        }),
-      } as any;
-    });
+      });
 
     const insertMemberSpy = vi.spyOn(db, "insertMember").mockResolvedValue({
       acknowledged: true,
@@ -114,14 +218,17 @@ describe("Pinocchio Enroll API", () => {
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
-    const response = await request(app).post("/pinocchio/enroll").send({
-      requestBlob: "test-face-scan",
-    });
+    const response = await request(app)
+      .post("/pinocchio/enroll")
+      .set("Authorization", `Bearer ${confirmationToken}`)
+      .send({
+        requestBlob: "test-face-scan",
+      });
 
     expect(response.status).toBe(201);
     expect(response.body).toEqual({
       didError: false,
-      faceSignUserId: expect.any(String),
+      faceSignUserId,
       responseBlob: "mock-scan-result-blob",
       result: { livenessProven: true },
       success: true,
@@ -129,19 +236,20 @@ describe("Pinocchio Enroll API", () => {
       token: expect.any(String),
     });
 
-    // Verify the JWT token
+    // Verify the JWT token (should be a regular auth token, not confirmation)
     const decoded = jwt.verify(response.body.token, publicKey, {
       algorithms: ["ES512"],
-    });
-    expect(decoded.sub).toBe(response.body.faceSignUserId);
+    }) as { sub: string; purpose?: string };
+    expect(decoded.sub).toBe(faceSignUserId);
+    expect(decoded.purpose).toBeUndefined(); // Auth token, not confirmation
 
-    // Enrollment spy
+    // Enrollment spy - should use the faceSignUserId from the token
     const processRequestCall = spyFetch.mock.calls.find((call) =>
       call[0].toString().endsWith("/process-request"),
     );
     expect(processRequestCall).toBeDefined();
     expect(JSON.parse(processRequestCall?.[1]?.body as string)).toMatchObject({
-      externalDatabaseRefID: response.body.faceSignUserId,
+      externalDatabaseRefID: faceSignUserId,
       requestBlob: "test-face-scan",
     });
 
@@ -151,19 +259,25 @@ describe("Pinocchio Enroll API", () => {
     );
     expect(duplicateCall).toBeDefined();
     expect(JSON.parse(duplicateCall?.[1]?.body as string)).toMatchObject({
-      externalDatabaseRefID: response.body.faceSignUserId,
+      externalDatabaseRefID: faceSignUserId,
       groupName: "pinocchio-users",
       minMatchLevel: 15,
     });
 
     expect(agentSpy).toHaveBeenCalledWith("pinocchio-enroll-new-user", {
-      identifier: response.body.faceSignUserId,
+      identifier: faceSignUserId,
     });
 
-    expect(insertMemberSpy).toHaveBeenCalledWith("pinocchio-users", response.body.faceSignUserId);
+    expect(insertMemberSpy).toHaveBeenCalledWith(
+      "pinocchio-users",
+      faceSignUserId,
+    );
   });
 
   it("failing liveness", async () => {
+    const faceSignUserId = crypto.randomUUID();
+    const confirmationToken = createConfirmationToken(faceSignUserId);
+
     vi.spyOn(global, "fetch").mockImplementation(async (url) => {
       if (url.toString().endsWith("/process-request")) {
         return {
@@ -180,13 +294,17 @@ describe("Pinocchio Enroll API", () => {
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
-    const response = await request(app).post("/pinocchio/enroll").send({
-      requestBlob: "test-face-scan",
-    });
+    const response = await request(app)
+      .post("/pinocchio/enroll")
+      .set("Authorization", `Bearer ${confirmationToken}`)
+      .send({
+        requestBlob: "test-face-scan",
+      });
 
     expect(response.status).toBe(400);
     expect(response.body).toEqual({
-      errorMessage: "Liveness check or enrollment 3D failed and was not processed.",
+      errorMessage:
+        "Liveness check or enrollment 3D failed and was not processed.",
       success: false,
       didError: true,
       responseBlob: "mock-scan-result-blob",
@@ -201,6 +319,8 @@ describe("Pinocchio Enroll API", () => {
   });
 
   it("existing user returns their existing ID and token without re-enrolling", async () => {
+    const faceSignUserId = crypto.randomUUID();
+    const confirmationToken = createConfirmationToken(faceSignUserId);
     const resultId = crypto.randomUUID();
 
     vi.spyOn(global, "fetch").mockImplementation(async (url) => {
@@ -235,12 +355,17 @@ describe("Pinocchio Enroll API", () => {
     });
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
-    const oldestSpy = vi.spyOn(db, "getOldestFaceSignUserId").mockResolvedValue(resultId);
+    const oldestSpy = vi
+      .spyOn(db, "getOldestFaceSignUserId")
+      .mockResolvedValue(resultId);
     const insertMemberSpy = vi.spyOn(db, "insertMember");
 
-    const response = await request(app).post("/pinocchio/enroll").send({
-      requestBlob: "test-face-scan",
-    });
+    const response = await request(app)
+      .post("/pinocchio/enroll")
+      .set("Authorization", `Bearer ${confirmationToken}`)
+      .send({
+        requestBlob: "test-face-scan",
+      });
 
     // Verify the JWT token
     const decoded = jwt.verify(response.body.token, publicKey, {
@@ -271,6 +396,8 @@ describe("Pinocchio Enroll API", () => {
   });
 
   it("existing user with multiple matches returns oldest without re-enrolling", async () => {
+    const faceSignUserId = crypto.randomUUID();
+    const confirmationToken = createConfirmationToken(faceSignUserId);
     const resultId = crypto.randomUUID();
     const resultId2 = crypto.randomUUID();
     const resultId3 = crypto.randomUUID();
@@ -312,11 +439,16 @@ describe("Pinocchio Enroll API", () => {
 
     const insertMemberSpy = vi.spyOn(db, "insertMember");
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
-    const oldestSpy = vi.spyOn(db, "getOldestFaceSignUserId").mockResolvedValue(resultId3);
+    const oldestSpy = vi
+      .spyOn(db, "getOldestFaceSignUserId")
+      .mockResolvedValue(resultId3);
 
-    const response = await request(app).post("/pinocchio/enroll").send({
-      requestBlob: "test-face-scan",
-    });
+    const response = await request(app)
+      .post("/pinocchio/enroll")
+      .set("Authorization", `Bearer ${confirmationToken}`)
+      .send({
+        requestBlob: "test-face-scan",
+      });
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
