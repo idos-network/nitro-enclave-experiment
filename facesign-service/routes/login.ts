@@ -1,15 +1,21 @@
 import crypto from "node:crypto";
+import { readFileSync } from "node:fs";
 import type { Request, Response } from "express";
-import { GROUP_NAME } from "../env.ts";
+import { GROUP_NAME, JWT_PRIVATE_KEY } from "../env.ts";
 import agent from "../providers/agent.ts";
-
 import { enrollment3d, enrollUser, searchForDuplicates } from "../providers/api.ts";
 import { countMembersInGroup, insertMember } from "../providers/db.ts";
+import { faceSignWalletLogin } from "../providers/facesign.ts";
 
 export default async function handler(req: Request, res: Response) {
   let faceSignUserId: string = crypto.randomUUID();
 
-  const { requestBlob, groupName = GROUP_NAME, faceVector = true } = req.body;
+  const {
+    requestBlob,
+    groupName = GROUP_NAME,
+    faceVector = true,
+    onboardFaceSignWallet = false,
+  } = req.body;
 
   // First check if liveness is proven
   const { success, result, responseBlob, didError, additionalSessionData } = await enrollment3d(
@@ -92,8 +98,35 @@ export default async function handler(req: Request, res: Response) {
     faceSignUserId = results[0]?.identifier!;
   }
 
+  let faceSignWallet: {
+    newUser: boolean;
+    faceSignUserId: string;
+    entropyToken?: string | undefined;
+  } | null = null;
+
+  // If we want token and onboard user in facesign wallet group
+  if (onboardFaceSignWallet) {
+    const {
+      newUser: walletNewUser,
+      faceSignUserId: walletUserId,
+      entropyToken,
+    } = await faceSignWalletLogin(
+      faceSignUserId,
+      true, // Enroll if new, we want the user to be enrolled in facesign-wallet-users group, there is no confirmation
+    );
+
+    faceSignWallet = {
+      newUser: walletNewUser,
+      faceSignUserId: walletUserId,
+      entropyToken,
+    };
+  }
+
   return res.status(201).json({
     ...alwaysToReturn,
     faceSignUserId,
+
+    // In case of onboarding to FaceSignWallet
+    faceSignWallet,
   });
 }
