@@ -103,6 +103,7 @@ describe("Login API", () => {
       faceSignUserId: expect.any(String),
       responseBlob: "mock-scan-result-blob",
       result: { livenessProven: true },
+      faceSignWallet: null,
       success: true,
     });
 
@@ -173,6 +174,7 @@ describe("Login API", () => {
       faceSignUserId: expect.any(String),
       responseBlob: "mock-scan-result-blob",
       success: true,
+      faceSignWallet: null,
       result: { livenessProven: true },
     });
 
@@ -285,6 +287,7 @@ describe("Login API", () => {
       responseBlob: "mock-scan-result-blob",
       result: { livenessProven: true },
       success: true,
+      faceSignWallet: null,
       didError: false,
     });
 

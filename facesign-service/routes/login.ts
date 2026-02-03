@@ -17,6 +17,10 @@ export default async function handler(req: Request, res: Response) {
     onboardFaceSignWallet = false,
   } = req.body;
 
+  if (faceVector && onboardFaceSignWallet) {
+    throw new Error("Cannot request face vector and onboard to FaceSign Wallet at the same time.");
+  }
+
   // First check if liveness is proven
   const { success, result, responseBlob, didError, additionalSessionData } = await enrollment3d(
     faceSignUserId,

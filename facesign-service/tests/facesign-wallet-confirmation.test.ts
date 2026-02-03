@@ -3,9 +3,8 @@ import { generateKeyPairSync } from "node:crypto";
 import jwt from "jsonwebtoken";
 import request from "supertest";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import agent from "../providers/agent.ts";
 
-const { privateKey, publicKey } = generateKeyPairSync("ec", {
+const { privateKey } = generateKeyPairSync("ec", {
   namedCurve: "secp521r1",
   privateKeyEncoding: { type: "pkcs8", format: "pem" },
   publicKeyEncoding: { type: "spki", format: "pem" },
@@ -138,7 +137,7 @@ describe("FaceSign wallet Confirmation API", () => {
   it("everything ok", async () => {
     const userId = crypto.randomUUID();
 
-    vi.spyOn(global, "fetch").mockImplementation(async (url) => {
+    const spyFetch = vi.spyOn(global, "fetch").mockImplementation(async (url) => {
       if (url.toString().endsWith("3d-db/search")) {
         return {
           ok: true,
@@ -185,5 +184,15 @@ describe("FaceSign wallet Confirmation API", () => {
     });
 
     expect(insertMemberSpy).toHaveBeenCalledWith(userId, "facesign-wallet-users");
+
+    // 3d-db/enroll
+    const enrollCall = spyFetch.mock.calls.find((call) =>
+      call[0].toString().endsWith("3d-db/enroll")
+    );
+    expect(enrollCall).toBeDefined();
+    expect(JSON.parse(enrollCall![1]?.body as string)).toMatchObject({
+      externalDatabaseRefID: userId,
+      groupName: "facesign-wallet-users",
+    });
   });
 });

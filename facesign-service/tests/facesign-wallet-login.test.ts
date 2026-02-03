@@ -259,6 +259,7 @@ describe("FaceSign wallet Login API", () => {
 
     expect(agentSpy).toHaveBeenCalledWith("facesign-wallet-duplicate", {
       count: 1,
+      currentUserId: expect.any(String),
       identifiers: [resultId],
     });
 
@@ -348,6 +349,7 @@ describe("FaceSign wallet Login API", () => {
 
     expect(agentSpy).toBeCalledWith("facesign-wallet-duplicate", {
       count: 3,
+      currentUserId: expect.any(String),
       identifiers: [resultId, resultId2, resultId3],
     });
 

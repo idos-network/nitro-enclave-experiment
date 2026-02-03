@@ -65,6 +65,7 @@ export async function faceSignWalletLogin(
     // This is a difference from normal /login route
     agent.writeLog("facesign-wallet-duplicate", {
       identifiers: results.map((x) => x.identifier),
+      currentUserId,
       count: results.length,
     });
 
