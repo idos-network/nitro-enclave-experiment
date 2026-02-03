@@ -1,5 +1,5 @@
 diff --git a/pom.xml b/pom.xml
-index 3bbe185..8aaf9b1 100644
+index 80e25bf..ed0a5d1 100644
 --- a/pom.xml
 +++ b/pom.xml
 @@ -94,13 +94,32 @@
@@ -38,7 +38,7 @@ index 3bbe185..8aaf9b1 100644
  
      <dependency>
 diff --git a/src/main/java/com/facetec/facetecserver/database/MongoDatabase.java b/src/main/java/com/facetec/facetecserver/database/MongoDatabase.java
-index 526f4b7..89be4db 100644
+index bc724cf..b03dbfe 100644
 --- a/src/main/java/com/facetec/facetecserver/database/MongoDatabase.java
 +++ b/src/main/java/com/facetec/facetecserver/database/MongoDatabase.java
 @@ -13,10 +13,15 @@ import com.mongodb.client.MongoClient;
@@ -81,7 +81,7 @@ index 526f4b7..89be4db 100644
  
              return true;
          }
-@@ -782,12 +796,46 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
+@@ -786,12 +800,46 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
  
                  ByteWrapper faceMapWrapper = new ByteWrapper(faceMapString);
  
@@ -89,7 +89,7 @@ index 526f4b7..89be4db 100644
 -                if (auditTrailImageString == null) {
 +                Object auditTrailImageEncryptedRaw = data.get("auditTrailImage");
 +                if (auditTrailImageEncryptedRaw == null) {
-                     throw new FaceTecServerExpectedException("auditTrailImage property did not exist or was not a String.");
+                     throw new FaceTecServerExpectedException("auditTrailImage property did not exist or was not a String.", externalDatabaseRefID);
                  }
  
 -                ByteWrapper auditTrailImageWrapper = new ByteWrapper(auditTrailImageString);
@@ -131,7 +131,7 @@ index 526f4b7..89be4db 100644
  
                  return new EnrollmentRecord(true, externalDatabaseRefID, objectIdStringFromRecord, faceMapWrapper, auditTrailImageWrapper);
              }
-@@ -903,7 +951,12 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
+@@ -915,7 +963,12 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
  
          try {
              // Create an object that houses the 3D FaceMap and Response Blob.
@@ -145,7 +145,7 @@ index 526f4b7..89be4db 100644
              Document mainDoc = getMongoDocFromObjectWithSanitization(requestResponse, faceMapCoreDBData, "/liveness-3d");
  
              // Database keys that Dashboard uses for backwards compatibility.
-@@ -947,7 +1000,7 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
+@@ -959,7 +1012,7 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
              }
  
              // Create an object that houses the 3D FaceMap and Response Blob.
@@ -154,7 +154,7 @@ index 526f4b7..89be4db 100644
              Document mainDoc = getMongoDocFromObjectWithSanitization(requestResponse, faceMapCoreDBData, "/enrollment-3d");
  
              // Put External Database Ref ID on the record.
-@@ -977,7 +1030,7 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
+@@ -989,7 +1042,7 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
  
          try {
              // Create an object that houses the Response Blob.
@@ -163,9 +163,9 @@ index 526f4b7..89be4db 100644
              Document mainDoc = getMongoDocFromObjectWithSanitization(requestResponse, faceMapCoreDBData, "/match-3d-3d");
  
              // Store Launch ID on the record to reference the Session History Data.
-@@ -1139,6 +1192,12 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
-         mongoClient.getDatabase(serverConfig.mongoDBDatabaseName).getCollection(MAIN_COLLECTION_NAME).createIndex(Indexes.ascending("externalDatabaseRefID", "success"), indexOptions);
-         mongoClient.getDatabase(serverConfig.mongoDBDatabaseName).getCollection(MAIN_COLLECTION_NAME).createIndex(Indexes.ascending("launchId"), indexOptions);
+@@ -1154,6 +1207,12 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
+         // Session History Data Collection needs an index on launchId.
+         mongoClient.getDatabase(serverConfig.mongoDBDatabaseName).getCollection(SessionHistoryDataTable).createIndex(Indexes.ascending(LaunchIDKey), indexOptions);
  
 +        // FLE indexes
 +        IndexOptions fleIndexOptions = new IndexOptions();
@@ -176,7 +176,7 @@ index 526f4b7..89be4db 100644
          // FaceMap Hash Collection needs an index on the hash property for fast lookup.
          mongoClient.getDatabase(serverConfig.mongoDBDatabaseName).getCollection(FaceMapHashTable).createIndex(Indexes.ascending(FaceMapHashKey), indexOptions);
  
-@@ -1146,6 +1205,85 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
+@@ -1161,6 +1220,85 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
          mongoClient.getDatabase(serverConfig.mongoDBDatabaseName).getCollection(SessionRequestHashTable).createIndex(Indexes.ascending(SessionRequestHashKey), indexOptions);
      }
  
@@ -262,7 +262,7 @@ index 526f4b7..89be4db 100644
      // Wrapper function to insert a document to main collection.
      public boolean insertDoc(Document collectionDoc) {
          return insertDoc(collectionDoc, MAIN_COLLECTION_NAME);
-@@ -1416,7 +1554,7 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
+@@ -1431,7 +1569,7 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
          return mainDoc;
      }
  
@@ -271,7 +271,7 @@ index 526f4b7..89be4db 100644
          // Update path for Dashboard.
          Document callData = Document.parse(FaceTecServerState.gson.toJson(requestResponse.httpCallInfo));
          callData.put("path", dashboardPath);
-@@ -1429,7 +1567,7 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
+@@ -1444,7 +1582,7 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
          sanitizeObjectFromNoticeAndUpdateDate(mainDoc, requestResponse.httpCallInfo);
  
          // Get the JSON serializable object from the faceMapCoreDBData, then get the JSON, then get the document and put it on the mainDoc.
@@ -280,7 +280,7 @@ index 526f4b7..89be4db 100644
  
          return mainDoc;
      }
-@@ -1513,20 +1651,29 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
+@@ -1528,20 +1666,29 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
                      return;
                  }
  
@@ -316,7 +316,7 @@ index 526f4b7..89be4db 100644
          AdditionalSessionDataV10 additionalSessionDataV10 = new AdditionalSessionDataV10(result.sessionMetadata);
          FaceTecResponseResult responseResult = new FaceTecResponseResult(false,  null, null, null);
  
-@@ -1539,7 +1686,7 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
+@@ -1554,7 +1701,7 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
          }
  
          // Create CancelledSessionDatabaseRecord to organize the data.
@@ -325,7 +325,7 @@ index 526f4b7..89be4db 100644
  
          // Create Document object that we can store in the Database.
          Document mainDoc = Document.parse(FaceTecServerState.gson.toJson(record));
-@@ -1552,9 +1699,9 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
+@@ -1567,9 +1714,9 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
      }
  
      // Helper function to create a Document object from the FaceTecMatch3D3DSessionHistory result.
@@ -337,7 +337,7 @@ index 526f4b7..89be4db 100644
          AdditionalSessionDataV10 additionalSessionDataV10 = new AdditionalSessionDataV10(result.sessionMetadata);
          FaceTecResponseResult responseResult = new FaceTecResponseResult(result.livenessStatus == FaceTecLiveness3DStatus.LIVENESS_PROVEN, result.matchLevel.ordinal(), null, null);
          CallMetadata callMetadata = new CallMetadata("/match-3d-3d");
-@@ -1569,7 +1716,7 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
+@@ -1584,7 +1731,7 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
          }
  
          // Create CancelledSessionDatabaseRecord to organize the data.
