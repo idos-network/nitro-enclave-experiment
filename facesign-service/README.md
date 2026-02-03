@@ -17,6 +17,7 @@ Methods are mapped to status response codes in this favor:
    * requestBlob - facetec stuff
    * groupName - optional
    * faceVector - optional (default: true)
+   * onboardFaceSignWallet - optional (default: false)
   
 **Outputs:**
 
@@ -49,6 +50,13 @@ Methods are mapped to status response codes in this favor:
 
   // FaceSign service customs
   faceSignUserId: "user-uuid",
+
+  // When FaceSignWallet onboarding is required
+  faceSign: {
+    newUser: boolean, // user has been created, no profile
+    faceSignUserId: string,
+    entropyToken: string,
+  }
 }
 ```
 
@@ -180,7 +188,7 @@ Methods are mapped to status response codes in this favor:
 }
 ```
 
-### POST /pinocchio
+### POST /facesign
 
 1. SessionStarted (status: **200**) - FaceTec internals, no success, just responseBlob
 
@@ -190,7 +198,7 @@ Methods are mapped to status response codes in this favor:
 }
 ```
 
-2. New user login or reused user login (status: **201**)
+2a. Existing user (status: **201**)
 
 - this is a happy path scenario
 
@@ -211,7 +219,32 @@ Methods are mapped to status response codes in this favor:
 
   // FaceSign service customs
   faceSignUserId: "user-uuid",
-  token: "jwt token for entropy service",
+  entropyToken: "jwt token for entropy service",
+}
+```
+
+2b. New user (status: **200**)
+
+- this is a happy path scenario
+
+```javascript
+{
+  // FaceTec standard response
+  success: true,
+  didError: false,
+  responseBlob: "string",
+  additionalSessionData: {
+    platform: "string",
+    deviceModel: "string",
+    userAgent: "string",
+  },
+  result: {
+    livenessProven: boolean,
+  },
+
+  // FaceSign service customs
+  faceSignUserId: "user-uuid",
+  confirmationToken: "jwt token for entropy service",
 }
 ```
 
@@ -236,5 +269,42 @@ Methods are mapped to status response codes in this favor:
 
   // FaceSign service customs
   errorMessage: "Liveness check or enrollment 3D failed and was not processed."
+}
+```
+
+# POST /facesign/confirmation
+
+This endpoint is when user clicks on `I am a new user`.
+
+Body:
+
+```javascript
+{
+  confirmationToken: "JWT token from facesign", 
+}
+```
+
+1. This is a ideal case scenario (status: **201**):
+
+```javascript
+{
+  faceSignUserId: "UUID",
+  entropyToken: "JWT-token",
+}
+```
+
+2. Token expired, invalid format (status: **400**):
+
+```javascript
+{
+  errorMessage: "JWT token expired",
+}
+```
+
+3. User has been already onboarded (status: **409**):
+
+```javascript
+{
+  errorMessage: "User already exists",
 }
 ```
