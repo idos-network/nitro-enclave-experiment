@@ -1,8 +1,10 @@
 // biome-ignore-all lint/suspicious/noExplicitAny: Test files often need any
+
+import { generateKeyPairSync } from "node:crypto";
+import jwt from "jsonwebtoken";
+import { ObjectId } from "mongodb";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
-import agent from "../providers/agent.ts";
-import jwt from "jsonwebtoken";
 
 // Mock modules before importing the app
 vi.mock("../providers/db.ts", () => ({
@@ -26,11 +28,9 @@ vi.mock("fs", async () => {
   };
 });
 
-import { ObjectId } from "mongodb";
+import agent from "../providers/agent.ts";
 import * as db from "../providers/db.ts";
-
 import app from "../server.ts";
-import { generateKeyPairSync } from "crypto";
 
 describe("Login API (with facesign onboarding)", () => {
   it("new user", async () => {
@@ -100,15 +100,16 @@ describe("Login API (with facesign onboarding)", () => {
       identifier: response.body.faceSignUserId,
     });
 
-    expect(insertMemberSpy).toHaveBeenCalledWith("facesign-wallet-users", response.body.faceSignUserId);
+    expect(insertMemberSpy).toHaveBeenCalledWith(
+      "facesign-wallet-users",
+      response.body.faceSignUserId,
+    );
     expect(spyFetch).toHaveBeenCalledTimes(5); // 3 login, 2 facesign wallet
 
     // Check jwt
-    const decoded = jwt.verify(
-      response.body.faceSignWallet.entropyToken,
-      publicKey,
-      { algorithms: ["ES512"] },
-    ) as { sub: string; iat: number };
+    const decoded = jwt.verify(response.body.faceSignWallet.entropyToken, publicKey, {
+      algorithms: ["ES512"],
+    }) as { sub: string; iat: number };
 
     expect(decoded.sub).toBe(response.body.faceSignWallet.faceSignUserId);
   });
@@ -134,20 +135,17 @@ describe("Login API (with facesign onboarding)", () => {
             ok: true,
             json: async () => ({
               success: true,
-              results: [
-                { identifier: "existing-user-id", matchLevel: 90 },
-              ],
-            }),
-          } as any;
-        } else {
-          return {
-            ok: true,
-            json: async () => ({
-              success: true,
-              results: [],
+              results: [{ identifier: "existing-user-id", matchLevel: 90 }],
             }),
           } as any;
         }
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            results: [],
+          }),
+        } as any;
       }
 
       return {
@@ -199,11 +197,9 @@ describe("Login API (with facesign onboarding)", () => {
     expect(spyFetch).toHaveBeenCalledTimes(4); // 3 login, 1 facesign wallet
 
     // Check jwt
-    const decoded = jwt.verify(
-      response.body.faceSignWallet.entropyToken,
-      publicKey,
-      { algorithms: ["ES512"] },
-    ) as { sub: string; iat: number };
+    const decoded = jwt.verify(response.body.faceSignWallet.entropyToken, publicKey, {
+      algorithms: ["ES512"],
+    }) as { sub: string; iat: number };
 
     expect(decoded.sub).toBe("existing-user-id");
   });

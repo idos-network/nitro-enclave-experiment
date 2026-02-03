@@ -105,9 +105,6 @@ export async function enrollment3d(
   requestBlob: string,
   faceVector: boolean,
 ) {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 60000);
-
   const enrollmentResponse = await fetch(`${FACETEC_SERVER}process-request`, {
     method: "POST",
     headers: {

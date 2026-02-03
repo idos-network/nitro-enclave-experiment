@@ -1,4 +1,3 @@
-import crypto from "node:crypto";
 import { readFileSync } from "node:fs";
 import jwt from "jsonwebtoken";
 import { FACESIGN_WALLET_GROUP_NAME, JWT_PRIVATE_KEY } from "../env.ts";
@@ -69,7 +68,7 @@ export async function faceSignWalletLogin(
       count: results.length,
     });
 
-    let faceSignUserId = results[0]?.identifier!;
+    let faceSignUserId = results[0]?.identifier;
 
     // For more than 1 result (should not happen), we take the oldest one (the one that was onboarded first)
     if (results.length > 1) {
@@ -85,6 +84,7 @@ export async function faceSignWalletLogin(
     return {
       newUser: false,
       entropyToken,
+      // @ts-expect-error Missing types, but it should be fine with the check above
       faceSignUserId,
     };
   }

@@ -6,8 +6,8 @@ import jwt from "jsonwebtoken";
 import { FACESIGN_WALLET_GROUP_NAME, JWT_PRIVATE_KEY } from "../env.ts";
 import agent from "../providers/agent.ts";
 import { enrollment3d, enrollUser, searchForDuplicates } from "../providers/api.ts";
-import { faceSignWalletLogin } from "../providers/facesign.ts";
 import { insertMember } from "../providers/db.ts";
+import { faceSignWalletLogin } from "../providers/facesign.ts";
 
 // FACESIGN WALLET - Login route
 export const login = async (req: Request, res: Response) => {
@@ -64,6 +64,8 @@ export const confirmation = async (req: Request, res: Response) => {
       algorithms: ["ES512"],
     }) as { sub: string; action: string; iat: number };
   } catch (error) {
+    // biome-ignore lint/suspicious/noExplicitAny: Need to access error message
+    agent.writeLog("jwt-verify-error", { error: (error as any)?.message });
     return res.status(400).json({ errorMessage: "Invalid or expired token" });
   }
 

@@ -28,7 +28,7 @@ export async function connectDB() {
   return db;
 }
 
-export async function getOldestFaceSignUserId(identifiers: string[]) {
+export async function getOldestFaceSignUserId(identifiers: string[]): Promise<string> {
   const facetecDb = client.db(FACETEC_DB_NAME);
   const sessionsCollection = facetecDb.collection(FACETEC_SESSION_COLLECTION);
 

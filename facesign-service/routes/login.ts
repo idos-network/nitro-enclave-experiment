@@ -1,7 +1,6 @@
 import crypto from "node:crypto";
-import { readFileSync } from "node:fs";
 import type { Request, Response } from "express";
-import { GROUP_NAME, JWT_PRIVATE_KEY } from "../env.ts";
+import { GROUP_NAME } from "../env.ts";
 import agent from "../providers/agent.ts";
 import { enrollment3d, enrollUser, searchForDuplicates } from "../providers/api.ts";
 import { countMembersInGroup, insertMember } from "../providers/db.ts";

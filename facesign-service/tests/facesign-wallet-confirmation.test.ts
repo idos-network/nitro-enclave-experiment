@@ -99,9 +99,7 @@ describe("FaceSign wallet Confirmation API", () => {
           ok: true,
           json: async () => ({
             success: true,
-            results: [
-              { identifier: "different-user-id", matchLevel: 15 },
-            ],
+            results: [{ identifier: "different-user-id", matchLevel: 15 }],
           }),
         } as any;
       }
@@ -187,10 +185,10 @@ describe("FaceSign wallet Confirmation API", () => {
 
     // 3d-db/enroll
     const enrollCall = spyFetch.mock.calls.find((call) =>
-      call[0].toString().endsWith("3d-db/enroll")
+      call[0].toString().endsWith("3d-db/enroll"),
     );
     expect(enrollCall).toBeDefined();
-    expect(JSON.parse(enrollCall![1]?.body as string)).toMatchObject({
+    expect(JSON.parse(enrollCall?.[1]?.body as string)).toMatchObject({
       externalDatabaseRefID: userId,
       groupName: "facesign-wallet-users",
     });

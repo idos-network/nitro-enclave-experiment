@@ -130,7 +130,9 @@ describe("FaceSign wallet Login API", () => {
     });
 
     // Verify the JWT token
-    const decoded = jwt.verify(response.body.confirmationToken, publicKey, { algorithms: ["ES512"] });
+    const decoded = jwt.verify(response.body.confirmationToken, publicKey, {
+      algorithms: ["ES512"],
+    });
     expect(decoded.sub).toBe(response.body.faceSignUserId);
 
     // Enrollment spy
