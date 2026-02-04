@@ -30,7 +30,9 @@ import app from "../server.ts";
 
 describe("FaceSign Wallet Entropy API", () => {
 	it("missing token", async () => {
-		const response = await request(app).post("/facesign-wallet/entropy").send({});
+		const response = await request(app)
+			.post("/facesign-wallet/entropy")
+			.send({});
 
 		expect(response.status).toBe(400);
 		expect(response.body).toEqual({ error: "Token is required" });
@@ -119,10 +121,13 @@ describe("FaceSign Wallet Entropy API", () => {
 
 		expect(response.status).toBe(400);
 		expect(response.body).toEqual({ error: "Invalid token" });
-		expect(agentSpy).toHaveBeenCalledWith("facesign-wallet-entropy-error-verify", {
-			error: expect.any(Error),
-			message: "Invalid token",
-		});
+		expect(agentSpy).toHaveBeenCalledWith(
+			"facesign-wallet-entropy-error-verify",
+			{
+				error: expect.any(Error),
+				message: "Invalid token",
+			},
+		);
 	});
 
 	it("expired token", async () => {
