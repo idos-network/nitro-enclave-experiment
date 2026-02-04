@@ -11,7 +11,7 @@ import {
 import {
 	AWS_REGION,
 	DB_NAME,
-	FACE_SIGN_WALLET_ENTROPY_COLLECTION,
+	FACE_SIGN_ENTROPY_COLLECTION,
 	FLE_KEY_ALIAS,
 	FLE_KMS_KEY_ID,
 	MONGO_URI,
@@ -125,14 +125,14 @@ export async function connectDB() {
 	};
 }
 
-export async function fetchOrCreateFaceSignWalletEntropy(
+export async function fetchOrCreateFaceSignEntropy(
 	faceSignUserId: string,
 ): Promise<{ insert: boolean; entropy: string }> {
 	const { db, encrypt, decrypt } = await connectDB();
 
 	// try to find existing encrypted record
 	const existing = await db
-		.collection(FACE_SIGN_WALLET_ENTROPY_COLLECTION)
+		.collection(FACE_SIGN_ENTROPY_COLLECTION)
 		.findOne({ faceSignUserId });
 
 	if (existing?.entropy) {
@@ -165,7 +165,7 @@ export async function fetchOrCreateFaceSignWalletEntropy(
 	const encryptedEntropy = await encrypt(mnemonic);
 
 	await db
-		.collection(FACE_SIGN_WALLET_ENTROPY_COLLECTION)
+		.collection(FACE_SIGN_ENTROPY_COLLECTION)
 		.findOneAndUpdate(
 			{ faceSignUserId },
 			{ $setOnInsert: { entropy: encryptedEntropy } },

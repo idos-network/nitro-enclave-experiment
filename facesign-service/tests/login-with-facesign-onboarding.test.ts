@@ -75,7 +75,7 @@ describe("Login API (with facesign onboarding)", () => {
     const response = await request(app).post("/login").send({
       requestBlob: "test-face-scan",
       faceVector: false,
-      onboardFaceSignWallet: true,
+      onboardFaceSign: true,
     });
 
     expect(response.status).toBe(201);
@@ -100,11 +100,8 @@ describe("Login API (with facesign onboarding)", () => {
       identifier: response.body.faceSignUserId,
     });
 
-    expect(insertMemberSpy).toHaveBeenCalledWith(
-      "facesign-users",
-      response.body.faceSignUserId,
-    );
-    expect(spyFetch).toHaveBeenCalledTimes(5); // 3 login, 2 facesign 
+    expect(insertMemberSpy).toHaveBeenCalledWith("facesign-users", response.body.faceSignUserId);
+    expect(spyFetch).toHaveBeenCalledTimes(5); // 3 login, 2 facesign
 
     // Check jwt
     const decoded = jwt.verify(response.body.faceSign.entropyToken, publicKey, {
@@ -130,7 +127,7 @@ describe("Login API (with facesign onboarding)", () => {
 
       if (url.toString().endsWith("3d-db/search")) {
         // @ts-expect-error This is fine for testing
-        if (options?.body?.includes("facesign-users")) {
+        if (options?.body?.includes("pinocchio-users")) {
           return {
             ok: true,
             json: async () => ({
@@ -166,7 +163,7 @@ describe("Login API (with facesign onboarding)", () => {
     const response = await request(app).post("/login").send({
       requestBlob: "test-face-scan",
       faceVector: false,
-      onboardFaceSignWallet: true,
+      onboardFaceSign: true,
     });
 
     expect(response.status).toBe(201);

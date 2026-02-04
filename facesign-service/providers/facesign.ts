@@ -1,12 +1,12 @@
 import { readFileSync } from "node:fs";
 import jwt from "jsonwebtoken";
-import { FACESIGN_WALLET_GROUP_NAME, JWT_PRIVATE_KEY } from "../env.ts";
+import { FACE_SIGN_GROUP_NAME, JWT_PRIVATE_KEY } from "../env.ts";
 import agent from "../providers/agent.ts";
 import { enrollUser, searchForDuplicates } from "./api.ts";
 import { countMembersInGroup, getOldestFaceSignUserId, insertMember } from "./db.ts";
 
 /**
- * FaceSign Wallet Login process
+ * FaceSign Login process
  * @param faceSignUserId Onboarded users, liveness proven, no error
  */
 export async function faceSignLogin(
@@ -20,7 +20,7 @@ export async function faceSignLogin(
 }> {
   let results: { identifier: string; matchLevel: number }[] = [];
 
-  const searchResult = await searchForDuplicates(currentUserId, FACESIGN_WALLET_GROUP_NAME);
+  const searchResult = await searchForDuplicates(currentUserId, FACE_SIGN_GROUP_NAME);
 
   if (searchResult.success) {
     results = searchResult.results;
@@ -29,7 +29,7 @@ export async function faceSignLogin(
     searchResult.errorMessage?.includes("groupName when that groupName does not exist")
   ) {
     // Check if group exists in DB, if yes, we have a problem (most likely recovery from corrupted FS)
-    const memberCount = await countMembersInGroup(FACESIGN_WALLET_GROUP_NAME);
+    const memberCount = await countMembersInGroup(FACE_SIGN_GROUP_NAME);
     if (memberCount > 0) {
       throw new Error("Group exists in our DB, but not in 3d-db, this should never happen.");
     }
@@ -59,7 +59,7 @@ export async function faceSignLogin(
     };
   }
 
-  // Existing user, we can provide an entropy token for key in wallet
+  // Existing user, we can provide an entropy token for key
   if (results.length > 0) {
     // This is a difference from normal /login route
     agent.writeLog("facesign-duplicate", {
@@ -92,8 +92,8 @@ export async function faceSignLogin(
   // New user, enroll and onboard
   agent.writeLog("facesign-new-user", { identifier: currentUserId });
 
-  await enrollUser(currentUserId, FACESIGN_WALLET_GROUP_NAME);
-  await insertMember(FACESIGN_WALLET_GROUP_NAME, currentUserId);
+  await enrollUser(currentUserId, FACE_SIGN_GROUP_NAME);
+  await insertMember(FACE_SIGN_GROUP_NAME, currentUserId);
 
   const token = jwt.sign({ sub: currentUserId }, readFileSync(JWT_PRIVATE_KEY, "utf-8"), {
     algorithm: "ES512",

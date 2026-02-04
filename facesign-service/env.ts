@@ -1,5 +1,5 @@
-export const GROUP_NAME = "facesign-users";
-export const FACESIGN_WALLET_GROUP_NAME = "facesign-users";
+export const GROUP_NAME = "facesign-users"; // Default group for APP
+export const FACE_SIGN_GROUP_NAME = "pinocchio-users"; // This is Face-Sign Users group name (old one to not confuse)
 export const FACETEC_SERVER = process.env.FACETEC_SERVER ?? "http://127.0.0.1:5000/";
 export const MONGO_URI = "INSERT YOUR MONGO URL HERE";
 export const DB_COLLECTION_NAME = "faceSignGroupMembers";

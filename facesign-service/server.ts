@@ -12,10 +12,7 @@ import morgan from "morgan";
 import { HOST, KEY_1_MULTIBASE_PUBLIC_PATH } from "./env.ts";
 import agent from "./providers/agent.ts";
 import { FaceTecError, getStatus, SessionStartError } from "./providers/api.ts";
-import {
-  confirmation as faceSignConfirmation,
-  login as faceSignLogin,
-} from "./routes/facesign.ts";
+import { confirmation as faceSignConfirmation, login as faceSignLogin } from "./routes/facesign.ts";
 import login from "./routes/login.ts";
 import match from "./routes/match.ts";
 

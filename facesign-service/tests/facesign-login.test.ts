@@ -152,7 +152,7 @@ describe("FaceSign Login API", () => {
     expect(duplicateCall).toBeDefined();
     expect(JSON.parse(duplicateCall?.[1]?.body as string)).toMatchObject({
       externalDatabaseRefID: response.body.faceSignUserId,
-      groupName: "facesign-users",
+      groupName: "pinocchio-users",
       minMatchLevel: 15,
     });
 
@@ -343,7 +343,7 @@ describe("FaceSign Login API", () => {
     // @ts-expect-error This is fine for tests
     expect(JSON.parse(duplicateRequestCall?.[1]?.body ?? "{}")).toMatchObject({
       externalDatabaseRefID: expect.any(String),
-      groupName: "facesign-users",
+      groupName: "pinocchio-users",
       minMatchLevel: 15,
     });
 

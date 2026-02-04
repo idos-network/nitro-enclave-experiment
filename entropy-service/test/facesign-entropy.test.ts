@@ -21,18 +21,16 @@ vi.mock("fs", async () => {
 
 // Mock modules before importing the app
 vi.mock("../providers/db.ts", () => ({
-	fetchOrCreateFaceSignWalletEntropy: vi.fn(),
+	fetchOrCreateFaceSignEntropy: vi.fn(),
 }));
 
 import * as db from "../providers/db.ts";
 
 import app from "../server.ts";
 
-describe("FaceSign Wallet Entropy API", () => {
+describe("FaceSign Entropy API", () => {
 	it("missing token", async () => {
-		const response = await request(app)
-			.post("/facesign/entropy")
-			.send({});
+		const response = await request(app).post("/facesign/entropy").send({});
 
 		expect(response.status).toBe(400);
 		expect(response.body).toEqual({ error: "Token is required" });
@@ -41,7 +39,7 @@ describe("FaceSign Wallet Entropy API", () => {
 	it("new user no entropy", async () => {
 		const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 		const entropySpy = vi
-			.spyOn(db, "fetchOrCreateFaceSignWalletEntropy")
+			.spyOn(db, "fetchOrCreateFaceSignEntropy")
 			.mockResolvedValue({
 				insert: true,
 				entropy: "mock test entropy",
@@ -78,7 +76,7 @@ describe("FaceSign Wallet Entropy API", () => {
 	it("user with existing entropy", async () => {
 		const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 		const entropySpy = vi
-			.spyOn(db, "fetchOrCreateFaceSignWalletEntropy")
+			.spyOn(db, "fetchOrCreateFaceSignEntropy")
 			.mockResolvedValue({
 				insert: false,
 				entropy: "mock test entropy",
@@ -121,13 +119,10 @@ describe("FaceSign Wallet Entropy API", () => {
 
 		expect(response.status).toBe(400);
 		expect(response.body).toEqual({ error: "Invalid token" });
-		expect(agentSpy).toHaveBeenCalledWith(
-			"facesign-entropy-error-verify",
-			{
-				error: expect.any(Error),
-				message: "Invalid token",
-			},
-		);
+		expect(agentSpy).toHaveBeenCalledWith("facesign-entropy-error-verify", {
+			error: expect.any(Error),
+			message: "Invalid token",
+		});
 	});
 
 	it("expired token", async () => {

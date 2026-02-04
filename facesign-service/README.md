@@ -17,7 +17,7 @@ Methods are mapped to status response codes in this favor:
    * requestBlob - facetec stuff
    * groupName - optional
    * faceVector - optional (default: true)
-   * onboardFaceSignWallet - optional (default: false)
+   * onboardFaceSign - optional (default: false)
   
 **Outputs:**
 
@@ -51,7 +51,7 @@ Methods are mapped to status response codes in this favor:
   // FaceSign service customs
   faceSignUserId: "user-uuid",
 
-  // When FaceSignWallet onboarding is required
+  // When FaceSign onboarding is required
   faceSign: {
     newUser: boolean, // user has been created, no profile
     faceSignUserId: string,

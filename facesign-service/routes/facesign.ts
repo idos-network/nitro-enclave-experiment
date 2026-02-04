@@ -3,13 +3,13 @@ import { readFileSync } from "node:fs";
 import type { Request, Response } from "express";
 import jwt from "jsonwebtoken";
 
-import { FACESIGN_WALLET_GROUP_NAME, JWT_PRIVATE_KEY } from "../env.ts";
+import { FACE_SIGN_GROUP_NAME, JWT_PRIVATE_KEY } from "../env.ts";
 import agent from "../providers/agent.ts";
 import { enrollment3d, enrollUser, searchForDuplicates } from "../providers/api.ts";
 import { insertMember } from "../providers/db.ts";
 import { faceSignLogin } from "../providers/facesign.ts";
 
-// FACESIGN WALLET - Login route
+// FACESIGN - Login route
 export const login = async (req: Request, res: Response) => {
   const generatedUserId: string = crypto.randomUUID();
 
@@ -89,14 +89,14 @@ export const confirmation = async (req: Request, res: Response) => {
   const faceSignUserId = result.sub;
 
   // Check duplications (race-condition)
-  const searchResult = await searchForDuplicates(faceSignUserId, FACESIGN_WALLET_GROUP_NAME);
+  const searchResult = await searchForDuplicates(faceSignUserId, FACE_SIGN_GROUP_NAME);
   if (!searchResult.success || searchResult.results.length > 0) {
     return res.status(409).json({ errorMessage: "User already exists" });
   }
 
   // Enroll user in 3d-db so they can be matched later
-  await enrollUser(faceSignUserId, FACESIGN_WALLET_GROUP_NAME);
-  await insertMember(faceSignUserId, FACESIGN_WALLET_GROUP_NAME);
+  await enrollUser(faceSignUserId, FACE_SIGN_GROUP_NAME);
+  await insertMember(faceSignUserId, FACE_SIGN_GROUP_NAME);
 
   const entropyToken = jwt.sign(
     { sub: faceSignUserId },

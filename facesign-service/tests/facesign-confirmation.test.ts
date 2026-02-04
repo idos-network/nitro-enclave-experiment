@@ -181,7 +181,7 @@ describe("FaceSign Confirmation API", () => {
       entropyToken: expect.any(String),
     });
 
-    expect(insertMemberSpy).toHaveBeenCalledWith(userId, "facesign-users");
+    expect(insertMemberSpy).toHaveBeenCalledWith(userId, "pinocchio-users");
 
     // 3d-db/enroll
     const enrollCall = spyFetch.mock.calls.find((call) =>
@@ -190,7 +190,7 @@ describe("FaceSign Confirmation API", () => {
     expect(enrollCall).toBeDefined();
     expect(JSON.parse(enrollCall?.[1]?.body as string)).toMatchObject({
       externalDatabaseRefID: userId,
-      groupName: "facesign-users",
+      groupName: "pinocchio-users",
     });
   });
 });

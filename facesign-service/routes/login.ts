@@ -13,11 +13,11 @@ export default async function handler(req: Request, res: Response) {
     requestBlob,
     groupName = GROUP_NAME,
     faceVector = true,
-    onboardFaceSignWallet = false,
+    onboardFaceSign = false,
   } = req.body;
 
-  if (faceVector && onboardFaceSignWallet) {
-    throw new Error("Cannot request face vector and onboard to FaceSign Wallet at the same time.");
+  if (faceVector && onboardFaceSign) {
+    throw new Error("Cannot request face vector and onboard to FaceSign at the same time.");
   }
 
   // First check if liveness is proven
@@ -107,11 +107,11 @@ export default async function handler(req: Request, res: Response) {
     entropyToken?: string | undefined;
   } | null = null;
 
-  // If we want token and onboard user in facesign wallet group
-  if (onboardFaceSignWallet) {
+  // If we want token and onboard user in facesign group
+  if (onboardFaceSign) {
     const {
-      newUser: walletNewUser,
-      faceSignUserId: walletUserId,
+      newUser: faceSignNewUser,
+      faceSignUserId: faceSignNewUserId,
       entropyToken,
     } = await faceSignLogin(
       faceSignUserId,
@@ -119,8 +119,8 @@ export default async function handler(req: Request, res: Response) {
     );
 
     faceSign = {
-      newUser: walletNewUser,
-      faceSignUserId: walletUserId,
+      newUser: faceSignNewUser,
+      faceSignUserId: faceSignNewUserId,
       entropyToken,
     };
   }
@@ -129,7 +129,7 @@ export default async function handler(req: Request, res: Response) {
     ...alwaysToReturn,
     faceSignUserId,
 
-    // In case of onboarding to FaceSignWallet
+    // In case of onboarding to FaceSign
     faceSign,
   });
 }

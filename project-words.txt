@@ -1,4 +1,5 @@
 Caddyfile
+libmongocrypt
 DNAT
 Dartifact
 Dfile
