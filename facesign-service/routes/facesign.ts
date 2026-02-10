@@ -54,6 +54,7 @@ export const login = async (req: Request, res: Response) => {
   });
 };
 
+// FACESIGN - Confirmation route
 export const confirmation = async (req: Request, res: Response) => {
   const { confirmationToken } = req.body;
 

@@ -36,6 +36,7 @@
     "@types/os-utils": "^0.0.4",
     "@types/supertest": "^6.0.3",
     "@vitest/ui": "^2.1.8",
+    "msw": "^2.12.9",
     "supertest": "^7.0.0",
     "typescript": "^5.9.3",
     "vitest": "^2.1.8"

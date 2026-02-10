@@ -1,23 +1,17 @@
 // biome-ignore-all lint/suspicious/noExplicitAny: Test files often need any
 import { generateKeyPairSync } from "node:crypto";
 import request from "supertest";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import {
-  GROUP_NAME,
-  makeConfirmationToken,
-  mock3dDbFetch,
-} from "./utils/facesign-test-helpers.ts";
+import { GROUP_NAME, makeConfirmationToken } from "../utils/helper.ts";
+import { requestCapture, searchHandler } from "../utils/msw-handlers.ts";
+import { server } from "../utils/msw-server.ts";
 
 import { ObjectId } from "mongodb";
-import * as db from "../providers/db.ts";
-import app from "../server.ts";
+import * as db from "../../providers/db.ts";
+import app from "../../server.ts";
 
-describe("FaceSign Confirmation API", () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
+describe("FaceSign/Confirmation API", () => {
   it("missing token", async () => {
     const response = await request(app).post("/facesign/confirmation").send({});
 
@@ -64,9 +58,7 @@ describe("FaceSign Confirmation API", () => {
   it("user is already onboarded", async () => {
     const userId = "test-user-id-already-onboarded";
 
-    mock3dDbFetch({
-      searchResults: [{ identifier: "different-user-id", matchLevel: 15 }],
-    });
+    server.use(searchHandler([{ identifier: "different-user-id", matchLevel: 15 }]));
 
     const token = makeConfirmationToken({
       sub: userId,
@@ -84,7 +76,7 @@ describe("FaceSign Confirmation API", () => {
   it("everything ok", async () => {
     const userId = crypto.randomUUID();
 
-    const spyFetch = mock3dDbFetch();
+    server.use(searchHandler([]));
 
     const token = makeConfirmationToken({
       sub: userId,
@@ -108,12 +100,9 @@ describe("FaceSign Confirmation API", () => {
 
     expect(insertMemberSpy).toHaveBeenCalledWith(userId, GROUP_NAME);
 
-    // 3d-db/enroll
-    const enrollCall = spyFetch.mock.calls.find((call) =>
-      call[0].toString().endsWith("3d-db/enroll"),
-    );
-    expect(enrollCall).toBeDefined();
-    expect(JSON.parse(enrollCall?.[1]?.body as string)).toMatchObject({
+    // Verify FaceTec API calls
+    const enrollRequest = requestCapture.getLastByEndpoint("/3d-db/enroll");
+    expect(enrollRequest?.body).toMatchObject({
       externalDatabaseRefID: userId,
       groupName: GROUP_NAME,
     });

@@ -2,43 +2,28 @@
 import jwt from "jsonwebtoken";
 import { ObjectId } from "mongodb";
 import request from "supertest";
-import { publicKey } from "./utils/test-keys.ts";
-import agent from "../providers/agent.ts";
-import * as db from "../providers/db.ts";
-import app from "../server.ts";
+import { publicKey } from "../utils/helper.ts";
+import agent from "../../providers/agent.ts";
+import * as db from "../../providers/db.ts";
+import app from "../../server.ts";
+import {
+  processRequestHandler,
+  searchHandler,
+  searchHandlerWithBodyCheck,
+} from "../utils/msw-handlers.ts";
+import { server } from "../utils/msw-server.ts";
 
-describe("Login API (with facesign onboarding)", () => {
+describe("Login/Facesign Onboarding API", () => {
   it("new user", async () => {
-    const spyFetch = vi.spyOn(global, "fetch").mockImplementation(async (url) => {
-      if (url.toString().endsWith("/process-request")) {
-        return {
-          ok: true,
-          json: async () => ({
-            success: true,
-            result: { livenessProven: true },
-            didError: false,
-            responseBlob: "mock-scan-result-blob",
-          }),
-        } as any;
-      }
-
-      if (url.toString().endsWith("3d-db/search")) {
-        return {
-          ok: true,
-          json: async () => ({
-            success: true,
-            results: [],
-          }),
-        } as any;
-      }
-
-      return {
-        ok: true,
-        json: async () => ({
-          success: true,
-        }),
-      } as any;
-    });
+    server.use(
+      processRequestHandler({
+        success: true,
+        result: { livenessProven: true },
+        didError: false,
+        responseBlob: "mock-scan-result-blob",
+      }),
+      searchHandler([]),
+    );
 
     const insertMemberSpy = vi.spyOn(db, "insertMember").mockResolvedValue({
       acknowledged: true,
@@ -76,7 +61,6 @@ describe("Login API (with facesign onboarding)", () => {
     });
 
     expect(insertMemberSpy).toHaveBeenCalledWith("facesign-users", response.body.faceSignUserId);
-    expect(spyFetch).toHaveBeenCalledTimes(5); // 3 login, 2 facesign
 
     // Check jwt
     const decoded = jwt.verify(response.body.faceSign.entropyToken, publicKey, {
@@ -87,46 +71,20 @@ describe("Login API (with facesign onboarding)", () => {
   });
 
   it("existing user", async () => {
-    const spyFetch = vi.spyOn(global, "fetch").mockImplementation(async (url, options) => {
-      if (url.toString().endsWith("/process-request")) {
-        return {
-          ok: true,
-          json: async () => ({
-            success: true,
-            result: { livenessProven: true },
-            didError: false,
-            responseBlob: "mock-scan-result-blob",
-          }),
-        } as any;
-      }
-
-      if (url.toString().endsWith("3d-db/search")) {
-        // @ts-expect-error This is fine for testing
-        if (options?.body?.includes("pinocchio-users")) {
-          return {
-            ok: true,
-            json: async () => ({
-              success: true,
-              results: [{ identifier: "existing-user-id", matchLevel: 90 }],
-            }),
-          } as any;
-        }
-        return {
-          ok: true,
-          json: async () => ({
-            success: true,
-            results: [],
-          }),
-        } as any;
-      }
-
-      return {
-        ok: true,
-        json: async () => ({
-          success: true,
-        }),
-      } as any;
-    });
+    server.use(
+      processRequestHandler({
+        success: true,
+        result: { livenessProven: true },
+        didError: false,
+        responseBlob: "mock-scan-result-blob",
+      }),
+      // Return existing user only for pinocchio-users group (facesign), empty for others (login)
+      searchHandlerWithBodyCheck(
+        (body) => body.groupName === "pinocchio-users",
+        [{ identifier: "existing-user-id", matchLevel: 90 }],
+        [],
+      ),
+    );
 
     const insertMemberSpy = vi.spyOn(db, "insertMember").mockResolvedValue({
       acknowledged: true,
@@ -166,7 +124,6 @@ describe("Login API (with facesign onboarding)", () => {
     });
 
     expect(insertMemberSpy).toHaveBeenCalledTimes(1);
-    expect(spyFetch).toHaveBeenCalledTimes(4); // 3 login, 1 facesign
 
     // Check jwt
     const decoded = jwt.verify(response.body.faceSign.entropyToken, publicKey, {

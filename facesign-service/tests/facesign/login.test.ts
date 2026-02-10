@@ -1,27 +1,25 @@
 // biome-ignore-all lint/suspicious/noExplicitAny: Test files often need any
 import jwt from "jsonwebtoken";
 import request from "supertest";
-import agent from "../providers/agent.ts";
+import agent from "../../providers/agent.ts";
 
-import { GROUP_NAME } from "./utils/facesign-test-helpers.ts";
-import { publicKey } from "./utils/test-keys.ts";
+import {
+  processRequestErrorHandler,
+  processRequestHandler,
+  requestCapture,
+  searchHandler,
+  sessionStartHandler,
+} from "../utils/msw-handlers.ts";
+import { server } from "../utils/msw-server.ts";
+import { publicKey, GROUP_NAME } from "../utils/helper.ts";
 
 import { ObjectId } from "mongodb";
-import * as db from "../providers/db.ts";
-import app from "../server.ts";
+import * as db from "../../providers/db.ts";
+import app from "../../server.ts";
 
-describe("FaceSign Login API", () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
+describe("FaceSign/Login API", () => {
   it("return new session", async () => {
-    vi.spyOn(global, "fetch").mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        responseBlob: "mock-session-result-blob",
-      }),
-    } as any);
+    server.use(sessionStartHandler("mock-session-result-blob"));
 
     const response = await request(app).post("/facesign").send({
       requestBlob: "test-face-scan",
@@ -33,12 +31,7 @@ describe("FaceSign Login API", () => {
   });
 
   it("fail with error", async () => {
-    vi.spyOn(global, "fetch").mockResolvedValue({
-      ok: false,
-      status: 500,
-      statusText: "Internal Server Error",
-      text: async () => "Server error",
-    } as any);
+    server.use(processRequestErrorHandler(500, "Server error"));
 
     const response = await request(app).post("/facesign").send({
       requestBlob: "test-face-scan",
@@ -54,36 +47,15 @@ describe("FaceSign Login API", () => {
   });
 
   it("new user", async () => {
-    const spyFetch = vi.spyOn(global, "fetch").mockImplementation(async (url) => {
-      if (url.toString().endsWith("/process-request")) {
-        return {
-          ok: true,
-          json: async () => ({
-            success: true,
-            result: { livenessProven: true },
-            didError: false,
-            responseBlob: "mock-scan-result-blob",
-          }),
-        } as any;
-      }
-
-      if (url.toString().endsWith("3d-db/search")) {
-        return {
-          ok: true,
-          json: async () => ({
-            success: true,
-            results: [],
-          }),
-        } as any;
-      }
-
-      return {
-        ok: true,
-        json: async () => ({
-          success: true,
-        }),
-      } as any;
-    });
+    server.use(
+      processRequestHandler({
+        success: true,
+        result: { livenessProven: true },
+        didError: false,
+        responseBlob: "mock-scan-result-blob",
+      }),
+      searchHandler([]),
+    );
 
     const insertMemberSpy = vi.spyOn(db, "insertMember").mockResolvedValue({
       acknowledged: true,
@@ -113,48 +85,36 @@ describe("FaceSign Login API", () => {
     });
     expect(decoded.sub).toBe(response.body.faceSignUserId);
 
-    // Enrollment spy
-    const processRequestCall = spyFetch.mock.calls.find((call) =>
-      call[0].toString().endsWith("/process-request"),
-    );
-    expect(processRequestCall).toBeDefined();
-    expect(JSON.parse(processRequestCall?.[1]?.body as string)).toMatchObject({
-      externalDatabaseRefID: response.body.faceSignUserId,
-      requestBlob: "test-face-scan",
-    });
-
-    // Search 3d-db duplicate spy
-    const duplicateCall = spyFetch.mock.calls.find((call) =>
-      call[0].toString().endsWith("3d-db/search"),
-    );
-    expect(duplicateCall).toBeDefined();
-    expect(JSON.parse(duplicateCall?.[1]?.body as string)).toMatchObject({
-      externalDatabaseRefID: response.body.faceSignUserId,
-      groupName: GROUP_NAME,
-      minMatchLevel: 15,
-    });
-
     expect(agentSpy).toHaveBeenCalledWith("facesign-user-pending-confirmation", {
       faceSignUserId: response.body.faceSignUserId,
     });
 
     expect(insertMemberSpy).not.toHaveBeenCalled();
+
+    // Verify FaceTec API calls
+    const processRequest = requestCapture.getLastByEndpoint("/process-request");
+    expect(processRequest?.body).toMatchObject({
+      externalDatabaseRefID: response.body.faceSignUserId,
+      requestBlob: "test-face-scan",
+    });
+
+    const searchRequest = requestCapture.getLastByEndpoint("/3d-db/search");
+    expect(searchRequest?.body).toMatchObject({
+      externalDatabaseRefID: response.body.faceSignUserId,
+      groupName: GROUP_NAME,
+      minMatchLevel: 15,
+    });
   });
 
   it("failing liveness", async () => {
-    vi.spyOn(global, "fetch").mockImplementation(async (url) => {
-      if (url.toString().endsWith("/process-request")) {
-        return {
-          ok: true,
-          json: async () => ({
-            success: false,
-            result: { livenessProven: false },
-            didError: true,
-            responseBlob: "mock-scan-result-blob",
-          }),
-        } as any;
-      }
-    });
+    server.use(
+      processRequestHandler({
+        success: false,
+        result: { livenessProven: false },
+        didError: true,
+        responseBlob: "mock-scan-result-blob",
+      }),
+    );
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
@@ -182,36 +142,15 @@ describe("FaceSign Login API", () => {
   it("duplicate (normal)", async () => {
     const resultId = crypto.randomUUID();
 
-    vi.spyOn(global, "fetch").mockImplementation(async (url) => {
-      if (url.toString().endsWith("/process-request")) {
-        return {
-          ok: true,
-          json: async () => ({
-            success: true,
-            result: { livenessProven: true },
-            didError: false,
-            responseBlob: "mock-scan-result-blob",
-          }),
-        } as any;
-      }
-
-      if (url.toString().endsWith("3d-db/search")) {
-        return {
-          ok: true,
-          json: async () => ({
-            success: true,
-            results: [{ identifier: resultId, matchLevel: 15 }],
-          }),
-        } as any;
-      }
-
-      return {
-        ok: true,
-        json: async () => ({
-          success: true,
-        }),
-      } as any;
-    });
+    server.use(
+      processRequestHandler({
+        success: true,
+        result: { livenessProven: true },
+        didError: false,
+        responseBlob: "mock-scan-result-blob",
+      }),
+      searchHandler([{ identifier: resultId, matchLevel: 15 }]),
+    );
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
     const oldestSpy = vi.spyOn(db, "getOldestFaceSignUserId").mockResolvedValue(resultId);
@@ -251,40 +190,19 @@ describe("FaceSign Login API", () => {
     const resultId2 = crypto.randomUUID();
     const resultId3 = crypto.randomUUID();
 
-    const spyFetch = vi.spyOn(global, "fetch").mockImplementation(async (url) => {
-      if (url.toString().endsWith("/process-request")) {
-        return {
-          ok: true,
-          json: async () => ({
-            success: true,
-            result: { livenessProven: true },
-            didError: false,
-            responseBlob: "mock-scan-result-blob",
-          }),
-        } as any;
-      }
-
-      if (url.toString().endsWith("3d-db/search")) {
-        return {
-          ok: true,
-          json: async () => ({
-            success: true,
-            results: [
-              { identifier: resultId, matchLevel: 15 },
-              { identifier: resultId2, matchLevel: 15 },
-              { identifier: resultId3, matchLevel: 15 },
-            ],
-          }),
-        } as any;
-      }
-
-      return {
-        ok: true,
-        json: async () => ({
-          success: true,
-        }),
-      } as any;
-    });
+    server.use(
+      processRequestHandler({
+        success: true,
+        result: { livenessProven: true },
+        didError: false,
+        responseBlob: "mock-scan-result-blob",
+      }),
+      searchHandler([
+        { identifier: resultId, matchLevel: 15 },
+        { identifier: resultId2, matchLevel: 15 },
+        { identifier: resultId3, matchLevel: 15 },
+      ]),
+    );
 
     const insertMemberSpy = vi.spyOn(db, "insertMember").mockResolvedValue({
       acknowledged: true,
@@ -314,17 +232,6 @@ describe("FaceSign Login API", () => {
     const decoded = jwt.verify(response.body.entropyToken, publicKey, { algorithms: ["ES512"] });
     expect(decoded.sub).toBe(resultId3);
 
-    const duplicateRequestCall = spyFetch.mock.calls.find((call) =>
-      call[0].toString().endsWith("3d-db/search"),
-    );
-    expect(duplicateRequestCall).toBeDefined();
-    // @ts-expect-error This is fine for tests
-    expect(JSON.parse(duplicateRequestCall?.[1]?.body ?? "{}")).toMatchObject({
-      externalDatabaseRefID: expect.any(String),
-      groupName: GROUP_NAME,
-      minMatchLevel: 15,
-    });
-
     expect(db.insertMember).not.toHaveBeenCalled();
 
     expect(agentSpy).toBeCalledWith("facesign-duplicate", {
@@ -335,5 +242,13 @@ describe("FaceSign Login API", () => {
 
     expect(oldestSpy).toHaveBeenCalledWith([resultId, resultId2, resultId3]);
     expect(insertMemberSpy).not.toHaveBeenCalled();
+
+    // Verify FaceTec API calls
+    const searchRequest = requestCapture.getLastByEndpoint("/3d-db/search");
+    expect(searchRequest?.body).toMatchObject({
+      externalDatabaseRefID: expect.any(String),
+      groupName: GROUP_NAME,
+      minMatchLevel: 15,
+    });
   });
 });
