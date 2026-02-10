@@ -1,8 +1,11 @@
 // biome-ignore-all lint/suspicious/noExplicitAny: Test files often need any
 import jwt from "jsonwebtoken";
+import { ObjectId } from "mongodb";
 import request from "supertest";
 import agent from "../../providers/agent.ts";
-
+import * as db from "../../providers/db.ts";
+import app from "../../server.ts";
+import { GROUP_NAME, publicKey } from "../utils/helper.ts";
 import {
   processRequestErrorHandler,
   processRequestHandler,
@@ -11,11 +14,6 @@ import {
   sessionStartHandler,
 } from "../utils/msw-handlers.ts";
 import { server } from "../utils/msw-server.ts";
-import { publicKey, GROUP_NAME } from "../utils/helper.ts";
-
-import { ObjectId } from "mongodb";
-import * as db from "../../providers/db.ts";
-import app from "../../server.ts";
 
 describe("FaceSign/Login API", () => {
   it("return new session", async () => {

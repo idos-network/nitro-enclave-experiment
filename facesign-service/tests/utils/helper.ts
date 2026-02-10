@@ -25,5 +25,4 @@ export function makeConfirmationToken({
   return jwt.sign({ sub, action, iat }, key, { algorithm: "ES512" });
 }
 
-
 export { privateKey, publicKey };

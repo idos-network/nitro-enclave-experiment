@@ -1,7 +1,11 @@
 // biome-ignore-all lint/suspicious/noExplicitAny: Test files often need any
+
+import { ObjectId } from "mongodb";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 import agent from "../../providers/agent.ts";
+import * as db from "../../providers/db.ts";
+import app from "../../server.ts";
 import {
   processRequestErrorHandler,
   processRequestHandler,
@@ -10,11 +14,6 @@ import {
   sessionStartHandler,
 } from "../utils/msw-handlers.ts";
 import { server } from "../utils/msw-server.ts";
-
-import { ObjectId } from "mongodb";
-import * as db from "../../providers/db.ts";
-
-import app from "../../server.ts";
 
 describe("Login API", () => {
   it("return new session", async () => {

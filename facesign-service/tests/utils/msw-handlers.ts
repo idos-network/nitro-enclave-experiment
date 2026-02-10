@@ -1,4 +1,4 @@
-import { http, HttpResponse } from "msw";
+import { HttpResponse, http } from "msw";
 
 const FACETEC_SERVER = "http://127.0.0.1:5000/";
 
@@ -130,9 +130,7 @@ export function sessionStartHandler(responseBlob = "mock-session-result-blob") {
 }
 
 // Helper to create 3d-db/search handler with custom results
-export function searchHandler(
-  results: Array<{ identifier: string; matchLevel: number }> = [],
-) {
+export function searchHandler(results: Array<{ identifier: string; matchLevel: number }> = []) {
   return http.post(`${FACETEC_SERVER}3d-db/search`, async ({ request }) => {
     const body = await request.json();
     requestCapture.capture(request.url, request.method, body);

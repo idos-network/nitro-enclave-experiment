@@ -1,15 +1,13 @@
 // biome-ignore-all lint/suspicious/noExplicitAny: Test files often need any
 import { generateKeyPairSync } from "node:crypto";
+import { ObjectId } from "mongodb";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
-
+import * as db from "../../providers/db.ts";
+import app from "../../server.ts";
 import { GROUP_NAME, makeConfirmationToken } from "../utils/helper.ts";
 import { requestCapture, searchHandler } from "../utils/msw-handlers.ts";
 import { server } from "../utils/msw-server.ts";
-
-import { ObjectId } from "mongodb";
-import * as db from "../../providers/db.ts";
-import app from "../../server.ts";
 
 describe("FaceSign/Confirmation API", () => {
   it("missing token", async () => {
