@@ -225,7 +225,7 @@ Methods are mapped to status response codes in this favor:
 
 2b. New user (status: **200**)
 
-- this is a happy path scenario
+- this is a happy path scenario if user is new, because of FFR we can't be 100% sure, so we have to ask and than confirm with confirmationToken
 
 ```javascript
 {
@@ -248,7 +248,7 @@ Methods are mapped to status response codes in this favor:
 }
 ```
 
-3. User login failed or liveness was not proven (status: **400**)
+1. User login failed or liveness was not proven (status: **400**)
 
 - this is a recoverable error, the user have to start again
 
