@@ -1,32 +1,10 @@
 // biome-ignore-all lint/suspicious/noExplicitAny: Test files often need any
-import { generateKeyPairSync } from "node:crypto";
 import jwt from "jsonwebtoken";
 import request from "supertest";
-import { afterEach, describe, expect, it, vi } from "vitest";
 import agent from "../providers/agent.ts";
 
-const { privateKey, publicKey } = generateKeyPairSync("ec", {
-  namedCurve: "secp521r1",
-  privateKeyEncoding: { type: "pkcs8", format: "pem" },
-  publicKeyEncoding: { type: "spki", format: "pem" },
-});
-
-vi.mock("fs", async () => {
-  const actualFs = await vi.importActual<typeof import("fs")>("fs");
-
-  return {
-    ...actualFs,
-    readFileSync: vi.fn(() => privateKey),
-  };
-});
-
-// Mock modules before importing the app
-vi.mock("../providers/db.ts", () => ({
-  insertMember: vi.fn(),
-  countMembersInGroup: vi.fn(),
-  getMembers: vi.fn(),
-  getOldestFaceSignUserId: vi.fn(),
-}));
+import { GROUP_NAME } from "./utils/facesign-test-helpers.ts";
+import { publicKey } from "./utils/test-keys.ts";
 
 import { ObjectId } from "mongodb";
 import * as db from "../providers/db.ts";
@@ -152,7 +130,7 @@ describe("FaceSign Login API", () => {
     expect(duplicateCall).toBeDefined();
     expect(JSON.parse(duplicateCall?.[1]?.body as string)).toMatchObject({
       externalDatabaseRefID: response.body.faceSignUserId,
-      groupName: "pinocchio-users",
+      groupName: GROUP_NAME,
       minMatchLevel: 15,
     });
 
@@ -343,7 +321,7 @@ describe("FaceSign Login API", () => {
     // @ts-expect-error This is fine for tests
     expect(JSON.parse(duplicateRequestCall?.[1]?.body ?? "{}")).toMatchObject({
       externalDatabaseRefID: expect.any(String),
-      groupName: "pinocchio-users",
+      groupName: GROUP_NAME,
       minMatchLevel: 15,
     });
 

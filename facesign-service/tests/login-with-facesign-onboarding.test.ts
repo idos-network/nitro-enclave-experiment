@@ -1,33 +1,8 @@
 // biome-ignore-all lint/suspicious/noExplicitAny: Test files often need any
-
-import { generateKeyPairSync } from "node:crypto";
 import jwt from "jsonwebtoken";
 import { ObjectId } from "mongodb";
 import request from "supertest";
-import { describe, expect, it, vi } from "vitest";
-
-// Mock modules before importing the app
-vi.mock("../providers/db.ts", () => ({
-  insertMember: vi.fn(),
-  countMembersInGroup: vi.fn(),
-  getMembers: vi.fn(),
-}));
-
-const { privateKey, publicKey } = generateKeyPairSync("ec", {
-  namedCurve: "secp521r1",
-  privateKeyEncoding: { type: "pkcs8", format: "pem" },
-  publicKeyEncoding: { type: "spki", format: "pem" },
-});
-
-vi.mock("fs", async () => {
-  const actualFs = await vi.importActual<typeof import("fs")>("fs");
-
-  return {
-    ...actualFs,
-    readFileSync: vi.fn(() => privateKey),
-  };
-});
-
+import { publicKey } from "./utils/test-keys.ts";
 import agent from "../providers/agent.ts";
 import * as db from "../providers/db.ts";
 import app from "../server.ts";

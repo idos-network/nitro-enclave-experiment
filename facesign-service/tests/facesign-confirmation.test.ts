@@ -1,31 +1,13 @@
 // biome-ignore-all lint/suspicious/noExplicitAny: Test files often need any
 import { generateKeyPairSync } from "node:crypto";
-import jwt from "jsonwebtoken";
 import request from "supertest";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { privateKey } = generateKeyPairSync("ec", {
-  namedCurve: "secp521r1",
-  privateKeyEncoding: { type: "pkcs8", format: "pem" },
-  publicKeyEncoding: { type: "spki", format: "pem" },
-});
-
-vi.mock("fs", async () => {
-  const actualFs = await vi.importActual<typeof import("fs")>("fs");
-
-  return {
-    ...actualFs,
-    readFileSync: vi.fn(() => privateKey),
-  };
-});
-
-// Mock modules before importing the app
-vi.mock("../providers/db.ts", () => ({
-  insertMember: vi.fn(),
-  countMembersInGroup: vi.fn(),
-  getMembers: vi.fn(),
-  getOldestFaceSignUserId: vi.fn(),
-}));
+import {
+  GROUP_NAME,
+  makeConfirmationToken,
+  mock3dDbFetch,
+} from "./utils/facesign-test-helpers.ts";
 
 import { ObjectId } from "mongodb";
 import * as db from "../providers/db.ts";
@@ -50,16 +32,11 @@ describe("FaceSign Confirmation API", () => {
       publicKeyEncoding: { type: "spki", format: "pem" },
     }).privateKey;
 
-    const token = jwt.sign(
-      {
-        sub: "test-user-id",
-        action: "facesign-confirmation",
-      },
-      wrongPrivateKey,
-      {
-        algorithm: "ES512",
-      },
-    );
+    const token = makeConfirmationToken({
+      sub: "test-user-id",
+      action: "facesign-confirmation",
+      key: wrongPrivateKey,
+    });
 
     const response = await request(app).post("/facesign/confirmation").send({
       confirmationToken: token,
@@ -70,17 +47,11 @@ describe("FaceSign Confirmation API", () => {
   });
 
   it("expired token", async () => {
-    const token = jwt.sign(
-      {
-        sub: "test-user-id",
-        action: "confirmation",
-        iat: Math.floor(Date.now() / 1000) - 120, // 2 minutes ago
-      },
-      privateKey,
-      {
-        algorithm: "ES512",
-      },
-    );
+    const token = makeConfirmationToken({
+      sub: "test-user-id",
+      action: "confirmation",
+      iat: Math.floor(Date.now() / 1000) - 120, // 2 minutes ago
+    });
 
     const response = await request(app).post("/facesign/confirmation").send({
       confirmationToken: token,
@@ -93,36 +64,14 @@ describe("FaceSign Confirmation API", () => {
   it("user is already onboarded", async () => {
     const userId = "test-user-id-already-onboarded";
 
-    vi.spyOn(global, "fetch").mockImplementation(async (url) => {
-      if (url.toString().endsWith("3d-db/search")) {
-        return {
-          ok: true,
-          json: async () => ({
-            success: true,
-            results: [{ identifier: "different-user-id", matchLevel: 15 }],
-          }),
-        } as any;
-      }
-
-      return {
-        ok: true,
-        json: async () => ({
-          success: true,
-        }),
-      } as any;
+    mock3dDbFetch({
+      searchResults: [{ identifier: "different-user-id", matchLevel: 15 }],
     });
 
-    const token = jwt.sign(
-      {
-        sub: userId,
-        action: "confirmation",
-        iat: Math.floor(Date.now() / 1000),
-      },
-      privateKey,
-      {
-        algorithm: "ES512",
-      },
-    );
+    const token = makeConfirmationToken({
+      sub: userId,
+      action: "confirmation",
+    });
 
     const response = await request(app).post("/facesign/confirmation").send({
       confirmationToken: token,
@@ -135,36 +84,12 @@ describe("FaceSign Confirmation API", () => {
   it("everything ok", async () => {
     const userId = crypto.randomUUID();
 
-    const spyFetch = vi.spyOn(global, "fetch").mockImplementation(async (url) => {
-      if (url.toString().endsWith("3d-db/search")) {
-        return {
-          ok: true,
-          json: async () => ({
-            success: true,
-            results: [],
-          }),
-        } as any;
-      }
+    const spyFetch = mock3dDbFetch();
 
-      return {
-        ok: true,
-        json: async () => ({
-          success: true,
-        }),
-      } as any;
+    const token = makeConfirmationToken({
+      sub: userId,
+      action: "confirmation",
     });
-
-    const token = jwt.sign(
-      {
-        sub: userId,
-        action: "confirmation",
-        iat: Math.floor(Date.now() / 1000),
-      },
-      privateKey,
-      {
-        algorithm: "ES512",
-      },
-    );
 
     const insertMemberSpy = vi.spyOn(db, "insertMember").mockResolvedValue({
       acknowledged: true,
@@ -181,7 +106,7 @@ describe("FaceSign Confirmation API", () => {
       entropyToken: expect.any(String),
     });
 
-    expect(insertMemberSpy).toHaveBeenCalledWith(userId, "pinocchio-users");
+    expect(insertMemberSpy).toHaveBeenCalledWith(userId, GROUP_NAME);
 
     // 3d-db/enroll
     const enrollCall = spyFetch.mock.calls.find((call) =>
@@ -190,7 +115,7 @@ describe("FaceSign Confirmation API", () => {
     expect(enrollCall).toBeDefined();
     expect(JSON.parse(enrollCall?.[1]?.body as string)).toMatchObject({
       externalDatabaseRefID: userId,
-      groupName: "pinocchio-users",
+      groupName: GROUP_NAME,
     });
   });
 });

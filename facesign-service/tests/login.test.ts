@@ -2,6 +2,7 @@
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 import agent from "../providers/agent.ts";
+import { mockFetchByEndpoint } from "./utils/facesign-test-helpers.ts";
 
 // Mock modules before importing the app
 vi.mock("../providers/db.ts", () => ({
@@ -17,12 +18,11 @@ import app from "../server.ts";
 
 describe("Login API", () => {
   it("return new session", async () => {
-    vi.spyOn(global, "fetch").mockResolvedValue({
-      ok: true,
-      json: async () => ({
+    mockFetchByEndpoint([], {
+      json: {
         responseBlob: "mock-session-result-blob",
-      }),
-    } as any);
+      },
+    });
 
     const response = await request(app).post("/login").send({
       requestBlob: "test-face-scan",
@@ -34,12 +34,12 @@ describe("Login API", () => {
   });
 
   it("fail with error", async () => {
-    vi.spyOn(global, "fetch").mockResolvedValue({
+    mockFetchByEndpoint([], {
       ok: false,
       status: 500,
       statusText: "Internal Server Error",
-      text: async () => "Server error",
-    } as any);
+      text: "Server error",
+    });
 
     const response = await request(app).post("/login").send({
       requestBlob: "test-face-scan",
@@ -55,36 +55,35 @@ describe("Login API", () => {
   });
 
   it("new user (default group and face vector)", async () => {
-    const spyFetch = vi.spyOn(global, "fetch").mockImplementation(async (url) => {
-      if (url.toString().endsWith("/process-request")) {
-        return {
-          ok: true,
-          json: async () => ({
-            success: true,
-            result: { livenessProven: true },
-            didError: false,
-            responseBlob: "mock-scan-result-blob",
-          }),
-        } as any;
-      }
-
-      if (url.toString().endsWith("3d-db/search")) {
-        return {
-          ok: true,
-          json: async () => ({
-            success: true,
-            results: [],
-          }),
-        } as any;
-      }
-
-      return {
-        ok: true,
-        json: async () => ({
+    const spyFetch = mockFetchByEndpoint(
+      [
+        {
+          endsWith: "/process-request",
+          response: {
+            json: {
+              success: true,
+              result: { livenessProven: true },
+              didError: false,
+              responseBlob: "mock-scan-result-blob",
+            },
+          },
+        },
+        {
+          endsWith: "3d-db/search",
+          response: {
+            json: {
+              success: true,
+              results: [],
+            },
+          },
+        },
+      ],
+      {
+        json: {
           success: true,
-        }),
-      } as any;
-    });
+        },
+      },
+    );
 
     const insertMemberSpy = vi.spyOn(db, "insertMember").mockResolvedValue({
       acknowledged: true,
@@ -129,36 +128,35 @@ describe("Login API", () => {
   });
 
   it("new user (different group and faceMap instead of vectors)", async () => {
-    const spyFetch = vi.spyOn(global, "fetch").mockImplementation(async (url) => {
-      if (url.toString().endsWith("/process-request")) {
-        return {
-          ok: true,
-          json: async () => ({
-            success: true,
-            result: { livenessProven: true },
-            didError: false,
-            responseBlob: "mock-scan-result-blob",
-          }),
-        } as any;
-      }
-
-      if (url.toString().endsWith("3d-db/search")) {
-        return {
-          ok: true,
-          json: async () => ({
-            success: true,
-            results: [],
-          }),
-        } as any;
-      }
-
-      return {
-        ok: true,
-        json: async () => ({
+    const spyFetch = mockFetchByEndpoint(
+      [
+        {
+          endsWith: "/process-request",
+          response: {
+            json: {
+              success: true,
+              result: { livenessProven: true },
+              didError: false,
+              responseBlob: "mock-scan-result-blob",
+            },
+          },
+        },
+        {
+          endsWith: "3d-db/search",
+          response: {
+            json: {
+              success: true,
+              results: [],
+            },
+          },
+        },
+      ],
+      {
+        json: {
           success: true,
-        }),
-      } as any;
-    });
+        },
+      },
+    );
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
@@ -196,19 +194,19 @@ describe("Login API", () => {
   });
 
   it("failing liveness", async () => {
-    const spyFetch = vi.spyOn(global, "fetch").mockImplementation(async (url) => {
-      if (url.toString().endsWith("/process-request")) {
-        return {
-          ok: true,
-          json: async () => ({
+    const spyFetch = mockFetchByEndpoint([
+      {
+        endsWith: "/process-request",
+        response: {
+          json: {
             success: false,
             result: { livenessProven: false },
             didError: true,
             responseBlob: "mock-scan-result-blob",
-          }),
-        } as any;
-      }
-    });
+          },
+        },
+      },
+    ]);
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
@@ -239,36 +237,35 @@ describe("Login API", () => {
   it("duplicate (normal)", async () => {
     const resultId = crypto.randomUUID();
 
-    vi.spyOn(global, "fetch").mockImplementation(async (url) => {
-      if (url.toString().endsWith("/process-request")) {
-        return {
-          ok: true,
-          json: async () => ({
-            success: true,
-            result: { livenessProven: true },
-            didError: false,
-            responseBlob: "mock-scan-result-blob",
-          }),
-        } as any;
-      }
-
-      if (url.toString().endsWith("3d-db/search")) {
-        return {
-          ok: true,
-          json: async () => ({
-            success: true,
-            results: [{ identifier: resultId, matchLevel: 15 }],
-          }),
-        } as any;
-      }
-
-      return {
-        ok: true,
-        json: async () => ({
+    mockFetchByEndpoint(
+      [
+        {
+          endsWith: "/process-request",
+          response: {
+            json: {
+              success: true,
+              result: { livenessProven: true },
+              didError: false,
+              responseBlob: "mock-scan-result-blob",
+            },
+          },
+        },
+        {
+          endsWith: "3d-db/search",
+          response: {
+            json: {
+              success: true,
+              results: [{ identifier: resultId, matchLevel: 15 }],
+            },
+          },
+        },
+      ],
+      {
+        json: {
           success: true,
-        }),
-      } as any;
-    });
+        },
+      },
+    );
 
     const insertMemberSpy = vi.spyOn(db, "insertMember").mockResolvedValue({
       acknowledged: true,
@@ -304,39 +301,38 @@ describe("Login API", () => {
     const resultId = crypto.randomUUID();
     const resultId2 = crypto.randomUUID();
 
-    const spyFetch = vi.spyOn(global, "fetch").mockImplementation(async (url) => {
-      if (url.toString().endsWith("/process-request")) {
-        return {
-          ok: true,
-          json: async () => ({
-            success: true,
-            result: { livenessProven: true },
-            didError: false,
-            responseBlob: "mock-scan-result-blob",
-          }),
-        } as any;
-      }
-
-      if (url.toString().endsWith("3d-db/search")) {
-        return {
-          ok: true,
-          json: async () => ({
-            success: true,
-            results: [
-              { identifier: resultId, matchLevel: 15 },
-              { identifier: resultId2, matchLevel: 15 },
-            ],
-          }),
-        } as any;
-      }
-
-      return {
-        ok: true,
-        json: async () => ({
+    const spyFetch = mockFetchByEndpoint(
+      [
+        {
+          endsWith: "/process-request",
+          response: {
+            json: {
+              success: true,
+              result: { livenessProven: true },
+              didError: false,
+              responseBlob: "mock-scan-result-blob",
+            },
+          },
+        },
+        {
+          endsWith: "3d-db/search",
+          response: {
+            json: {
+              success: true,
+              results: [
+                { identifier: resultId, matchLevel: 15 },
+                { identifier: resultId2, matchLevel: 15 },
+              ],
+            },
+          },
+        },
+      ],
+      {
+        json: {
           success: true,
-        }),
-      } as any;
-    });
+        },
+      },
+    );
 
     const insertMemberSpy = vi.spyOn(db, "insertMember").mockResolvedValue({
       acknowledged: true,
