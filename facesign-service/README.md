@@ -55,7 +55,7 @@ Methods are mapped to status response codes in this favor:
   faceSign: {
     newUser: boolean, // user has been created, no profile
     faceSignUserId: string,
-    entropyToken: string,
+    userAttestmentToken: string,
   }
 }
 ```
@@ -219,7 +219,7 @@ Methods are mapped to status response codes in this favor:
 
   // FaceSign service customs
   faceSignUserId: "user-uuid",
-  entropyToken: "jwt token for entropy service",
+  userAttestmentToken: "jwt token for entropy service",
 }
 ```
 
@@ -244,7 +244,7 @@ Methods are mapped to status response codes in this favor:
 
   // FaceSign service customs
   faceSignUserId: "user-uuid",
-  confirmationToken: "jwt token for entropy service",
+  newUserConfirmationToken: "jwt token to confirm users creation",
 }
 ```
 
@@ -280,7 +280,7 @@ Body:
 
 ```javascript
 {
-  confirmationToken: "JWT token from facesign", 
+  newUserConfirmationToken: "token from facesign", 
 }
 ```
 
@@ -289,7 +289,7 @@ Body:
 ```javascript
 {
   faceSignUserId: "UUID",
-  entropyToken: "JWT-token",
+  userAttestmentToken: "token for entropy service",
 }
 ```
 

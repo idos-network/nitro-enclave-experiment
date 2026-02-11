@@ -74,11 +74,11 @@ describe("FaceSign/Login API", () => {
       result: { livenessProven: true },
       success: true,
       newUser: true,
-      confirmationToken: expect.any(String),
+      newUserConfirmationToken: expect.any(String),
     });
 
     // Verify the JWT token
-    const decoded = jwt.verify(response.body.confirmationToken, publicKey, {
+    const decoded = jwt.verify(response.body.newUserConfirmationToken, publicKey, {
       algorithms: ["ES512"],
     });
     expect(decoded.sub).toBe(response.body.faceSignUserId);
@@ -158,7 +158,7 @@ describe("FaceSign/Login API", () => {
     });
 
     // Verify the JWT token
-    const decoded = jwt.verify(response.body.entropyToken, publicKey, { algorithms: ["ES512"] });
+    const decoded = jwt.verify(response.body.userAttestmentToken, publicKey, { algorithms: ["ES512"] });
     expect(decoded.sub).toBe(resultId);
 
     expect(response.status).toBe(201);
@@ -169,7 +169,7 @@ describe("FaceSign/Login API", () => {
       didError: false,
       newUser: false,
       result: { livenessProven: true },
-      entropyToken: expect.any(String),
+      userAttestmentToken: expect.any(String),
     });
 
     expect(oldestSpy).not.toHaveBeenCalledWith([resultId]);
@@ -223,11 +223,11 @@ describe("FaceSign/Login API", () => {
       result: { livenessProven: true },
       didError: false,
       newUser: false,
-      entropyToken: expect.any(String),
+      userAttestmentToken: expect.any(String),
     });
 
     // Verify the JWT token
-    const decoded = jwt.verify(response.body.entropyToken, publicKey, { algorithms: ["ES512"] });
+    const decoded = jwt.verify(response.body.userAttestmentToken, publicKey, { algorithms: ["ES512"] });
     expect(decoded.sub).toBe(resultId3);
 
     expect(db.insertMember).not.toHaveBeenCalled();

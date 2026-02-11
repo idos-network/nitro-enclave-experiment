@@ -109,27 +109,19 @@ export default async function handler(req: Request, res: Response) {
 
   // If we want token and onboard user in facesign group
   if (onboardFaceSign) {
-    const {
-      newUser: faceSignNewUser,
-      faceSignUserId: faceSignNewUserId,
-      entropyToken,
-    } = await faceSignLogin(
+    const faceSignLoginResult = await faceSignLogin(
       faceSignUserId,
       true, // Enroll if new, we want the user to be enrolled in facesign-users group, there is no confirmation
     );
 
     faceSign = {
-      newUser: faceSignNewUser,
-      faceSignUserId: faceSignNewUserId,
-      entropyToken,
+      ...faceSignLoginResult,
     };
   }
 
   return res.status(201).json({
     ...alwaysToReturn,
     faceSignUserId,
-
-    // In case of onboarding to FaceSign
     faceSign,
   });
 }

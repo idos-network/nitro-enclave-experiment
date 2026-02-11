@@ -5,6 +5,27 @@ import agent from "../providers/agent.ts";
 import { enrollUser, searchForDuplicates } from "./api.ts";
 import { countMembersInGroup, getOldestFaceSignUserId, insertMember } from "./db.ts";
 
+// FaceSign login - new user (waiting for confirmation)
+export interface FaceSignLoginNew {
+  newUser: true;
+  faceSignUserId: string;
+  newUserConfirmationToken: string;
+}
+
+// FaceSign login (via normal login route, forced onboarding)
+export interface FaceSignLoginCreated {
+  newUser: true;
+  faceSignUserId: string;
+  userAttestmentToken: string;
+}
+
+// FaceSign login (existing user)
+export interface FaceSignLoginExisting {
+  newUser: false;
+  faceSignUserId: string;
+  userAttestmentToken: string;
+}
+
 /**
  * FaceSign Login process
  * @param faceSignUserId Onboarded users, liveness proven, no error
@@ -12,12 +33,7 @@ import { countMembersInGroup, getOldestFaceSignUserId, insertMember } from "./db
 export async function faceSignLogin(
   currentUserId: string,
   enrollIfNew = false,
-): Promise<{
-  newUser: boolean;
-  faceSignUserId: string;
-  entropyToken?: string;
-  confirmationToken?: string;
-}> {
+): Promise<FaceSignLoginNew | FaceSignLoginExisting | FaceSignLoginCreated> {
   let results: { identifier: string; matchLevel: number }[] = [];
 
   const searchResult = await searchForDuplicates(currentUserId, FACE_SIGN_GROUP_NAME);
@@ -42,7 +58,7 @@ export async function faceSignLogin(
 
   // New user, but it should not be enrolled yet
   if (results.length === 0 && !enrollIfNew) {
-    const confirmationToken = jwt.sign(
+    const newUserConfirmationToken = jwt.sign(
       { sub: currentUserId, action: "confirmation" },
       readFileSync(JWT_PRIVATE_KEY, "utf-8"),
       { algorithm: "ES512" }, // Token contains "iat" which is used in entropy-service to check token age
@@ -55,7 +71,7 @@ export async function faceSignLogin(
     return {
       newUser: true,
       faceSignUserId: currentUserId,
-      confirmationToken,
+      newUserConfirmationToken,
     };
   }
 
@@ -70,12 +86,12 @@ export async function faceSignLogin(
 
     let faceSignUserId = results[0]?.identifier;
 
-    // For more than 1 result (should not happen), we take the oldest one (the one that was onboarded first)
+    // For more than 1 result (FFRs), we take the oldest one (the one that was onboarded first)
     if (results.length > 1) {
       faceSignUserId = await getOldestFaceSignUserId(results.map((x) => x.identifier));
     }
 
-    const entropyToken = jwt.sign(
+    const userAttestmentToken = jwt.sign(
       { sub: faceSignUserId },
       readFileSync(JWT_PRIVATE_KEY, "utf-8"),
       { algorithm: "ES512" }, // Token contains "iat" which is used in entropy-service to check token age
@@ -83,7 +99,7 @@ export async function faceSignLogin(
 
     return {
       newUser: false,
-      entropyToken,
+      userAttestmentToken,
       // @ts-expect-error Missing types, but it should be fine with the check above
       faceSignUserId,
     };
@@ -95,14 +111,14 @@ export async function faceSignLogin(
   await enrollUser(currentUserId, FACE_SIGN_GROUP_NAME);
   await insertMember(FACE_SIGN_GROUP_NAME, currentUserId);
 
-  const token = jwt.sign({ sub: currentUserId }, readFileSync(JWT_PRIVATE_KEY, "utf-8"), {
+  const userAttestmentToken = jwt.sign({ sub: currentUserId }, readFileSync(JWT_PRIVATE_KEY, "utf-8"), {
     algorithm: "ES512",
     expiresIn: "20s",
   });
 
   return {
     newUser: true,
-    entropyToken: token,
+    userAttestmentToken,
     faceSignUserId: currentUserId,
   };
 }

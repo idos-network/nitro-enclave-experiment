@@ -31,7 +31,7 @@ describe("FaceSign/Confirmation API", () => {
     });
 
     const response = await request(app).post("/facesign/confirmation").send({
-      confirmationToken: token,
+      newUserConfirmationToken: token,
     });
 
     expect(response.status).toBe(400);
@@ -46,7 +46,7 @@ describe("FaceSign/Confirmation API", () => {
     });
 
     const response = await request(app).post("/facesign/confirmation").send({
-      confirmationToken: token,
+      newUserConfirmationToken: token,
     });
 
     expect(response.status).toBe(400);
@@ -64,7 +64,7 @@ describe("FaceSign/Confirmation API", () => {
     });
 
     const response = await request(app).post("/facesign/confirmation").send({
-      confirmationToken: token,
+      newUserConfirmationToken: token,
     });
 
     expect(response.status).toBe(409);
@@ -87,13 +87,13 @@ describe("FaceSign/Confirmation API", () => {
     });
 
     const response = await request(app).post("/facesign/confirmation").send({
-      confirmationToken: token,
+      newUserConfirmationToken: token,
     });
 
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({
       faceSignUserId: userId,
-      entropyToken: expect.any(String),
+      userAttestmentToken: expect.any(String),
     });
 
     expect(insertMemberSpy).toHaveBeenCalledWith(userId, GROUP_NAME);

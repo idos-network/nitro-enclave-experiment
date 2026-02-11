@@ -47,7 +47,7 @@ describe("Login/Facesign Onboarding API", () => {
       faceSign: {
         newUser: true,
         faceSignUserId: expect.any(String),
-        entropyToken: expect.any(String),
+        userAttestmentToken: expect.any(String),
       },
       success: true,
     });
@@ -63,7 +63,7 @@ describe("Login/Facesign Onboarding API", () => {
     expect(insertMemberSpy).toHaveBeenCalledWith("facesign-users", response.body.faceSignUserId);
 
     // Check jwt
-    const decoded = jwt.verify(response.body.faceSign.entropyToken, publicKey, {
+    const decoded = jwt.verify(response.body.faceSign.userAttestmentToken, publicKey, {
       algorithms: ["ES512"],
     }) as { sub: string; iat: number };
 
@@ -108,7 +108,7 @@ describe("Login/Facesign Onboarding API", () => {
       faceSign: {
         newUser: false,
         faceSignUserId: "existing-user-id",
-        entropyToken: expect.any(String),
+        userAttestmentToken: expect.any(String),
       },
       success: true,
     });
@@ -126,7 +126,7 @@ describe("Login/Facesign Onboarding API", () => {
     expect(insertMemberSpy).toHaveBeenCalledTimes(1);
 
     // Check jwt
-    const decoded = jwt.verify(response.body.faceSign.entropyToken, publicKey, {
+    const decoded = jwt.verify(response.body.faceSign.userAttestmentToken, publicKey, {
       algorithms: ["ES512"],
     }) as { sub: string; iat: number };
 

@@ -40,28 +40,22 @@ export const login = async (req: Request, res: Response) => {
     });
   }
 
-  const { newUser, entropyToken, confirmationToken, faceSignUserId } = await faceSignLogin(
-    generatedUserId,
-    false,
-  );
+  const faceSignLoginResult = await faceSignLogin( generatedUserId, false);
 
-  return res.status(newUser ? 200 : 201).json({
+  return res.status(faceSignLoginResult.newUser ? 200 : 201).json({
     ...alwaysToReturn,
-    faceSignUserId,
-    newUser,
-    entropyToken,
-    confirmationToken,
+    ...faceSignLoginResult,
   });
 };
 
 // FACESIGN - Confirmation route
 export const confirmation = async (req: Request, res: Response) => {
-  const { confirmationToken } = req.body;
+  const { newUserConfirmationToken } = req.body;
 
   let result: { sub: string; action: string; iat: number };
 
   try {
-    result = jwt.verify(confirmationToken, readFileSync(JWT_PRIVATE_KEY, "utf-8"), {
+    result = jwt.verify(newUserConfirmationToken, readFileSync(JWT_PRIVATE_KEY, "utf-8"), {
       algorithms: ["ES512"],
     }) as { sub: string; action: string; iat: number };
   } catch (error) {
@@ -99,7 +93,7 @@ export const confirmation = async (req: Request, res: Response) => {
   await enrollUser(faceSignUserId, FACE_SIGN_GROUP_NAME);
   await insertMember(faceSignUserId, FACE_SIGN_GROUP_NAME);
 
-  const entropyToken = jwt.sign(
+  const userAttestmentToken = jwt.sign(
     { sub: faceSignUserId },
     readFileSync(JWT_PRIVATE_KEY, "utf-8"),
     { algorithm: "ES512" }, // Token contains "iat" which is used in entropy-service to check token age
@@ -110,5 +104,5 @@ export const confirmation = async (req: Request, res: Response) => {
     ip: req.ip,
   });
 
-  return res.status(200).json({ faceSignUserId, entropyToken });
+  return res.status(200).json({ faceSignUserId, userAttestmentToken });
 };
