@@ -36,11 +36,11 @@ class RequestCapture {
 
 export const requestCapture = new RequestCapture();
 
+// biome-ignore lint/suspicious/noExplicitAny: MSW types are complex
+type ResolverResult = HttpResponse<any> | Record<string, unknown>;
+
 // Helper to create a POST handler with automatic request capture
-function postHandler<T>(
-  endpoint: string,
-  resolver: (body: unknown) => HttpResponse | T,
-) {
+function postHandler(endpoint: string, resolver: (body: unknown) => ResolverResult) {
   return http.post(`${FACETEC_SERVER}${endpoint}`, async ({ request }) => {
     const body = await request.json();
     requestCapture.capture(request.url, request.method, body);
@@ -119,5 +119,4 @@ export const searchHandlerWithBodyCheck = (
     results: matcher(body as { groupName?: string }) ? results : fallbackResults,
   }));
 
-export const enrollHandler = (success = true) =>
-  postHandler("3d-db/enroll", () => ({ success }));
+export const enrollHandler = (success = true) => postHandler("3d-db/enroll", () => ({ success }));
