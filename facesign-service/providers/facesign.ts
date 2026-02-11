@@ -111,10 +111,14 @@ export async function faceSignLogin(
   await enrollUser(currentUserId, FACE_SIGN_GROUP_NAME);
   await insertMember(FACE_SIGN_GROUP_NAME, currentUserId);
 
-  const userAttestmentToken = jwt.sign({ sub: currentUserId }, readFileSync(JWT_PRIVATE_KEY, "utf-8"), {
-    algorithm: "ES512",
-    expiresIn: "20s",
-  });
+  const userAttestmentToken = jwt.sign(
+    { sub: currentUserId },
+    readFileSync(JWT_PRIVATE_KEY, "utf-8"),
+    {
+      algorithm: "ES512",
+      expiresIn: "20s",
+    },
+  );
 
   return {
     newUser: true,

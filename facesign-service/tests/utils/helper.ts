@@ -16,7 +16,7 @@ type TokenOptions = {
   key?: string | Buffer;
 };
 
-export function makeConfirmationToken({
+export function makeNewUserConfirmationToken({
   sub,
   action = "confirmation",
   iat = Math.floor(Date.now() / 1000),

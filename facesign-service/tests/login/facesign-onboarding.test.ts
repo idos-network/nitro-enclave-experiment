@@ -81,7 +81,7 @@ describe("Login/Facesign Onboarding API", () => {
       // Return existing user only for pinocchio-users group (facesign), empty for others (login)
       searchHandlerWithBodyCheck(
         (body) => body.groupName === "pinocchio-users",
-        [{ identifier: "existing-user-id", matchLevel: 90 }],
+        [{ identifier: "existing-user-id", matchLevel: 15 }],
         [],
       ),
     );
@@ -113,7 +113,7 @@ describe("Login/Facesign Onboarding API", () => {
       success: true,
     });
 
-    // User IDs should match
+    // User IDs should not match
     expect(response.body.faceSignUserId).not.toBe(response.body.faceSign.faceSignUserId);
 
     // Check only faceSign stuff

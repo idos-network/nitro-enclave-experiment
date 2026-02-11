@@ -36,133 +36,88 @@ class RequestCapture {
 
 export const requestCapture = new RequestCapture();
 
-// Default successful responses
-export const defaultProcessRequestResponse = {
-  success: true,
-  result: { livenessProven: true },
-  didError: false,
-  responseBlob: "mock-scan-result-blob",
+// Helper to create a POST handler with automatic request capture
+function postHandler<T>(
+  endpoint: string,
+  resolver: (body: unknown) => HttpResponse | T,
+) {
+  return http.post(`${FACETEC_SERVER}${endpoint}`, async ({ request }) => {
+    const body = await request.json();
+    requestCapture.capture(request.url, request.method, body);
+    const result = resolver(body);
+    return result instanceof HttpResponse ? result : HttpResponse.json(result);
+  });
+}
+
+// Default responses
+const defaults = {
+  processRequest: {
+    success: true,
+    result: { livenessProven: true },
+    didError: false,
+    responseBlob: "mock-scan-result-blob",
+  },
+  search: {
+    success: true,
+    results: [] as Array<{ identifier: string; matchLevel: number }>,
+  },
+  enroll: { success: true },
+  status: {
+    running: true,
+    success: true,
+    serverInfo: {
+      coreServerSDKVersion: "1.0.0",
+      facetecServerWebserviceVersion: "1.0.0",
+      uptime: 1000,
+      machineID: "test-machine",
+      instanceID: "test-instance",
+      notice: "Test server",
+    },
+  },
 };
 
-export const defaultSearchResponse = {
-  success: true,
-  results: [] as Array<{ identifier: string; matchLevel: number }>,
-};
-
-export const defaultEnrollResponse = {
-  success: true,
-};
-
-export const defaultSessionResponse = {
-  responseBlob: "mock-session-result-blob",
-};
-
-// Default handlers - return success responses
+// Default handlers
 export const handlers = [
-  http.post(`${FACETEC_SERVER}process-request`, async ({ request }) => {
-    const body = await request.json();
-    requestCapture.capture(request.url, request.method, body);
-    return HttpResponse.json(defaultProcessRequestResponse);
-  }),
-
-  http.post(`${FACETEC_SERVER}3d-db/search`, async ({ request }) => {
-    const body = await request.json();
-    requestCapture.capture(request.url, request.method, body);
-    return HttpResponse.json(defaultSearchResponse);
-  }),
-
-  http.post(`${FACETEC_SERVER}3d-db/enroll`, async ({ request }) => {
-    const body = await request.json();
-    requestCapture.capture(request.url, request.method, body);
-    return HttpResponse.json(defaultEnrollResponse);
-  }),
-
+  postHandler("process-request", () => defaults.processRequest),
+  postHandler("3d-db/search", () => defaults.search),
+  postHandler("3d-db/enroll", () => defaults.enroll),
   http.get(`${FACETEC_SERVER}status`, ({ request }) => {
     requestCapture.capture(request.url, request.method, null);
-    return HttpResponse.json({
-      running: true,
-      success: true,
-      serverInfo: {
-        coreServerSDKVersion: "1.0.0",
-        facetecServerWebserviceVersion: "1.0.0",
-        uptime: 1000,
-        machineID: "test-machine",
-        instanceID: "test-instance",
-        notice: "Test server",
-      },
-    });
+    return HttpResponse.json(defaults.status);
   }),
 ];
 
-// Helper to create process-request handler with custom response
-export function processRequestHandler(response: {
+// Handler factories
+type ProcessRequestResponse = {
   success?: boolean;
   result?: { livenessProven: boolean; matchLevel?: number };
   didError?: boolean;
   responseBlob?: string;
-}) {
-  return http.post(`${FACETEC_SERVER}process-request`, async ({ request }) => {
-    const body = await request.json();
-    requestCapture.capture(request.url, request.method, body);
-    return HttpResponse.json({
-      ...defaultProcessRequestResponse,
-      ...response,
-    });
-  });
-}
+};
 
-// Helper to create process-request handler that returns error
-export function processRequestErrorHandler(status: number, body: string) {
-  return http.post(`${FACETEC_SERVER}process-request`, async ({ request }) => {
-    const reqBody = await request.json();
-    requestCapture.capture(request.url, request.method, reqBody);
-    return new HttpResponse(body, { status });
-  });
-}
+export const processRequestHandler = (response: ProcessRequestResponse = {}) =>
+  postHandler("process-request", () => ({ ...defaults.processRequest, ...response }));
 
-// Helper for session start response (no success field, just responseBlob)
-export function sessionStartHandler(responseBlob = "mock-session-result-blob") {
-  return http.post(`${FACETEC_SERVER}process-request`, async ({ request }) => {
-    const body = await request.json();
-    requestCapture.capture(request.url, request.method, body);
-    return HttpResponse.json({ responseBlob });
-  });
-}
+export const processRequestErrorHandler = (status: number, text: string) =>
+  postHandler("process-request", () => new HttpResponse(text, { status }));
 
-// Helper to create 3d-db/search handler with custom results
-export function searchHandler(results: Array<{ identifier: string; matchLevel: number }> = []) {
-  return http.post(`${FACETEC_SERVER}3d-db/search`, async ({ request }) => {
-    const body = await request.json();
-    requestCapture.capture(request.url, request.method, body);
-    return HttpResponse.json({
-      success: true,
-      results,
-    });
-  });
-}
+export const sessionStartHandler = (responseBlob = "mock-session-result-blob") =>
+  postHandler("process-request", () => ({ responseBlob }));
 
-// Helper for search handler that checks request body (for conditional responses)
-export function searchHandlerWithBodyCheck(
+type SearchResult = { identifier: string; matchLevel: number };
+
+export const searchHandler = (results: SearchResult[] = []) =>
+  postHandler("3d-db/search", () => ({ success: true, results }));
+
+export const searchHandlerWithBodyCheck = (
   matcher: (body: { groupName?: string }) => boolean,
-  results: Array<{ identifier: string; matchLevel: number }>,
-  fallbackResults: Array<{ identifier: string; matchLevel: number }> = [],
-) {
-  return http.post(`${FACETEC_SERVER}3d-db/search`, async ({ request }) => {
-    const body = (await request.json()) as { groupName?: string };
-    requestCapture.capture(request.url, request.method, body);
-    const matchedResults = matcher(body) ? results : fallbackResults;
-    return HttpResponse.json({
-      success: true,
-      results: matchedResults,
-    });
-  });
-}
+  results: SearchResult[],
+  fallbackResults: SearchResult[] = [],
+) =>
+  postHandler("3d-db/search", (body) => ({
+    success: true,
+    results: matcher(body as { groupName?: string }) ? results : fallbackResults,
+  }));
 
-// Helper to create 3d-db/enroll handler
-export function enrollHandler(success = true) {
-  return http.post(`${FACETEC_SERVER}3d-db/enroll`, async ({ request }) => {
-    const body = await request.json();
-    requestCapture.capture(request.url, request.method, body);
-    return HttpResponse.json({ success });
-  });
-}
+export const enrollHandler = (success = true) =>
+  postHandler("3d-db/enroll", () => ({ success }));

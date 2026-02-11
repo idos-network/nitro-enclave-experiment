@@ -158,7 +158,9 @@ describe("FaceSign/Login API", () => {
     });
 
     // Verify the JWT token
-    const decoded = jwt.verify(response.body.userAttestmentToken, publicKey, { algorithms: ["ES512"] });
+    const decoded = jwt.verify(response.body.userAttestmentToken, publicKey, {
+      algorithms: ["ES512"],
+    });
     expect(decoded.sub).toBe(resultId);
 
     expect(response.status).toBe(201);
@@ -217,7 +219,7 @@ describe("FaceSign/Login API", () => {
 
     expect(response.status).toBe(201);
     expect(response.body).toEqual({
-      faceSignUserId: resultId3, // 3 is the oldest
+      faceSignUserId: resultId3, // 3 is the oldest (because it was returned by getOldestFaceSignUserId)
       responseBlob: "mock-scan-result-blob",
       success: true,
       result: { livenessProven: true },
@@ -227,7 +229,9 @@ describe("FaceSign/Login API", () => {
     });
 
     // Verify the JWT token
-    const decoded = jwt.verify(response.body.userAttestmentToken, publicKey, { algorithms: ["ES512"] });
+    const decoded = jwt.verify(response.body.userAttestmentToken, publicKey, {
+      algorithms: ["ES512"],
+    });
     expect(decoded.sub).toBe(resultId3);
 
     expect(db.insertMember).not.toHaveBeenCalled();

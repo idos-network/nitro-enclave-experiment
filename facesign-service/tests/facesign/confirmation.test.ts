@@ -5,7 +5,7 @@ import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 import * as db from "../../providers/db.ts";
 import app from "../../server.ts";
-import { GROUP_NAME, makeConfirmationToken } from "../utils/helper.ts";
+import { GROUP_NAME, makeNewUserConfirmationToken } from "../utils/helper.ts";
 import { requestCapture, searchHandler } from "../utils/msw-handlers.ts";
 import { server } from "../utils/msw-server.ts";
 
@@ -24,7 +24,7 @@ describe("FaceSign/Confirmation API", () => {
       publicKeyEncoding: { type: "spki", format: "pem" },
     }).privateKey;
 
-    const token = makeConfirmationToken({
+    const token = makeNewUserConfirmationToken({
       sub: "test-user-id",
       action: "facesign-confirmation",
       key: wrongPrivateKey,
@@ -39,7 +39,7 @@ describe("FaceSign/Confirmation API", () => {
   });
 
   it("expired token", async () => {
-    const token = makeConfirmationToken({
+    const token = makeNewUserConfirmationToken({
       sub: "test-user-id",
       action: "confirmation",
       iat: Math.floor(Date.now() / 1000) - 120, // 2 minutes ago
@@ -58,7 +58,7 @@ describe("FaceSign/Confirmation API", () => {
 
     server.use(searchHandler([{ identifier: "different-user-id", matchLevel: 15 }]));
 
-    const token = makeConfirmationToken({
+    const token = makeNewUserConfirmationToken({
       sub: userId,
       action: "confirmation",
     });
@@ -76,7 +76,7 @@ describe("FaceSign/Confirmation API", () => {
 
     server.use(searchHandler([]));
 
-    const token = makeConfirmationToken({
+    const token = makeNewUserConfirmationToken({
       sub: userId,
       action: "confirmation",
     });

@@ -40,7 +40,7 @@ export const login = async (req: Request, res: Response) => {
     });
   }
 
-  const faceSignLoginResult = await faceSignLogin( generatedUserId, false);
+  const faceSignLoginResult = await faceSignLogin(generatedUserId, false);
 
   return res.status(faceSignLoginResult.newUser ? 200 : 201).json({
     ...alwaysToReturn,
