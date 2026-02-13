@@ -19,17 +19,18 @@ export default async function handler(req: Request, res: Response) {
     additionalSessionData,
   };
 
-  if (!success && result.livenessProven) {
-    // Liveness proved, but no match found
-    agent.writeLog("match-3d-3d-no-match", { success, result, externalUserId });
+  if (!success || didError) {
+    // When there is no result (and or liveness has been proven), we have no-match 409
+    if (!result || result.livenessProven) {
+      agent.writeLog("match-3d-3d-no-match", { success, result, externalUserId });
 
-    return res.status(409).json({
-      ...alwaysToReturn,
-      errorMessage: "No match found for the provided face scan.",
-    });
-  }
+      return res.status(409).json({
+        ...alwaysToReturn,
+        errorMessage: "No match found for the provided face scan.",
+      });
+    }
 
-  if (!result.livenessProven || didError) {
+    // Otherwise we have a 400 error (liveness not proven)
     agent.writeLog("match-3d-3d-failed", { success, result, externalUserId });
 
     return res.status(400).json({
