@@ -95,8 +95,14 @@ type ProcessRequestResponse = {
   responseBlob?: string;
 };
 
-export const processRequestHandler = (response: ProcessRequestResponse = {}, defaultResult = true) =>
-  postHandler("process-request", () => ({ ...(defaultResult ? defaults.processRequest : {}), ...response }));
+export const processRequestHandler = (
+  response: ProcessRequestResponse = {},
+  defaultResult = true,
+) =>
+  postHandler("process-request", () => ({
+    ...(defaultResult ? defaults.processRequest : {}),
+    ...response,
+  }));
 
 export const processRequestErrorHandler = (status: number, text: string) =>
   postHandler("process-request", () => new HttpResponse(text, { status }));

@@ -97,11 +97,14 @@ describe("Match Login API", () => {
 
   it("liveness done, but no match (no result)", async () => {
     server.use(
-      processRequestHandler({
-        success: false,
-        didError: false,
-        responseBlob: "invalid-result-blob",
-      }, false),
+      processRequestHandler(
+        {
+          success: false,
+          didError: false,
+          responseBlob: "invalid-result-blob",
+        },
+        false,
+      ),
     );
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
