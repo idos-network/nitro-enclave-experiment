@@ -12,9 +12,9 @@ import morgan from "morgan";
 import { HOST, KEY_1_MULTIBASE_PUBLIC_PATH } from "./env.ts";
 import agent from "./providers/agent.ts";
 import { FaceTecError, getStatus, SessionStartError } from "./providers/api.ts";
+import { confirmation as faceSignConfirmation, login as faceSignLogin } from "./routes/facesign.ts";
 import login from "./routes/login.ts";
 import match from "./routes/match.ts";
-import pinocchio from "./routes/pinocchio.ts";
 
 const app = express();
 
@@ -42,8 +42,9 @@ export const asyncHandler = (
 };
 
 app.post("/login", asyncHandler(login));
-app.post("/pinocchio", asyncHandler(pinocchio));
 app.post("/match", asyncHandler(match));
+app.post("/facesign", asyncHandler(faceSignLogin));
+app.post("/facesign/confirmation", asyncHandler(faceSignConfirmation));
 
 // idOS issuer information for VCs
 app.get("/idos/issuers/1", (_req, res) => {

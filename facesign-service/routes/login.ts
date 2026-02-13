@@ -2,14 +2,23 @@ import crypto from "node:crypto";
 import type { Request, Response } from "express";
 import { GROUP_NAME } from "../env.ts";
 import agent from "../providers/agent.ts";
-
 import { enrollment3d, enrollUser, searchForDuplicates } from "../providers/api.ts";
 import { countMembersInGroup, insertMember } from "../providers/db.ts";
+import { faceSignLogin } from "../providers/facesign.ts";
 
 export default async function handler(req: Request, res: Response) {
   let faceSignUserId: string = crypto.randomUUID();
 
-  const { requestBlob, groupName = GROUP_NAME, faceVector = true } = req.body;
+  const {
+    requestBlob,
+    groupName = GROUP_NAME,
+    faceVector = true,
+    onboardFaceSign = false,
+  } = req.body;
+
+  if (faceVector && onboardFaceSign) {
+    throw new Error("Cannot request face vector and onboard to FaceSign at the same time.");
+  }
 
   // First check if liveness is proven
   const { success, result, responseBlob, didError, additionalSessionData } = await enrollment3d(
@@ -92,8 +101,27 @@ export default async function handler(req: Request, res: Response) {
     faceSignUserId = results[0]?.identifier!;
   }
 
+  let faceSign: {
+    newUser: boolean;
+    faceSignUserId: string;
+    entropyToken?: string | undefined;
+  } | null = null;
+
+  // If we want token and onboard user in facesign group
+  if (onboardFaceSign) {
+    const faceSignLoginResult = await faceSignLogin(
+      faceSignUserId,
+      true, // Enroll if new, we want the user to be enrolled in facesign-users group, there is no confirmation
+    );
+
+    faceSign = {
+      ...faceSignLoginResult,
+    };
+  }
+
   return res.status(201).json({
     ...alwaysToReturn,
     faceSignUserId,
+    faceSign,
   });
 }

@@ -6,7 +6,7 @@ import jwt from "jsonwebtoken";
 import morgan from "morgan";
 import { JWT_PUBLIC_KEY } from "./env.ts";
 import agent from "./providers/agent.ts";
-import { fetchOrCreatePINOCCHIOEntropy } from "./providers/db.ts";
+import { fetchOrCreateFaceSignEntropy } from "./providers/db.ts";
 
 const app = express();
 
@@ -19,7 +19,7 @@ app.get("/", (_req, res) => {
 	res.status(200).json({ message: "Welcome to the FaceSign entropy API!" });
 });
 
-app.post("/pinocchio-entropy", async (req, res) => {
+app.post("/facesign/entropy", async (req, res) => {
 	// Validate token from body
 	const token = req.body.token;
 
@@ -36,7 +36,7 @@ app.post("/pinocchio-entropy", async (req, res) => {
 			iat: number;
 		};
 	} catch (error) {
-		agent.writeLog("pinocchio-error-verify", {
+		agent.writeLog("facesign-entropy-error-verify", {
 			message: "Invalid token",
 			error,
 		});
@@ -44,14 +44,14 @@ app.post("/pinocchio-entropy", async (req, res) => {
 	}
 
 	if (!result.iat || !result.sub) {
-		agent.writeLog("pinocchio-error-validate", {
+		agent.writeLog("facesign-entropy-error-validate", {
 			message: "Token missing iat or sub",
 		});
 		return res.status(400).json({ error: "Invalid token" });
 	}
 
 	if (Date.now() / 1000 - result.iat > 1 * 60) {
-		agent.writeLog("pinocchio-error-iat", {
+		agent.writeLog("facesign-entropy-error-iat", {
 			message: "Token is too old",
 			iat: result.iat,
 			now: Date.now() / 1000,
@@ -59,11 +59,11 @@ app.post("/pinocchio-entropy", async (req, res) => {
 		return res.status(400).json({ error: "Token already expired" });
 	}
 
-	const { insert, entropy } = await fetchOrCreatePINOCCHIOEntropy(
+	const { insert, entropy } = await fetchOrCreateFaceSignEntropy(
 		result.sub as string,
 	);
 
-	agent.writeLog(`pinocchio-entropy-${insert ? "created" : "fetched"}`, {
+	agent.writeLog(`facesign-entropy-${insert ? "created" : "fetched"}`, {
 		userId: result.sub,
 		ip: req.ip,
 	});

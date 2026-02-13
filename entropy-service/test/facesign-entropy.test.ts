@@ -21,16 +21,16 @@ vi.mock("fs", async () => {
 
 // Mock modules before importing the app
 vi.mock("../providers/db.ts", () => ({
-	fetchOrCreatePINOCCHIOEntropy: vi.fn(),
+	fetchOrCreateFaceSignEntropy: vi.fn(),
 }));
 
 import * as db from "../providers/db.ts";
 
 import app from "../server.ts";
 
-describe("Entropy API", () => {
+describe("FaceSign Entropy API", () => {
 	it("missing token", async () => {
-		const response = await request(app).post("/pinocchio-entropy").send({});
+		const response = await request(app).post("/facesign/entropy").send({});
 
 		expect(response.status).toBe(400);
 		expect(response.body).toEqual({ error: "Token is required" });
@@ -39,7 +39,7 @@ describe("Entropy API", () => {
 	it("new user no entropy", async () => {
 		const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 		const entropySpy = vi
-			.spyOn(db, "fetchOrCreatePINOCCHIOEntropy")
+			.spyOn(db, "fetchOrCreateFaceSignEntropy")
 			.mockResolvedValue({
 				insert: true,
 				entropy: "mock test entropy",
@@ -56,7 +56,7 @@ describe("Entropy API", () => {
 			},
 		);
 
-		const response = await request(app).post("/pinocchio-entropy").send({
+		const response = await request(app).post("/facesign/entropy").send({
 			token,
 		});
 
@@ -67,7 +67,7 @@ describe("Entropy API", () => {
 		});
 
 		expect(entropySpy).toHaveBeenCalledWith(userId);
-		expect(agentSpy).toHaveBeenCalledWith("pinocchio-entropy-created", {
+		expect(agentSpy).toHaveBeenCalledWith("facesign-entropy-created", {
 			userId,
 			ip: "::ffff:127.0.0.1",
 		});
@@ -76,7 +76,7 @@ describe("Entropy API", () => {
 	it("user with existing entropy", async () => {
 		const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 		const entropySpy = vi
-			.spyOn(db, "fetchOrCreatePINOCCHIOEntropy")
+			.spyOn(db, "fetchOrCreateFaceSignEntropy")
 			.mockResolvedValue({
 				insert: false,
 				entropy: "mock test entropy",
@@ -93,7 +93,7 @@ describe("Entropy API", () => {
 			},
 		);
 
-		const response = await request(app).post("/pinocchio-entropy").send({
+		const response = await request(app).post("/facesign/entropy").send({
 			token,
 		});
 
@@ -104,7 +104,7 @@ describe("Entropy API", () => {
 		});
 
 		expect(entropySpy).toHaveBeenCalledWith(userId);
-		expect(agentSpy).toHaveBeenCalledWith("pinocchio-entropy-fetched", {
+		expect(agentSpy).toHaveBeenCalledWith("facesign-entropy-fetched", {
 			userId,
 			ip: "::ffff:127.0.0.1",
 		});
@@ -113,13 +113,13 @@ describe("Entropy API", () => {
 	it("invalid token", async () => {
 		const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
-		const response = await request(app).post("/pinocchio-entropy").send({
+		const response = await request(app).post("/facesign/entropy").send({
 			token: "invalid-token",
 		});
 
 		expect(response.status).toBe(400);
 		expect(response.body).toEqual({ error: "Invalid token" });
-		expect(agentSpy).toHaveBeenCalledWith("pinocchio-error-verify", {
+		expect(agentSpy).toHaveBeenCalledWith("facesign-entropy-error-verify", {
 			error: expect.any(Error),
 			message: "Invalid token",
 		});
@@ -140,13 +140,13 @@ describe("Entropy API", () => {
 			},
 		);
 
-		const response = await request(app).post("/pinocchio-entropy").send({
+		const response = await request(app).post("/facesign/entropy").send({
 			token,
 		});
 
 		expect(response.status).toBe(400);
 		expect(response.body).toEqual({ error: "Token already expired" });
-		expect(agentSpy).toHaveBeenCalledWith("pinocchio-error-iat", {
+		expect(agentSpy).toHaveBeenCalledWith("facesign-entropy-error-iat", {
 			message: "Token is too old",
 			iat: expect.any(Number),
 			now: expect.any(Number),

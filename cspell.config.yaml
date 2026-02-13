@@ -15,3 +15,4 @@ ignorePaths:
   - aws-nitro-kernel/*
   - facesign-service/env.ts
   - entropy-service/env.ts
+  - renovate.json

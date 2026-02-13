@@ -3,49 +3,36 @@ import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 import agent from "../providers/agent.ts";
 import app from "../server.ts";
-
-// This is required, otherwise it will fail due to missing DB
-vi.mock("../providers/db.ts", () => ({
-  insertMember: vi.fn(),
-  countMembersInGroup: vi.fn(),
-  getMembers: vi.fn(),
-  getOldestFaceSignUserId: vi.fn(),
-}));
+import {
+  processRequestErrorHandler,
+  processRequestHandler,
+  requestCapture,
+  sessionStartHandler,
+} from "./utils/msw-handlers.ts";
+import { server } from "./utils/msw-server.ts";
 
 describe("Match Login API", () => {
   it("return new session", async () => {
-    vi.spyOn(global, "fetch").mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        responseBlob: "mock-session-result-blob",
-      }),
-    } as any);
+    server.use(sessionStartHandler("mock-session-result-blob"));
 
     const response = await request(app).post("/match").send({
       requestBlob: "test-face-scan",
       externalUserId: "test-user-id",
     });
 
-    console.log(response.body);
-
     expect(response.status).toBe(200);
     expect(response.body.responseBlob).toBe("mock-session-result-blob");
   });
 
   it("user match (level 15)", async () => {
-    const spyFetch = vi.spyOn(global, "fetch").mockImplementation(async (url) => {
-      if (url.toString().endsWith("/process-request")) {
-        return {
-          ok: true,
-          json: async () => ({
-            success: true,
-            result: { livenessProven: true, matchLevel: 15 },
-            didError: false,
-            responseBlob: "mock-scan-result-blob",
-          }),
-        } as any;
-      }
-    });
+    server.use(
+      processRequestHandler({
+        success: true,
+        result: { livenessProven: true, matchLevel: 15 },
+        didError: false,
+        responseBlob: "mock-scan-result-blob",
+      }),
+    );
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
@@ -67,31 +54,23 @@ describe("Match Login API", () => {
       matchLevel: 15,
     });
 
-    expect(spyFetch).toHaveBeenCalledTimes(1);
-    const processRequestCall = spyFetch.mock.calls.find((call) =>
-      call[0].toString().endsWith("/process-request"),
-    );
-
-    expect(processRequestCall).toBeDefined();
-    const body = JSON.parse(processRequestCall?.[1]?.body as string);
-    expect(body.externalDatabaseRefID).toBe("test-user-id");
-    expect(body.requestBlob).toBe("test-face-scan");
+    // Verify FaceTec API calls
+    const processRequest = requestCapture.getLastByEndpoint("/process-request");
+    expect(processRequest?.body).toMatchObject({
+      externalDatabaseRefID: "test-user-id",
+      requestBlob: "test-face-scan",
+    });
   });
 
   it("failing liveness", async () => {
-    vi.spyOn(global, "fetch").mockImplementation(async (url) => {
-      if (url.toString().endsWith("/process-request")) {
-        return {
-          ok: true,
-          json: async () => ({
-            success: false,
-            result: { livenessProven: false },
-            didError: false,
-            responseBlob: "invalid-result-blob",
-          }),
-        } as any;
-      }
-    });
+    server.use(
+      processRequestHandler({
+        success: false,
+        result: { livenessProven: false },
+        didError: false,
+        responseBlob: "invalid-result-blob",
+      }),
+    );
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
@@ -117,19 +96,14 @@ describe("Match Login API", () => {
   });
 
   it("liveness done, but no match", async () => {
-    vi.spyOn(global, "fetch").mockImplementation(async (url) => {
-      if (url.toString().endsWith("/process-request")) {
-        return {
-          ok: true,
-          json: async () => ({
-            success: false,
-            result: { livenessProven: true },
-            didError: false,
-            responseBlob: "invalid-result-blob",
-          }),
-        } as any;
-      }
-    });
+    server.use(
+      processRequestHandler({
+        success: false,
+        result: { livenessProven: true },
+        didError: false,
+        responseBlob: "invalid-result-blob",
+      }),
+    );
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
@@ -155,21 +129,7 @@ describe("Match Login API", () => {
   });
 
   it("match error", async () => {
-    vi.spyOn(global, "fetch").mockImplementation(async (url) => {
-      if (url.toString().endsWith("/process-request")) {
-        return {
-          ok: false,
-          json: async () => ({
-            success: false,
-            result: { livenessProven: false },
-            didError: false,
-            responseBlob: "invalid-result-blob",
-          }),
-          status: 500,
-          text: async () => "Some unexpected error",
-        } as any;
-      }
-    });
+    server.use(processRequestErrorHandler(500, "Some unexpected error"));
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
