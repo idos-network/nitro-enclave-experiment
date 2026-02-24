@@ -95,6 +95,40 @@ describe("Match Login API", () => {
     });
   });
 
+  it("liveness done, but no match (no result)", async () => {
+    server.use(
+      processRequestHandler(
+        {
+          success: false,
+          didError: false,
+          responseBlob: "invalid-result-blob",
+        },
+        false,
+      ),
+    );
+
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+
+    const response = await request(app).post("/match").send({
+      requestBlob: "test-face-scan",
+      externalUserId: "test-user-id",
+    });
+
+    expect(response.status).toBe(409);
+    console.log(response.body);
+    expect(response.body).toEqual({
+      errorMessage: "No match found for the provided face scan.",
+      success: false,
+      didError: false,
+      responseBlob: "invalid-result-blob",
+    });
+
+    expect(agentSpy).toHaveBeenCalledWith("match-3d-3d-no-match", {
+      success: false,
+      externalUserId: "test-user-id",
+    });
+  });
+
   it("liveness done, but no match", async () => {
     server.use(
       processRequestHandler({
