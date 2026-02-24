@@ -14,6 +14,7 @@ export default async function handler(req: Request, res: Response) {
     groupName = GROUP_NAME,
     faceVector = true,
     onboardFaceSign = false,
+    storeAuditTrailImages = false,
   } = req.body;
 
   if (faceVector && onboardFaceSign) {
@@ -25,6 +26,7 @@ export default async function handler(req: Request, res: Response) {
     faceSignUserId,
     requestBlob,
     faceVector,
+    storeAuditTrailImages,
   );
 
   // Always return required fields for SDK

@@ -20,6 +20,7 @@ export const login = async (req: Request, res: Response) => {
     generatedUserId,
     requestBlob,
     false, // We need face maps
+    false, // We don't need audit trail images
   );
 
   // Always return required fields for SDK

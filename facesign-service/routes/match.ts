@@ -3,11 +3,12 @@ import agent from "../providers/agent.ts";
 import { match3d3d } from "../providers/api.ts";
 
 export default async function handler(req: Request, res: Response) {
-  const { requestBlob, externalUserId } = req.body;
+  const { requestBlob, externalUserId, storeAuditTrailImages = false } = req.body;
 
   const { success, result, responseBlob, didError, additionalSessionData } = await match3d3d(
     externalUserId,
     requestBlob,
+    storeAuditTrailImages,
   );
 
   // Always return required fields for SDK
