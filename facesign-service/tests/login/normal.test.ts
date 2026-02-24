@@ -89,6 +89,8 @@ describe("Login API", () => {
       externalDatabaseRefID: response.body.faceSignUserId,
       requestBlob: "test-face-scan",
       storeAsFaceVector: true,
+      storeAuditTrailImages: false,
+      storeIdImage: false,
     });
   });
 
@@ -132,6 +134,8 @@ describe("Login API", () => {
       externalDatabaseRefID: response.body.faceSignUserId,
       requestBlob: "test-face-scan",
       storeAsFaceVector: false,
+      storeAuditTrailImages: false,
+      storeIdImage: false,
     });
   });
 

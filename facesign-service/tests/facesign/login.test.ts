@@ -94,6 +94,8 @@ describe("FaceSign/Login API", () => {
     expect(processRequest?.body).toMatchObject({
       externalDatabaseRefID: response.body.faceSignUserId,
       requestBlob: "test-face-scan",
+      storeAuditTrailImages: false,
+      storeIdImage: false,
     });
 
     const searchRequest = requestCapture.getLastByEndpoint("/3d-db/search");

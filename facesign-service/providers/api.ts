@@ -114,6 +114,8 @@ export async function enrollment3d(
       externalDatabaseRefID,
       requestBlob,
       storeAsFaceVector: faceVector,
+      storeAuditTrailImages: false,
+      storeIdImage: false,
     }),
   });
 
@@ -146,6 +148,8 @@ export async function match3d3d(externalDatabaseRefID: string, requestBlob: stri
     body: JSON.stringify({
       externalDatabaseRefID,
       requestBlob,
+      storeAuditTrailImages: false,
+      storeIdImage: false,
     }),
   });
 
