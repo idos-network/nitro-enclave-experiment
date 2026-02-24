@@ -119,6 +119,7 @@ COPY --from=builder /home/FaceTec_Custom_Server $HOME_FACETEC_CUSTOM_SERVER
 RUN rm -rf $HOME_FACETEC_CUSTOM_SERVER/src
 
 WORKDIR $HOME_FACETEC_CUSTOM_SERVER/deploy/
+RUN sed -i 's#database: .*#database: mongodb#' ./config.yaml
 RUN sed -i 's#serverPort: 8080#serverPort: 5000#' ./config.yaml
 RUN sed -i 's#enableSearch: false#enableSearch: true#' ./config.yaml
 RUN sed -i 's#search3D3DDatabaseRootDirectory: .*#search3D3DDatabaseRootDirectory: /mnt/encrypted/facetec/search-3d-3d-database#' ./config.yaml
