@@ -76,6 +76,14 @@ describe("Login API", () => {
       success: true,
     });
 
+    expect(agentSpy).toHaveBeenCalledWith("login-request", {
+      faceSignUserId: response.body.faceSignUserId,
+      groupName: "facesign-users",
+      faceVector: true,
+      onboardFaceSign: false,
+      storeAuditTrailImages: false,
+    });
+
     expect(agentSpy).toHaveBeenCalledWith("login-new-user", {
       identifier: response.body.faceSignUserId,
       groupName: "facesign-users",

@@ -12,6 +12,7 @@ import { faceSignLogin } from "../providers/facesign.ts";
 // FACESIGN - Login route
 export const login = async (req: Request, res: Response) => {
   const generatedUserId: string = crypto.randomUUID();
+  agent.writeLog("facesign-login", { generatedUserId });
 
   const { requestBlob } = req.body;
 

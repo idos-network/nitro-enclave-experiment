@@ -5,6 +5,8 @@ import { match3d3d } from "../providers/api.ts";
 export default async function handler(req: Request, res: Response) {
   const { requestBlob, externalUserId, storeAuditTrailImages = false } = req.body;
 
+  agent.writeLog("match-request", { externalUserId, storeAuditTrailImages });
+
   const { success, result, responseBlob, didError, additionalSessionData } = await match3d3d(
     externalUserId,
     requestBlob,
