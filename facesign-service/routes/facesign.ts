@@ -12,6 +12,7 @@ import { faceSignLogin } from "../providers/facesign.ts";
 // FACESIGN - Login route
 export const login = async (req: Request, res: Response) => {
   const generatedUserId: string = crypto.randomUUID();
+  agent.writeLog("facesign-login", { generatedUserId });
 
   const { requestBlob } = req.body;
 
@@ -20,6 +21,7 @@ export const login = async (req: Request, res: Response) => {
     generatedUserId,
     requestBlob,
     false, // We need face maps
+    false, // We don't need audit trail images
   );
 
   // Always return required fields for SDK

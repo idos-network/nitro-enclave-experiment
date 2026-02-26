@@ -14,7 +14,16 @@ export default async function handler(req: Request, res: Response) {
     groupName = GROUP_NAME,
     faceVector = true,
     onboardFaceSign = false,
+    storeAuditTrailImages = false,
   } = req.body;
+
+  agent.writeLog("login-request", {
+    faceSignUserId,
+    groupName,
+    faceVector,
+    onboardFaceSign,
+    storeAuditTrailImages,
+  });
 
   if (faceVector && onboardFaceSign) {
     throw new Error("Cannot request face vector and onboard to FaceSign at the same time.");
@@ -25,6 +34,7 @@ export default async function handler(req: Request, res: Response) {
     faceSignUserId,
     requestBlob,
     faceVector,
+    storeAuditTrailImages,
   );
 
   // Always return required fields for SDK
@@ -59,10 +69,12 @@ export default async function handler(req: Request, res: Response) {
     // Check if group exists in DB, if yes, we have a problem (most likely recovery from corrupted FS)
     const memberCount = await countMembersInGroup(groupName);
     if (memberCount > 0) {
+      agent.writeLog("login-group-exists-in-db-but-not-in-3d-db", { groupName });
       throw new Error("Group exists in our DB, but not in 3d-db, this should never happen.");
     }
 
     console.log("Group does not exist, creating one by enrolling first user.");
+    agent.writeLog("login-group-not-exists", { groupName });
     results = [];
   } else {
     throw new Error("Failed to search for duplicates, check application logs.");

@@ -1,5 +1,5 @@
 diff --git a/pom.xml b/pom.xml
-index 80e25bf..ed0a5d1 100644
+index 1e2f76f..814e46a 100644
 --- a/pom.xml
 +++ b/pom.xml
 @@ -94,13 +94,32 @@
@@ -37,8 +37,69 @@ index 80e25bf..ed0a5d1 100644
      </dependency>
  
      <dependency>
+diff --git a/src/main/java/com/facetec/facetecserver/database/AWSS3BasicDatabase.java b/src/main/java/com/facetec/facetecserver/database/AWSS3BasicDatabase.java
+index abdb6cf..566cb72 100644
+--- a/src/main/java/com/facetec/facetecserver/database/AWSS3BasicDatabase.java
++++ b/src/main/java/com/facetec/facetecserver/database/AWSS3BasicDatabase.java
+@@ -431,7 +431,7 @@ public class AWSS3BasicDatabase extends FaceTecDatabase implements FaceTecDataba
+     }
+ 
+     @Override
+-    public boolean saveSessionResult(SessionRequestResponse requestResponse, FaceTecSessionRequestResult requestResult, String externalDatabaseRefID, boolean storeAsFaceVector) {
++    public boolean saveSessionResult(SessionRequestResponse requestResponse, FaceTecSessionRequestResult requestResult, String externalDatabaseRefID, boolean storeAsFaceVector,  boolean storeAuditTrailImages, boolean storeIdImage) {
+         // If the requestResult has Session History Data, store it in the Database.
+         if (requestResult.getSessionHistoryData().length > 0) {
+             this.saveSessionHistoryData(requestResult.getLaunchId(), requestResult.getSessionHistoryData());
+@@ -449,7 +449,7 @@ public class AWSS3BasicDatabase extends FaceTecDatabase implements FaceTecDataba
+     }
+ 
+     @Override
+-    public void storeCancelledSession(FaceTecRequestSessionHistoryResult sessionHistoryResult, String launchId, String externalDatabaseRefID) {
++    public void storeCancelledSession(FaceTecRequestSessionHistoryResult sessionHistoryResult, String launchId, String externalDatabaseRefID, boolean storeAuditTrailImages) {
+         // Please read the Developer Note in the header regarding APIs this FaceTecDatabase subclass supports.
+     }
+ 
+diff --git a/src/main/java/com/facetec/facetecserver/database/FaceTecDatabaseV10.java b/src/main/java/com/facetec/facetecserver/database/FaceTecDatabaseV10.java
+index 5305155..2f3c168 100644
+--- a/src/main/java/com/facetec/facetecserver/database/FaceTecDatabaseV10.java
++++ b/src/main/java/com/facetec/facetecserver/database/FaceTecDatabaseV10.java
+@@ -19,10 +19,10 @@ public interface FaceTecDatabaseV10 {
+     boolean saveSessionHistoryData(String launchId, byte[] sessionHistoryData);
+ 
+     // Driver function for storing Session History Data and Session Request results if available.
+-    boolean saveSessionResult(SessionRequestResponse requestResponse, FaceTecSessionRequestResult requestResult, String externalDatabaseRefID, boolean storeAsFaceVector);
++    boolean saveSessionResult(SessionRequestResponse requestResponse, FaceTecSessionRequestResult requestResult, String externalDatabaseRefID, boolean storeAsFaceVector, boolean storeAuditTrailImages, boolean storeIdImage);
+ 
+     // Store Cancelled session in Database.
+-    void storeCancelledSession(FaceTecRequestSessionHistoryResult sessionHistoryResult, String launchId, String externalDatabaseRefID);
++    void storeCancelledSession(FaceTecRequestSessionHistoryResult sessionHistoryResult, String launchId, String externalDatabaseRefID, boolean storeAuditTrailImages);
+ 
+     // Checks Session Request Replay Database.  Return true if it was a replay.  Return false if it was not a replay, adding to the Replay Database if not exists.
+     boolean checkSessionRequestReplayDatabaseAndAddIfNotExists(String requestBlob);
+diff --git a/src/main/java/com/facetec/facetecserver/database/InMemoryEphemeralNonPersistentDB.java b/src/main/java/com/facetec/facetecserver/database/InMemoryEphemeralNonPersistentDB.java
+index 7880f4c..e040612 100644
+--- a/src/main/java/com/facetec/facetecserver/database/InMemoryEphemeralNonPersistentDB.java
++++ b/src/main/java/com/facetec/facetecserver/database/InMemoryEphemeralNonPersistentDB.java
+@@ -297,7 +297,7 @@ public class InMemoryEphemeralNonPersistentDB extends FaceTecDatabase implements
+     }
+ 
+     // In Memory Ephemeral Database only stores Enrolled FaceMaps.
+-    public boolean saveSessionResult(SessionRequestResponse sessionRequestResponse, FaceTecSessionRequestResult requestResult, String externalDatabaseRefID, boolean storeAsFaceVector) {
++    public boolean saveSessionResult(SessionRequestResponse sessionRequestResponse, FaceTecSessionRequestResult requestResult, String externalDatabaseRefID, boolean storeAsFaceVector, boolean storeAuditTrailImages, boolean storeIdImage) {
+         boolean recordStoredSuccessfully;
+ 
+         try {
+@@ -368,7 +368,7 @@ public class InMemoryEphemeralNonPersistentDB extends FaceTecDatabase implements
+     }
+ 
+     // Store Cancelled session in Database.
+-    public void storeCancelledSession(FaceTecRequestSessionHistoryResult sessionHistoryFromCancelledSession, String launchId, String externalDatabaseRefID) {
++    public void storeCancelledSession(FaceTecRequestSessionHistoryResult sessionHistoryFromCancelledSession, String launchId, String externalDatabaseRefID, boolean storeAuditTrailImages) {
+         // Please read the Developer Note in the header regarding APIs this FaceTecDatabase subclass supports.
+     }
+ 
 diff --git a/src/main/java/com/facetec/facetecserver/database/MongoDatabase.java b/src/main/java/com/facetec/facetecserver/database/MongoDatabase.java
-index bc724cf..b03dbfe 100644
+index 1b8043d..e3ec862 100644
 --- a/src/main/java/com/facetec/facetecserver/database/MongoDatabase.java
 +++ b/src/main/java/com/facetec/facetecserver/database/MongoDatabase.java
 @@ -13,10 +13,15 @@ import com.mongodb.client.MongoClient;
@@ -58,7 +119,7 @@ index bc724cf..b03dbfe 100644
  import org.bson.types.ObjectId;
  import org.json.JSONObject;
  
-@@ -55,6 +60,14 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
+@@ -56,6 +61,14 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
      private static final String IDScanSessionIDKey = "idScanSessionId";
      private static final String EnrollmentSessionKey = "enrollmentSession";
  
@@ -73,7 +134,7 @@ index bc724cf..b03dbfe 100644
      public MongoDatabase(ServerConfig serverConfig) {
          this.serverConfig = serverConfig;
      }
-@@ -81,6 +94,7 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
+@@ -82,6 +95,7 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
              collection.find(query).first();
  
              ensureIndexes();
@@ -81,57 +142,117 @@ index bc724cf..b03dbfe 100644
  
              return true;
          }
-@@ -786,12 +800,46 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
+@@ -774,7 +788,7 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
+             throw new FaceTecServerExpectedException("A Record could not be found for the Enrollment.", externalDatabaseRefID);
+         }
+ 
+-        if (result != null && result.containsKey("data")) {
++        if (result.containsKey("data")) {
+             Document data = (Document) result.get("data");
+ 
+             if (data != null && data.containsKey("faceMap")) {
+@@ -787,13 +801,53 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
  
                  ByteWrapper faceMapWrapper = new ByteWrapper(faceMapString);
  
 -                String auditTrailImageString = (String) data.get("auditTrailImage");
 -                if (auditTrailImageString == null) {
+-                    throw new FaceTecServerExpectedException("auditTrailImage property did not exist or was not a String.", externalDatabaseRefID);
 +                Object auditTrailImageEncryptedRaw = data.get("auditTrailImage");
-+                if (auditTrailImageEncryptedRaw == null) {
-                     throw new FaceTecServerExpectedException("auditTrailImage property did not exist or was not a String.", externalDatabaseRefID);
++                byte[] auditTrailImage = new byte[] {};
++
++                // Null or empty strings are not stored auditTrailImage data
++                boolean skipAuditTrailDecryption = auditTrailImageEncryptedRaw == null;
++                if (auditTrailImageEncryptedRaw instanceof String) {
++                    skipAuditTrailDecryption = ((String) auditTrailImageEncryptedRaw).isEmpty();
                  }
  
 -                ByteWrapper auditTrailImageWrapper = new ByteWrapper(auditTrailImageString);
-+                BsonBinary encrypted;
++                if (!skipAuditTrailDecryption) {
++                    BsonBinary encrypted;
 +
-+                if (auditTrailImageEncryptedRaw instanceof Binary) {
-+                    Binary bin = (Binary) auditTrailImageEncryptedRaw;
-+                    encrypted = new BsonBinary(bin.getType(), bin.getData());
-+                } else if (auditTrailImageEncryptedRaw instanceof BsonBinary) {
-+                    encrypted = (BsonBinary) auditTrailImageEncryptedRaw;
-+                } else if (auditTrailImageEncryptedRaw instanceof Document) {
-+                    Document doc =  (Document) auditTrailImageEncryptedRaw;
-+                    Integer type = doc.getInteger("type");
++                    if (auditTrailImageEncryptedRaw instanceof Binary) {
++                        Binary bin = (Binary) auditTrailImageEncryptedRaw;
++                        encrypted = new BsonBinary(bin.getType(), bin.getData());
++                    } else if (auditTrailImageEncryptedRaw instanceof BsonBinary) {
++                        encrypted = (BsonBinary) auditTrailImageEncryptedRaw;
++                    } else if (auditTrailImageEncryptedRaw instanceof Document) {
++                        Document doc = (Document) auditTrailImageEncryptedRaw;
++                        Integer type = doc.getInteger("type");
 +
-+                    @SuppressWarnings("unchecked")
-+                    List<Integer> dataList = (List<Integer>) doc.get("data");
++                        @SuppressWarnings("unchecked")
++                        List<Integer> dataList = (List<Integer>) doc.get("data");
 +
-+                    byte[] bytes = new byte[dataList.size()];
-+                    for (int i = 0; i < dataList.size(); i++) {
-+                        bytes[i] = dataList.get(i).byteValue();
++                        byte[] bytes = new byte[dataList.size()];
++                        for (int i = 0; i < dataList.size(); i++) {
++                            bytes[i] = dataList.get(i).byteValue();
++                        }
++
++                        BsonBinarySubType subType = type != null && type == 6
++                                ? BsonBinarySubType.ENCRYPTED
++                                : BsonBinarySubType.BINARY;
++
++                        encrypted = new BsonBinary(subType, bytes);
++                    } else {
++                        throw new FaceTecServerExpectedException(
++                                "auditTrailImage has unsupported type: " +
++                                        (auditTrailImageEncryptedRaw == null ? "null" : auditTrailImageEncryptedRaw.getClass().getName())
++                        );
 +                    }
 +
-+                    BsonBinarySubType subType = type != null && type == 6
-+                            ? BsonBinarySubType.ENCRYPTED
-+                            : BsonBinarySubType.BINARY;
-+
-+                    encrypted = new BsonBinary(subType, bytes);
-+                } else {
-+                    throw new FaceTecServerExpectedException(
-+                            "auditTrailImage has unsupported type: " +
-+                                    (auditTrailImageEncryptedRaw == null ? "null" : auditTrailImageEncryptedRaw.getClass().getName())
-+                    );
++                    // We can have multiple auditTrailImage stored, but we should care
++                    // just about BsonBinary one.
++                    auditTrailImage = this.decrypt(encrypted);
 +                }
-+
-+                // We can have multiple auditTrailImage stored, but we should care
-+                // just about BsonBinary one.
-+                byte[] auditTrailImage = this.decrypt(encrypted);
-+                ByteWrapper auditTrailImageWrapper = new ByteWrapper(auditTrailImage);
  
++                ByteWrapper auditTrailImageWrapper = new ByteWrapper(auditTrailImage);
                  return new EnrollmentRecord(true, externalDatabaseRefID, objectIdStringFromRecord, faceMapWrapper, auditTrailImageWrapper);
              }
-@@ -915,7 +963,12 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
+             else {
+@@ -810,7 +864,7 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
+     //
+ 
+     // Driver function for storing Session History Data and Session Request results if available.
+-    public boolean saveSessionResult(SessionRequestResponse requestResponse, FaceTecSessionRequestResult requestResult, String externalDatabaseRefID, boolean storeAsFaceVector) {
++    public boolean saveSessionResult(SessionRequestResponse requestResponse, FaceTecSessionRequestResult requestResult, String externalDatabaseRefID, boolean storeAsFaceVector, boolean storeAuditTrailImages, boolean storeIdImage) {
+         boolean success = false;
+         boolean successfullyStoredSessionHistoryIfAvailable = true;
+         boolean successfullyStoredResultIfAvailable = true;
+@@ -824,15 +878,15 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
+         if (requestResult.hasResult()) {
+             // Store Liveness 3D Session.
+             if (requestResponse instanceof Liveness3DResponseV10) {
+-                successfullyStoredResultIfAvailable = storeLiveness3DSession(requestResult, requestResponse);
++                successfullyStoredResultIfAvailable = storeLiveness3DSession(requestResult, requestResponse, storeAuditTrailImages);
+             }
+             // Store Enrollment 3D Session.
+             else if (requestResponse instanceof NewEnrollmentResponseV10) {
+-                successfullyStoredResultIfAvailable = storeEnrollment3DSession(requestResult, requestResponse, externalDatabaseRefID, storeAsFaceVector);
++                successfullyStoredResultIfAvailable = storeEnrollment3DSession(requestResult, requestResponse, externalDatabaseRefID, storeAsFaceVector, storeAuditTrailImages);
+             }
+             // Store Match 3D:3D Session.
+             else if (requestResponse instanceof Match3D3DResponseV10) {
+-                successfullyStoredResultIfAvailable = storeMatch3D3DSession(requestResult, requestResponse, externalDatabaseRefID);
++                successfullyStoredResultIfAvailable = storeMatch3D3DSession(requestResult, requestResponse, externalDatabaseRefID,  storeAuditTrailImages);
+             }
+             // Store Photo ID Scan Session.
+             else if (requestResponse instanceof IDScanOnlyResponseV10) {
+@@ -840,7 +894,7 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
+             }
+             // Store Match 3D:2D ID Scan Session.
+             else if (requestResponse instanceof Match3D2DIDScanResponseV10) {
+-                successfullyStoredResultIfAvailable = storeMatch3D2DIDScanSession(requestResult, requestResponse, externalDatabaseRefID);
++                successfullyStoredResultIfAvailable = storeMatch3D2DIDScanSession(requestResult, requestResponse, externalDatabaseRefID, storeIdImage);
+             }
+         }
+         success = successfullyStoredResultIfAvailable && successfullyStoredSessionHistoryIfAvailable;
+@@ -911,12 +965,17 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
+     }
+ 
+     // Add the 3D Liveness result to the Database.
+-    public boolean storeLiveness3DSession(FaceTecSessionRequestResult requestResult, SessionRequestResponse requestResponse) {
++    public boolean storeLiveness3DSession(FaceTecSessionRequestResult requestResult, SessionRequestResponse requestResponse, boolean storeAuditTrailImages) {
+         boolean recordStoredSuccessfully;
  
          try {
              // Create an object that houses the 3D FaceMap and Response Blob.
@@ -139,31 +260,70 @@ index bc724cf..b03dbfe 100644
 +            FaceMapCoreMongoDataV10 faceMapCoreDBData = new FaceMapCoreMongoDataV10(
 +                    requestResult.getLiveness3DResult().faceMap,
 +                    requestResult.getResponseBlob(),
-+                    this.encrypt(requestResult.getLiveness3DResult().auditTrailImage),
++                    storeAuditTrailImages ? this.encrypt(requestResult.getLiveness3DResult().auditTrailImage) : null,
 +                    this.encrypt(requestResult.getLiveness3DResult().officialIDPhotoImage)
 +            );
              Document mainDoc = getMongoDocFromObjectWithSanitization(requestResponse, faceMapCoreDBData, "/liveness-3d");
  
-             // Database keys that Dashboard uses for backwards compatibility.
-@@ -959,7 +1012,7 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
+             // Add Session type for reference.
+@@ -940,7 +999,7 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
+     }
+ 
+     // Add the 3D Enrollment result to the Database.
+-    public boolean storeEnrollment3DSession(FaceTecSessionRequestResult requestResult, SessionRequestResponse requestResponse, String externalDatabaseRefID, boolean storeAsFaceVector) {
++    public boolean storeEnrollment3DSession(FaceTecSessionRequestResult requestResult, SessionRequestResponse requestResponse, String externalDatabaseRefID, boolean storeAsFaceVector, boolean storeAuditTrailImages) {
+         boolean recordStoredSuccessfully;
+ 
+         // Check if External Database Ref ID is already enrolled.
+@@ -963,7 +1022,12 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
              }
  
              // Create an object that houses the 3D FaceMap and Response Blob.
 -            FaceMapCoreDBDataV10 faceMapCoreDBData = new FaceMapCoreDBDataV10(faceBytes, requestResult.getResponseBlob(), requestResult.getLiveness3DResult().auditTrailImage, null);
-+            FaceMapCoreMongoDataV10 faceMapCoreDBData = new FaceMapCoreMongoDataV10(faceBytes, requestResult.getResponseBlob(), this.encrypt(requestResult.getLiveness3DResult().auditTrailImage), null);
++            FaceMapCoreMongoDataV10 faceMapCoreDBData = new FaceMapCoreMongoDataV10(
++                    faceBytes,
++                    requestResult.getResponseBlob(),
++                    storeAuditTrailImages ? this.encrypt(requestResult.getLiveness3DResult().auditTrailImage) : null,
++                    null
++            );
              Document mainDoc = getMongoDocFromObjectWithSanitization(requestResponse, faceMapCoreDBData, "/enrollment-3d");
  
-             // Put External Database Ref ID on the record.
-@@ -989,7 +1042,7 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
+             // Add Session type for reference.
+@@ -990,13 +1054,18 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
+     }
+ 
+     // Add the Match 3D:3D result to the Database.
+-    public boolean storeMatch3D3DSession(FaceTecSessionRequestResult requestResult, SessionRequestResponse requestResponse, String externalDatabaseRefID) {
++    public boolean storeMatch3D3DSession(FaceTecSessionRequestResult requestResult, SessionRequestResponse requestResponse, String externalDatabaseRefID, boolean storeAuditTrailImages) {
+         boolean recordStoredSuccessfully;
+         boolean adaptiveFaceMapUpdatedSuccessfully = false;
  
          try {
              // Create an object that houses the Response Blob.
 -            FaceMapCoreDBDataV10 faceMapCoreDBData = new FaceMapCoreDBDataV10(null, requestResult.getResponseBlob(), requestResult.getMatch3D3DResult().auditTrailImage, null);
-+            FaceMapCoreMongoDataV10 faceMapCoreDBData = new FaceMapCoreMongoDataV10(null, requestResult.getResponseBlob(), this.encrypt(requestResult.getMatch3D3DResult().auditTrailImage), null);
++            FaceMapCoreMongoDataV10 faceMapCoreDBData = new FaceMapCoreMongoDataV10(
++                    null,
++                    requestResult.getResponseBlob(),
++                    storeAuditTrailImages ? this.encrypt(requestResult.getMatch3D3DResult().auditTrailImage) : null,
++                    null
++            );
              Document mainDoc = getMongoDocFromObjectWithSanitization(requestResponse, faceMapCoreDBData, "/match-3d-3d");
  
-             // Store Launch ID on the record to reference the Session History Data.
-@@ -1154,6 +1207,12 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
+             // Add Session type for reference.
+@@ -1073,10 +1142,11 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
+     }
+ 
+     // Add the Photo ID Match Session result to the Database.
+-    public boolean storeMatch3D2DIDScanSession(FaceTecSessionRequestResult requestResult, SessionRequestResponse requestResponse, String externalDatabaseRefID) {
++    public boolean storeMatch3D2DIDScanSession(FaceTecSessionRequestResult requestResult, SessionRequestResponse requestResponse, String externalDatabaseRefID, boolean storeIdImage) {
+         boolean recordStoredSuccessfully = false;
+ 
+         try {
++            // TODO: storeIdImage we should use it here...
+             FaceTecMatch3D2DIDScanResultV10 match3D2DIDScanResult = requestResult.getMatch3D2DIDScanResult();
+ 
+             // Parse the IDScan images and document data from the result.
+@@ -1171,6 +1241,12 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
          // Session History Data Collection needs an index on launchId.
          mongoClient.getDatabase(serverConfig.mongoDBDatabaseName).getCollection(SessionHistoryDataTable).createIndex(Indexes.ascending(LaunchIDKey), indexOptions);
  
@@ -176,7 +336,7 @@ index bc724cf..b03dbfe 100644
          // FaceMap Hash Collection needs an index on the hash property for fast lookup.
          mongoClient.getDatabase(serverConfig.mongoDBDatabaseName).getCollection(FaceMapHashTable).createIndex(Indexes.ascending(FaceMapHashKey), indexOptions);
  
-@@ -1161,6 +1220,85 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
+@@ -1178,6 +1254,85 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
          mongoClient.getDatabase(serverConfig.mongoDBDatabaseName).getCollection(SessionRequestHashTable).createIndex(Indexes.ascending(SessionRequestHashKey), indexOptions);
      }
  
@@ -262,7 +422,7 @@ index bc724cf..b03dbfe 100644
      // Wrapper function to insert a document to main collection.
      public boolean insertDoc(Document collectionDoc) {
          return insertDoc(collectionDoc, MAIN_COLLECTION_NAME);
-@@ -1431,7 +1569,7 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
+@@ -1448,7 +1603,7 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
          return mainDoc;
      }
  
@@ -271,7 +431,7 @@ index bc724cf..b03dbfe 100644
          // Update path for Dashboard.
          Document callData = Document.parse(FaceTecServerState.gson.toJson(requestResponse.httpCallInfo));
          callData.put("path", dashboardPath);
-@@ -1444,7 +1582,7 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
+@@ -1461,7 +1616,7 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
          sanitizeObjectFromNoticeAndUpdateDate(mainDoc, requestResponse.httpCallInfo);
  
          // Get the JSON serializable object from the faceMapCoreDBData, then get the JSON, then get the document and put it on the mainDoc.
@@ -280,14 +440,23 @@ index bc724cf..b03dbfe 100644
  
          return mainDoc;
      }
-@@ -1528,20 +1666,29 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
+@@ -1534,7 +1689,7 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
+     }
+ 
+     // Store Cancelled session in Database.
+-    public void storeCancelledSession(FaceTecRequestSessionHistoryResult sessionHistoryFromCancelledSession, String launchId, String externalDatabaseRefID) {
++    public void storeCancelledSession(FaceTecRequestSessionHistoryResult sessionHistoryFromCancelledSession, String launchId, String externalDatabaseRefID, boolean storeAuditTrailImages) {
+         // Create records out of FaceTecRequestSessionHistoryResult objects for Liveness 3D and Match 3D3D Sessions.
+         if (sessionHistoryFromCancelledSession.sessionHistoryRetrievalStatus == FaceTecSessionHistoryRetrievalStatus.RETRIEVED) {
+             Document mainDoc;
+@@ -1545,20 +1700,29 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
                      return;
                  }
  
 -                mainDoc = createCancelledLiveness3DSessionRecord(sessionHistoryFromCancelledSession.liveness3DSessionHistory, launchId, externalDatabaseRefID);
 -                insertDoc(mainDoc, MAIN_COLLECTION_NAME);
 +                try {
-+                    mainDoc = createCancelledLiveness3DSessionRecord(sessionHistoryFromCancelledSession.liveness3DSessionHistory, launchId, externalDatabaseRefID);
++                    mainDoc = createCancelledLiveness3DSessionRecord(sessionHistoryFromCancelledSession.liveness3DSessionHistory, launchId, externalDatabaseRefID, storeAuditTrailImages);
 +                    insertDoc(mainDoc, MAIN_COLLECTION_NAME);
 +                } catch (FaceTecServerExpectedException e) {
 +                    FaceTecLogging.error(e.getMessage());
@@ -297,7 +466,7 @@ index bc724cf..b03dbfe 100644
 -                mainDoc = createCancelledMatch3D3DSessionRecord(sessionHistoryFromCancelledSession.match3D3DSessionHistory, launchId, externalDatabaseRefID);
 -                insertDoc(mainDoc, MAIN_COLLECTION_NAME);
 +                try {
-+                    mainDoc = createCancelledMatch3D3DSessionRecord(sessionHistoryFromCancelledSession.match3D3DSessionHistory, launchId, externalDatabaseRefID);
++                    mainDoc = createCancelledMatch3D3DSessionRecord(sessionHistoryFromCancelledSession.match3D3DSessionHistory, launchId, externalDatabaseRefID, storeAuditTrailImages);
 +                    insertDoc(mainDoc, MAIN_COLLECTION_NAME);
 +                } catch (FaceTecServerExpectedException e) {
 +                    FaceTecLogging.error(e.getMessage());
@@ -309,14 +478,14 @@ index bc724cf..b03dbfe 100644
  
      // Helper function to create a Document object from the FaceTecLiveness3DSessionHistory result.
 -    private Document createCancelledLiveness3DSessionRecord(FaceTecLiveness3DSessionHistory result, String launchId, String externalDatabaseRefID) {
-+    private Document createCancelledLiveness3DSessionRecord(FaceTecLiveness3DSessionHistory result, String launchId, String externalDatabaseRefID) throws FaceTecServerExpectedException {
++    private Document createCancelledLiveness3DSessionRecord(FaceTecLiveness3DSessionHistory result, String launchId, String externalDatabaseRefID, boolean storeAuditTrailImages) throws FaceTecServerExpectedException {
          // Build session record as if it was a complete session.
 -        SessionHistoryCoreData sessionHistoryCoreData = new SessionHistoryCoreData(result.auditTrailImageSequence);
-+        SessionHistoryCoreMongoData sessionHistoryCoreData = new SessionHistoryCoreMongoData(this.encrypt(result.auditTrailImageSequence));
++        SessionHistoryCoreMongoData sessionHistoryCoreData = new SessionHistoryCoreMongoData(storeAuditTrailImages ? this.encrypt(result.auditTrailImageSequence) : new BsonBinary(new byte[] {}));
          AdditionalSessionDataV10 additionalSessionDataV10 = new AdditionalSessionDataV10(result.sessionMetadata);
          FaceTecResponseResult responseResult = new FaceTecResponseResult(false,  null, null, null);
  
-@@ -1554,7 +1701,7 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
+@@ -1571,7 +1735,7 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
          }
  
          // Create CancelledSessionDatabaseRecord to organize the data.
@@ -325,19 +494,19 @@ index bc724cf..b03dbfe 100644
  
          // Create Document object that we can store in the Database.
          Document mainDoc = Document.parse(FaceTecServerState.gson.toJson(record));
-@@ -1567,9 +1714,9 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
+@@ -1592,9 +1756,9 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
      }
  
      // Helper function to create a Document object from the FaceTecMatch3D3DSessionHistory result.
 -    private Document createCancelledMatch3D3DSessionRecord(FaceTecMatch3D3DSessionHistory result, String launchId, String externalDatabaseRefID) {
-+    private Document createCancelledMatch3D3DSessionRecord(FaceTecMatch3D3DSessionHistory result, String launchId, String externalDatabaseRefID) throws FaceTecServerExpectedException {
++    private Document createCancelledMatch3D3DSessionRecord(FaceTecMatch3D3DSessionHistory result, String launchId, String externalDatabaseRefID, boolean storeAuditTrailImages) throws FaceTecServerExpectedException {
          // Build session record as if it was a complete session.
 -        SessionHistoryCoreData sessionHistoryCoreData = new SessionHistoryCoreData(result.auditTrailImageSequence);
-+        SessionHistoryCoreMongoData sessionHistoryCoreData = new SessionHistoryCoreMongoData(this.encrypt(result.auditTrailImageSequence));
++        SessionHistoryCoreMongoData sessionHistoryCoreData = new SessionHistoryCoreMongoData(storeAuditTrailImages ? this.encrypt(result.auditTrailImageSequence) : new BsonBinary(new byte[] {}));
          AdditionalSessionDataV10 additionalSessionDataV10 = new AdditionalSessionDataV10(result.sessionMetadata);
          FaceTecResponseResult responseResult = new FaceTecResponseResult(result.livenessStatus == FaceTecLiveness3DStatus.LIVENESS_PROVEN, result.matchLevel.ordinal(), null, null);
          CallMetadata callMetadata = new CallMetadata("/match-3d-3d");
-@@ -1584,7 +1731,7 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
+@@ -1609,7 +1773,7 @@ public class MongoDatabase extends FaceTecDatabase implements FaceTecDatabaseV9,
          }
  
          // Create CancelledSessionDatabaseRecord to organize the data.
@@ -346,6 +515,57 @@ index bc724cf..b03dbfe 100644
  
          // Create Document object that we can store in the Database.
          Document mainDoc = Document.parse(FaceTecServerState.gson.toJson(record));
+diff --git a/src/main/java/com/facetec/facetecserver/database/PostgreSQLDatabase.java b/src/main/java/com/facetec/facetecserver/database/PostgreSQLDatabase.java
+index 214ad74..47c003b 100644
+--- a/src/main/java/com/facetec/facetecserver/database/PostgreSQLDatabase.java
++++ b/src/main/java/com/facetec/facetecserver/database/PostgreSQLDatabase.java
+@@ -799,7 +799,7 @@ public class PostgreSQLDatabase extends FaceTecDatabase implements FaceTecDataba
+ 
+     // Driver function for storing Session History Data and Session Request results if available.
+     @Override
+-    public boolean saveSessionResult(SessionRequestResponse requestResponse, FaceTecSessionRequestResult requestResult, String externalDatabaseRefID, boolean storeAsFaceVector) {
++    public boolean saveSessionResult(SessionRequestResponse requestResponse, FaceTecSessionRequestResult requestResult, String externalDatabaseRefID, boolean storeAsFaceVector, boolean storeAuditTrailImages, boolean storeIdImage) {
+         boolean success;
+         boolean successfullyStoredSessionHistoryIfAvailable = true;
+         boolean successfullyStoredResultIfAvailable = true;
+@@ -813,7 +813,7 @@ public class PostgreSQLDatabase extends FaceTecDatabase implements FaceTecDataba
+         if (requestResult.hasResult()) {
+             // Store Liveness 3D Session.
+             if (requestResponse instanceof Liveness3DResponseV10) {
+-                successfullyStoredResultIfAvailable = storeLiveness3DSession(requestResult, requestResponse);
++                successfullyStoredResultIfAvailable = storeLiveness3DSession(requestResult, requestResponse, storeAuditTrailImages);
+             }
+             // Store Enrollment 3D Session.
+             else if (requestResponse instanceof NewEnrollmentResponseV10) {
+@@ -912,12 +912,17 @@ public class PostgreSQLDatabase extends FaceTecDatabase implements FaceTecDataba
+     }
+ 
+     // Add the 3D Liveness result to the Database.
+-    public boolean storeLiveness3DSession(FaceTecSessionRequestResult requestResult, SessionRequestResponse requestResponse) {
++    public boolean storeLiveness3DSession(FaceTecSessionRequestResult requestResult, SessionRequestResponse requestResponse, boolean storeAuditTrailImages) {
+         boolean recordStoredSuccessfully;
+ 
+         try {
+             // Create an object that houses the 3D FaceMap and Response Blob.
+-            FaceMapCoreDBDataV10 faceMapCoreDBData = new FaceMapCoreDBDataV10(requestResult.getLiveness3DResult().faceMap, requestResult.getResponseBlob(), requestResult.getLiveness3DResult().auditTrailImage, requestResult.getLiveness3DResult().officialIDPhotoImage);
++            FaceMapCoreDBDataV10 faceMapCoreDBData = new FaceMapCoreDBDataV10(
++                    requestResult.getLiveness3DResult().faceMap,
++                    requestResult.getResponseBlob(),
++                    storeAuditTrailImages ? requestResult.getLiveness3DResult().auditTrailImage : new byte[] {},
++                    requestResult.getLiveness3DResult().officialIDPhotoImage
++            );
+             Document mainDoc = getDocumentFromObjectWithSanitization(requestResponse, faceMapCoreDBData, "/liveness-3d");
+ 
+             // Add Session type for reference.
+@@ -1173,7 +1178,7 @@ public class PostgreSQLDatabase extends FaceTecDatabase implements FaceTecDataba
+     }
+ 
+     // Store Cancelled session in Database.
+-    public void storeCancelledSession(FaceTecRequestSessionHistoryResult sessionHistoryFromCancelledSession, String launchId, String externalDatabaseRefID) {
++    public void storeCancelledSession(FaceTecRequestSessionHistoryResult sessionHistoryFromCancelledSession, String launchId, String externalDatabaseRefID, boolean storeAuditTrailImages) {
+         // Create records out of FaceTecRequestSessionHistoryResult objects for Liveness 3D and Match 3D3D Sessions.
+         if (sessionHistoryFromCancelledSession.sessionHistoryRetrievalStatus == FaceTecSessionHistoryRetrievalStatus.RETRIEVED) {
+             Document mainDoc;
 diff --git a/src/main/java/com/facetec/facetecserver/helpers/ServerConfig.java b/src/main/java/com/facetec/facetecserver/helpers/ServerConfig.java
 index 9a0876a..4d4afce 100644
 --- a/src/main/java/com/facetec/facetecserver/helpers/ServerConfig.java
@@ -454,7 +674,7 @@ index 0000000..0f7eb38
 +    }
 +}
 diff --git a/src/main/java/com/facetec/facetecserver/processors_v10/SessionRequestProcessor.java b/src/main/java/com/facetec/facetecserver/processors_v10/SessionRequestProcessor.java
-index ac59761..bbcf560 100644
+index ac59761..5072d10 100644
 --- a/src/main/java/com/facetec/facetecserver/processors_v10/SessionRequestProcessor.java
 +++ b/src/main/java/com/facetec/facetecserver/processors_v10/SessionRequestProcessor.java
 @@ -1,5 +1,6 @@
@@ -464,3 +684,34 @@ index ac59761..bbcf560 100644
  import com.facetec.servercore.*;
  import com.facetec.facetecserver.classes.FaceTecInstanceManager;
  import com.facetec.facetecserver.classes.FaceTecLogging;
+@@ -51,6 +52,12 @@ public class SessionRequestProcessor extends CommonProcessorV10 {
+         // Get storeAsFaceVector from request.
+         boolean storeAsFaceVector = RequestParsing.getBooleanPropertyFromRequest(requestJSON, "storeAsFaceVector");
+ 
++        // Store audit trail images from request
++        boolean storeAuditTrailImages =  RequestParsing.getBooleanPropertyFromRequest(requestJSON, "storeAuditTrailImages");
++
++        // Store original idDOC photos
++        boolean storeIdImage =  RequestParsing.getBooleanPropertyFromRequest(requestJSON, "storeIdImage");
++
+         // Creates an asynchronous future to process the request.  Using asynchronous futures is required.
+         // Pass the Session Request Blob output from the Device SDK, and a FaceTecSDKAdditionalDataCallback to define the behavior of callbacks needed as the request is evaluated.
+         var requestResultFuture = FaceTecInstanceManager.FaceTecSDKInstance.processSessionRequest(sessionRequest.requestBlob, new FaceTecSDKAdditionalDataCallback() {
+@@ -96,7 +103,7 @@ public class SessionRequestProcessor extends CommonProcessorV10 {
+             // Invoked when a Liveness 3D or Match3D3D Session is cancelled to provide the FaceTec Server Webservice with the Session History Data from the session.
+             @Override
+             public void storeCancelledSessionResult(@NotNull FaceTecRequestSessionHistoryResult requestSessionHistoryResult, @NotNull String launchId) {
+-                FaceTecServerState.getFaceTecDatabaseV10().storeCancelledSession(requestSessionHistoryResult, launchId, sessionRequest.externalDatabaseRefID);
++                FaceTecServerState.getFaceTecDatabaseV10().storeCancelledSession(requestSessionHistoryResult, launchId, sessionRequest.externalDatabaseRefID, storeAuditTrailImages);
+             }
+         });
+ 
+@@ -114,7 +121,7 @@ public class SessionRequestProcessor extends CommonProcessorV10 {
+                 // Calls the main driver function for storing Session Request results.
+                 // Always stores Session History Data if available.
+                 // If the Session Request Result contains a result object, stores the API results in the Database.
+-                boolean success = FaceTecServerState.getFaceTecDatabaseV10().saveSessionResult(response, requestResult, sessionRequest.externalDatabaseRefID, storeAsFaceVector);
++                boolean success = FaceTecServerState.getFaceTecDatabaseV10().saveSessionResult(response, requestResult, sessionRequest.externalDatabaseRefID, storeAsFaceVector, storeAuditTrailImages, storeIdImage);
+ 
+                 // Update the response to include the success boolean.
+                 // The success boolean is true if no errors occurred when inserting the record into the database.

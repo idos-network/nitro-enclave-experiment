@@ -49,6 +49,11 @@ describe("Match Login API", () => {
       success: true,
     });
 
+    expect(agentSpy).toHaveBeenCalledWith("match-request", {
+      externalUserId: "test-user-id",
+      storeAuditTrailImages: false,
+    });
+
     expect(agentSpy).toHaveBeenCalledWith("match-3d-3d-done", {
       identifier: "test-user-id",
       matchLevel: 15,
@@ -115,7 +120,6 @@ describe("Match Login API", () => {
     });
 
     expect(response.status).toBe(409);
-    console.log(response.body);
     expect(response.body).toEqual({
       errorMessage: "No match found for the provided face scan.",
       success: false,

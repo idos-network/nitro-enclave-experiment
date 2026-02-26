@@ -104,6 +104,7 @@ export async function enrollment3d(
   externalDatabaseRefID: string,
   requestBlob: string,
   faceVector: boolean,
+  storeAuditTrailImages: boolean,
 ) {
   const enrollmentResponse = await fetch(`${FACETEC_SERVER}process-request`, {
     method: "POST",
@@ -114,6 +115,8 @@ export async function enrollment3d(
       externalDatabaseRefID,
       requestBlob,
       storeAsFaceVector: faceVector,
+      storeAuditTrailImages,
+      storeIdImage: false,
     }),
   });
 
@@ -137,7 +140,11 @@ export async function enrollment3d(
   return response;
 }
 
-export async function match3d3d(externalDatabaseRefID: string, requestBlob: string) {
+export async function match3d3d(
+  externalDatabaseRefID: string,
+  requestBlob: string,
+  storeAuditTrailImages: boolean,
+) {
   const matchResponse = await fetch(`${FACETEC_SERVER}process-request`, {
     method: "POST",
     headers: {
@@ -146,6 +153,8 @@ export async function match3d3d(externalDatabaseRefID: string, requestBlob: stri
     body: JSON.stringify({
       externalDatabaseRefID,
       requestBlob,
+      storeAuditTrailImages,
+      storeIdImage: false,
     }),
   });
 

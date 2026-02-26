@@ -76,6 +76,14 @@ describe("Login API", () => {
       success: true,
     });
 
+    expect(agentSpy).toHaveBeenCalledWith("login-request", {
+      faceSignUserId: response.body.faceSignUserId,
+      groupName: "facesign-users",
+      faceVector: true,
+      onboardFaceSign: false,
+      storeAuditTrailImages: false,
+    });
+
     expect(agentSpy).toHaveBeenCalledWith("login-new-user", {
       identifier: response.body.faceSignUserId,
       groupName: "facesign-users",
@@ -89,6 +97,8 @@ describe("Login API", () => {
       externalDatabaseRefID: response.body.faceSignUserId,
       requestBlob: "test-face-scan",
       storeAsFaceVector: true,
+      storeAuditTrailImages: false,
+      storeIdImage: false,
     });
   });
 
@@ -132,6 +142,8 @@ describe("Login API", () => {
       externalDatabaseRefID: response.body.faceSignUserId,
       requestBlob: "test-face-scan",
       storeAsFaceVector: false,
+      storeAuditTrailImages: false,
+      storeIdImage: false,
     });
   });
 

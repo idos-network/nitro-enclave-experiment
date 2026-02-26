@@ -83,6 +83,10 @@ describe("FaceSign/Login API", () => {
     });
     expect(decoded.sub).toBe(response.body.faceSignUserId);
 
+    expect(agentSpy).toHaveBeenCalledWith("facesign-login", {
+      generatedUserId: response.body.faceSignUserId,
+    });
+
     expect(agentSpy).toHaveBeenCalledWith("facesign-user-pending-confirmation", {
       faceSignUserId: response.body.faceSignUserId,
     });
@@ -94,6 +98,8 @@ describe("FaceSign/Login API", () => {
     expect(processRequest?.body).toMatchObject({
       externalDatabaseRefID: response.body.faceSignUserId,
       requestBlob: "test-face-scan",
+      storeAuditTrailImages: false,
+      storeIdImage: false,
     });
 
     const searchRequest = requestCapture.getLastByEndpoint("/3d-db/search");
@@ -127,6 +133,10 @@ describe("FaceSign/Login API", () => {
       didError: true,
       responseBlob: "mock-scan-result-blob",
       result: { livenessProven: false },
+    });
+
+    expect(agentSpy).toHaveBeenCalledWith("facesign-login", {
+      generatedUserId: expect.any(String),
     });
 
     expect(agentSpy).toHaveBeenCalledWith("facesign-enrollment-failed", {
