@@ -132,8 +132,14 @@ RUN sed -i 's#search2D2DFacePortraitDatabaseRootDirectory: .*#search2D2DFacePort
 RUN sed -i 's#usageLogServerUri: .*#usageLogServerUri: http://localhost:3000/#' ./config.yaml
 RUN printf "#!/bin/bash\njava -cp $HOME_FACETEC_SERVER_CORE/libs/FaceTecSDK-Server-Core-$FACETEC_SDK_VERSION.jar:FaceTec-Server-Webservice.jar com.facetec.facetecserver.app.App" > ./run.ash
 
+# Add feature flags for max 5 attempts
+RUN echo "" >> ./config.yaml
+RUN echo "featureFlags:" >> ./config.yaml
+RUN echo "  ac_lpmft: 5a0b17ec-5121-44c4-b902-3fa24ed6156d" >> ./config.yaml
+
 # This is in config.yaml but it's not loaded
 RUN sed -i 's#search3D3DDatabaseExportRootDirectory: .*#search3D3DDatabaseExportRootDirectory: /mnt/encrypted/facetec/search-3d-3d-database-export#' ./config.yaml
+
 # This is missing in config.yaml, but server tries to load that
 RUN echo "" >> ./config.yaml
 RUN echo "searchDatabaseExportRootDirectory: /mnt/encrypted/facetec/search-3d-3d-database-export" >> ./config.yaml

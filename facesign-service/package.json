@@ -8,6 +8,7 @@
     "repopulate": "node utils/repopulate.ts",
     "duplicates": "node utils/duplicates.ts",
     "test": "vitest",
+    "test:coverage": "vitest run --coverage",
     "types": "tsc --noEmit",
     "format": "npx @biomejs/biome check --write",
     "format:ci": "npx @biomejs/biome ci"
@@ -25,6 +26,7 @@
     "mongodb": "^6.19.0",
 		"mongodb-client-encryption": "^6.5.0",
     "morgan": "^1.10.1",
+    "node-cron": "^4.2.1",
     "os-utils": "^0.0.14",
     "pm2": "^6.0.13"
   },
@@ -37,10 +39,10 @@
     "@types/node": "^24.7.0",
     "@types/os-utils": "^0.0.4",
     "@types/supertest": "^6.0.3",
-    "@vitest/ui": "^2.1.8",
+    "@vitest/coverage-v8": "^4.1.0",
     "msw": "^2.12.9",
     "supertest": "^7.0.0",
     "typescript": "^5.9.3",
-    "vitest": "^2.1.8"
+    "vitest": "^4.1.0"
   }
 }

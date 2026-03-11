@@ -1,361 +1,42 @@
 # FaceSign service
 
-## API description
+Node/Express service that fronts FaceTec (`process-request` and related APIs), runs FaceSign login/confirmation, and exposes idOS issuer metadata.
 
-All methods are using `/process-request` of FaceTec SDK.
-Methods are mapped to status response codes in this favor:
+## API specification
 
-* 200 - standard session from facetec
-* 201 - success response
-* 400 - recoverable error
-* 409 - non-recoverable error
-* 500 - facetec error
+Check [ReDoc pages](https://idos-network.github.io/nitro-enclave-experiment/) or you can go directly into **[openapi.yaml](./openapi.yaml)** (OpenAPI 3.0.3). It is maintained to match `server.ts` and the `routes/` handlers.
 
-### POST /login
+View or lint locally:
 
-**Inputs:**
-   * requestBlob - facetec stuff
-   * groupName - optional (default: null)
-   * faceVector - optional (default: true)
-   * onboardFaceSign - optional (default: false)
-   * storeAuditTrailImages - optional (default: false)
-  
-**Outputs:**
-
-1. SessionStarted (status: **200**) - FaceTec internals, no success, just responseBlob
-
-```javascript
-{
-  responseBlob: "string"
-}
+```bash
+npx @redocly/cli preview-docs openapi.yaml
+# or
+npx @redocly/cli lint openapi.yaml
 ```
 
-2. New user login or reused user login (status: **201**)
+### Published docs (GitHub Pages)
 
-- this is a happy path scenario
+On pushes to `main` / `master` that change `openapi.yaml`, [FaceSign API docs (GitHub Pages)](../.github/workflows/facesign-api-docs.yml) builds a standalone Redoc `index.html` and deploys it.
 
-```javascript
-{
-  // FaceTec standard response
-  success: true,
-  didError: false,
-  responseBlob: "string",
-  additionalSessionData: {
-    platform: "string",
-    deviceModel: "string",
-    userAgent: "string",
-  },
-  result: {
-    livenessProven: boolean,
-  },
+**One-time setup:** in the GitHub repo go to **Settings → Pages → Build and deployment**, set **Source** to **GitHub Actions** (not “Deploy from a branch”). After the first successful run, the site URL is shown on the workflow run and under **Settings → Pages** (typically `https://<owner>.github.io/<repo>/`).
 
-  // FaceSign userId (when groupName is provided)
-  faceSignUserId: "user-uuid",
+**If deploy fails with `HttpError: Not Found`:** the Pages API returns 404 when Actions-based publishing is not active for this repository. Fix it by opening **Settings → Pages**, choosing **GitHub Actions** under **Build and deployment**, and saving (you may need to pick a suggested workflow once; ours will run from `.github/workflows/facesign-api-docs.yml`). Also confirm the repo is allowed to use GitHub Pages: **public** repos can use Pages on the free plan; **private** repos need a plan that includes Pages ([GitHub Pages docs](https://docs.github.com/en/pages/getting-started-with-github-pages/github-pages-limits)). On **GitHub Enterprise Server**, older instances need different action versions—see [deploy-pages issues](https://github.com/actions/deploy-pages/issues).
 
-  // When FaceSign onboarding is required
-  faceSign: {
-    newUser: boolean, // user has been created, no profile
-    faceSignUserId: string,
-    userAttestmentToken: string,
-  },
+### Endpoints (summary)
 
-  // When storeAuditTrailImages is true
-  auditTrailImageId: "audit-trail-image-id"
-}
-```
+| Area | Methods |
+|------|---------|
+| Health | `GET /`, `GET /health` |
+| Relay | `POST /relay/liveness`, `POST /relay/uniqueness`, `POST /relay/match`, `POST /relay/match-id-doc`, `GET /relay/selfie/{selfieId}` |
+| FaceSign | `POST /facesign`, `POST /facesign/confirmation` |
+| idOS VC | `GET /idos/issuers/1`, `GET /idos/keys/1` |
 
-3. User login failed or liveness was not proven (status: **400**)
+### Status codes (FaceTec-facing routes)
 
-- this is a recoverable error, the user have to start again
+- **200** — FaceTec session continuation: JSON includes `responseBlob` (and in this service also `sessionStart`, `launchId` — see `SessionStartResponse` in the spec).
+- **201** — Successful completion for that operation (enrollment, match, ID-doc match, etc.).
+- **400** — Recoverable error (liveness/match failure, bad confirmation token, etc.).
+- **409** — Non-recoverable conflict (e.g. duplicate face-vector on uniqueness, user already exists on confirmation).
+- **500** — FaceTec API error or internal error (see `FaceTecErrorBody` / generic error schemas in the spec).
 
-```javascript
-{
-  // FaceTec standard response
-  success: true,
-  didError: false,
-  responseBlob: "string",
-  additionalSessionData: {
-    platform: "string",
-    deviceModel: "string",
-    userAgent: "string",
-  },
-  result: {
-    livenessProven: boolean,
-  },
-
-  // FaceSign service customs
-  errorMessage: "Liveness check or enrollment 3D failed and was not processed."
-}
-```
-
-4. Login duplicate error (multiple results - status: **409**)
-
-- this is a FFR issue during deduplication, nothing much we can do about
-- the 409 response has been chosen, to not conflict with 500 from facetec
-- this is non-recoverable error
-
-```javascript
-{
-  // FaceTec standard response
-  success: true,
-  didError: false,
-  responseBlob: "string",
-  additionalSessionData: {
-    platform: "string",
-    deviceModel: "string",
-    userAgent: "string",
-  },
-  result: {
-    livenessProven: boolean,
-  },
-
-  // FaceSign service customs
-  errorMessage: "Login process failed, check server logs: Multiple users found with the same face-vector."
-}
-```
-
-### POST /match
-
-
-**Inputs:**
-   * requestBlob - facetec stuff
-   * externalDatabaseRefID - to whom we should match
-   * storeAuditTrailImages - optional (default: false)
-  
-**Outputs:**
-
-1. SessionStarted (status: **200**) - FaceTec internals, no success, just responseBlob
-
-```javascript
-{
-  responseBlob: "string"
-}
-```
-
-2. 3d-3d match has been done (status: **201**)
-
-- this is a correct response
-
-```javascript
-{
-  // FaceTec standard response
-  success: true,
-  didError: false,
-  responseBlob: "string",
-  additionalSessionData: {
-    platform: "string",
-    deviceModel: "string",
-    userAgent: "string",
-  },
-  result: {
-    livenessProven: boolean,
-    matchLevel: number,
-  },
-
-  // Image (when storeAuditTrailImages is true)
-  storeAuditTrailImages: "uuid"
-}
-```
-
-3. User verification failed or liveness was not proven (status: **400**)
-
-- this is a recoverable error, the user have to start again
-
-```javascript
-{
-  // FaceTec standard response
-  success: true,
-  didError: false,
-  responseBlob: "string",
-  additionalSessionData: {
-    platform: "string",
-    deviceModel: "string",
-    userAgent: "string",
-  },
-  result: {
-    livenessProven: boolean,
-  },
-
-  // FaceSign service customs
-  errorMessage: "Liveness check or enrollment 3D failed and was not processed."
-}
-```
-
-4. Liveness proven, but no match (status: **409**)
-
-- this is non recoverable error, matching has been done, but with no success
-
-```javascript
-{
-  // FaceTec standard response
-  success: false,
-  didError: false,
-  responseBlob: "string",
-  additionalSessionData: {
-    platform: "string",
-    deviceModel: "string",
-    userAgent: "string",
-  },
-  result: {
-    livenessProven: true,
-    matchLevel: 0, // not sure about this
-  },
-}
-```
-
-### POST /facesign
-
-1. SessionStarted (status: **200**) - FaceTec internals, no success, just responseBlob
-
-```javascript
-{
-  responseBlob: "string"
-}
-```
-
-2a. Existing user (status: **201**)
-
-- this is a happy path scenario
-
-```javascript
-{
-  // FaceTec standard response
-  success: true,
-  didError: false,
-  responseBlob: "string",
-  additionalSessionData: {
-    platform: "string",
-    deviceModel: "string",
-    userAgent: "string",
-  },
-  result: {
-    livenessProven: boolean,
-  },
-
-  // FaceSign service customs
-  faceSignUserId: "user-uuid",
-  userAttestmentToken: "jwt token for entropy service",
-}
-```
-
-2b. New user (status: **200**)
-
-- this is a happy path scenario if user is new, because of FFR we can't be 100% sure, so we have to ask and than confirm with confirmationToken
-
-```javascript
-{
-  // FaceTec standard response
-  success: true,
-  didError: false,
-  responseBlob: "string",
-  additionalSessionData: {
-    platform: "string",
-    deviceModel: "string",
-    userAgent: "string",
-  },
-  result: {
-    livenessProven: boolean,
-  },
-
-  // FaceSign service customs
-  faceSignUserId: "user-uuid",
-  newUserConfirmationToken: "jwt token to confirm users creation",
-}
-```
-
-1. User login failed or liveness was not proven (status: **400**)
-
-- this is a recoverable error, the user have to start again
-
-```javascript
-{
-  // FaceTec standard response
-  success: true,
-  didError: false,
-  responseBlob: "string",
-  additionalSessionData: {
-    platform: "string",
-    deviceModel: "string",
-    userAgent: "string",
-  },
-  result: {
-    livenessProven: boolean,
-  },
-
-  // FaceSign service customs
-  errorMessage: "Liveness check or enrollment 3D failed and was not processed."
-}
-```
-
-# POST /facesign/confirmation
-
-This endpoint is when user clicks on `I am a new user`.
-
-Body:
-
-```javascript
-{
-  newUserConfirmationToken: "token from facesign", 
-}
-```
-
-1. This is a ideal case scenario (status: **201**):
-
-```javascript
-{
-  faceSignUserId: "UUID",
-  userAttestmentToken: "token for entropy service",
-}
-```
-
-2. Token expired, invalid format (status: **400**):
-
-```javascript
-{
-  errorMessage: "JWT token expired",
-}
-```
-
-3. User has been already onboarded (status: **409**):
-
-```javascript
-{
-  errorMessage: "User already exists",
-}
-```
-
-# GET /audit-trail-image/:auditTrailImageId
-
-1. This endpoint returns base64 audit trail image if available (status: **200**):
-
-```
-[base64string]
-```
-
-2. No image available (status: **400**):
-
-```javascript
-{
-  error: "No audit trail image available."
-}
-```
-
-# DELETE /audit-trail-image/:auditTrailImageId
-
-This endpoint remove an audit trail image from DB if available.
-
-1. Image deleted (200)
-  
-```javascript
-{
-  message: "Audit trail image deleted sucesfully."
-}
-```
-
-2. Image not found or missing external id (400)
-
-```javascript
-{
-  errorMessage: "External database reference ID is required."
-}
-```
+Optional header: **`x-request-id`** — correlation id; omitted values are replaced with a generated UUID per request.

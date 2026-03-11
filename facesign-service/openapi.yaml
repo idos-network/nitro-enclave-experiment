@@ -1,0 +1,668 @@
+openapi: 3.0.3
+info:
+  title: FaceSign service
+  license:
+    name: ISC
+  description: |
+    HTTP API for FaceTec relay flows, FaceSign login/confirmation, and idOS issuer metadata.
+
+    FaceTec-oriented endpoints ultimately call FaceTec `process-request` (or related APIs). Status codes follow this convention where applicable:
+
+    - **200** — FaceTec session continuation (`responseBlob` for the SDK); see `SessionStartResponse`.
+    - **201** — Successful completion for that operation (enrollment/match/doc match, etc.).
+    - **400** — Recoverable client/session error (liveness not proven, match failed, invalid token, etc.).
+    - **409** — Non-recoverable conflict (e.g. duplicate face-vector in uniqueness, user already exists on confirmation).
+    - **500** — FaceTec API or internal server error.
+  version: 1.0.0
+
+# No auth on these routes today; callers may sit behind their own gateway.
+security: []
+
+servers:
+  - url: /
+    description: Relative to deployed host (see `HOST` in deployment).
+
+tags:
+  - name: Health
+    description: Root banner and readiness.
+  - name: Relay
+    description: idOS relay endpoints (FaceTec enrollment, uniqueness, match, ID photo match, selfie retrieval).
+  - name: FaceSign
+    description: FaceSign login and new-user confirmation.
+  - name: idOS
+    description: Issuer document and verification key for verifiable credentials.
+
+paths:
+  /:
+    get:
+      tags: [Health]
+      summary: Service banner
+      operationId: getRoot
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: string
+                    example: FaceSign Service is running
+
+  /health:
+    get:
+      tags: [Health]
+      summary: Liveness and FaceTec server version
+      operationId: getHealth
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, version]
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  version:
+                    type: string
+                    description: FaceTec server webservice version from FaceTec `/status`.
+
+  /relay/liveness:
+    post:
+      tags: [Relay]
+      summary: 3D liveness / enrollment (no group deduplication)
+      operationId: postRelayLiveness
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LivenessRequest"
+      responses:
+        "200":
+          description: FaceTec session start — return `responseBlob` to the SDK.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionStartResponse"
+        "201":
+          description: Liveness/enrollment step completed successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LivenessSuccessResponse"
+        "400":
+          description: Recoverable error (liveness not proven, etc.).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Enrollment3DRecoverableErrorBody"
+        "500":
+          $ref: "#/components/responses/FaceTecOrInternalError"
+
+  /relay/uniqueness:
+    post:
+      tags: [Relay]
+      summary: Uniqueness / group enrollment with deduplication
+      operationId: postRelayUniqueness
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UniquenessRequest"
+      responses:
+        "200":
+          description: FaceTec session start.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionStartResponse"
+        "201":
+          description: Success — `userId` is the resolved group user id.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UniquenessSuccessResponse"
+        "400":
+          description: Recoverable error (liveness not proven, missing `groupName`, etc.).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Enrollment3DRecoverableErrorBody"
+        "409":
+          description: Non-recoverable duplicate face-vector (FFR) during uniqueness.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConflictErrorBody"
+        "500":
+          $ref: "#/components/responses/FaceTecOrInternalError"
+
+  /relay/match:
+    post:
+      tags: [Relay]
+      summary: 3D–3D match against an enrolled user
+      operationId: postRelayMatch
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MatchRequest"
+      responses:
+        "200":
+          description: FaceTec session start.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionStartResponse"
+        "201":
+          description: Match completed successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MatchSuccessResponse"
+        "400":
+          description: Match failed or liveness not proven (recoverable).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MatchFailureBody"
+        "500":
+          $ref: "#/components/responses/FaceTecOrInternalError"
+
+  /relay/match-id-doc:
+    post:
+      tags: [Relay]
+      summary: Match 3D enrollment to 2D ID photo (FaceTec `match-3d-2d-3rdparty-idphoto`)
+      operationId: postRelayMatchIdDoc
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MatchIdDocRequest"
+      responses:
+        "200":
+          description: FaceTec session start (if the FaceTec response is a session continuation).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionStartResponse"
+        "201":
+          description: FaceTec match response body (interpret `success` / `result.matchLevel`).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProcessRequestResponse"
+        "500":
+          $ref: "#/components/responses/FaceTecOrInternalError"
+
+  /relay/selfie/{selfieId}:
+    get:
+      tags: [Relay]
+      summary: Retrieve stored audit-trail selfie (JPEG bytes)
+      operationId: getRelaySelfie
+      parameters:
+        - name: selfieId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Enrollment or match identifier used when `storeSelfie` was true (internal FaceTec ref id).
+      responses:
+        "200":
+          description: JPEG image body (not Base64).
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: Missing selfie id.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimpleErrorMessage"
+        "404":
+          description: No image stored for this id.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimpleErrorMessage"
+
+  /facesign:
+    post:
+      tags: [FaceSign]
+      summary: FaceSign login (liveness + group resolution)
+      operationId: postFaceSign
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FaceSignLoginRequest"
+      responses:
+        "200":
+          description: New user — must confirm via `/facesign/confirmation` (`newUserConfirmationToken`).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FaceSignLoginNewUserResponse"
+        "201":
+          description: Existing (or auto-enrolled) user — includes `userAttestmentToken`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FaceSignLoginExistingResponse"
+        "400":
+          description: Recoverable liveness/enrollment error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Enrollment3DRecoverableErrorBody"
+        "500":
+          $ref: "#/components/responses/FaceTecOrInternalError"
+
+  /facesign/confirmation:
+    post:
+      tags: [FaceSign]
+      summary: Confirm new user after `/facesign` (200 new-user flow)
+      operationId: postFaceSignConfirmation
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [newUserConfirmationToken]
+              properties:
+                newUserConfirmationToken:
+                  type: string
+                  description: JWT from `POST /facesign` when status was 200.
+      responses:
+        "200":
+          description: User enrolled; returns attestation token for entropy service.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [userId, userAttestmentToken]
+                properties:
+                  userId:
+                    type: string
+                    format: uuid
+                  userAttestmentToken:
+                    type: string
+                    description: JWT (ES512) for downstream entropy service.
+        "400":
+          description: Invalid, expired, or malformed confirmation token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimpleErrorMessage"
+        "409":
+          description: User already onboarded (race or duplicate).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimpleErrorMessage"
+        "500":
+          $ref: "#/components/responses/FaceTecOrInternalError"
+
+  /idos/issuers/1:
+    get:
+      tags: [idOS]
+      summary: idOS issuer document (VC)
+      operationId: getIdosIssuer1
+      responses:
+        "200":
+          description: JSON-LD issuer metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - "@context"
+                  - id
+                  - assertionMethod
+                  - authentication
+                properties:
+                  "@context":
+                    type: string
+                    example: https://w3id.org/security/v2
+                  id:
+                    type: string
+                    format: uri
+                  assertionMethod:
+                    type: array
+                    items:
+                      type: string
+                      format: uri
+                  authentication:
+                    type: array
+                    items:
+                      type: string
+
+  /idos/keys/1:
+    get:
+      tags: [idOS]
+      summary: Public key (multibase) for issuer `1`
+      operationId: getIdosKeys1
+      responses:
+        "200":
+          description: Raw multibase-encoded public key (text).
+          content:
+            text/plain:
+              schema:
+                type: string
+
+components:
+  parameters:
+    XRequestId:
+      name: x-request-id
+      in: header
+      required: false
+      schema:
+        type: string
+        format: uuid
+      description: Optional correlation id; server generates one if omitted.
+
+  responses:
+    FaceTecOrInternalError:
+      description: FaceTec API error, internal error, or uncaught exception.
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - $ref: "#/components/schemas/FaceTecErrorBody"
+              - $ref: "#/components/schemas/SimpleErrorMessage"
+              - $ref: "#/components/schemas/GenericInternalError"
+
+  schemas:
+    SessionStartResponse:
+      type: object
+      required: [responseBlob, sessionStart, launchId]
+      properties:
+        responseBlob:
+          type: string
+        sessionStart:
+          type: boolean
+          enum: [true]
+        launchId:
+          type: string
+
+    AdditionalSessionData:
+      type: object
+      required: [platform, deviceModel, userAgent]
+      properties:
+        platform:
+          type: string
+        deviceModel:
+          type: string
+        userAgent:
+          type: string
+
+    FaceTecProcessResult:
+      type: object
+      required: [livenessProven]
+      properties:
+        livenessProven:
+          type: boolean
+        matchLevel:
+          type: integer
+          description: Present on 3D–3D match responses when applicable.
+
+    FaceTecProcessEnvelope:
+      type: object
+      required: [success, responseBlob, didError, additionalSessionData, result]
+      properties:
+        success:
+          type: boolean
+        responseBlob:
+          type: string
+        didError:
+          type: boolean
+        additionalSessionData:
+          $ref: "#/components/schemas/AdditionalSessionData"
+        result:
+          $ref: "#/components/schemas/FaceTecProcessResult"
+
+    FaceSignOnboard:
+      type: object
+      required: [newUser, userId]
+      properties:
+        newUser:
+          type: boolean
+        userId:
+          type: string
+          format: uuid
+        userAttestmentToken:
+          type: string
+          description: Present when user is logged in / created with token (relay onboarding).
+
+    LivenessRequest:
+      type: object
+      required: [requestBlob]
+      properties:
+        requestBlob:
+          type: string
+        faceVector:
+          type: boolean
+          default: true
+        onboardFaceSign:
+          type: boolean
+          default: false
+        storeSelfie:
+          type: boolean
+          default: false
+      description: |
+        `faceVector` and `onboardFaceSign` cannot both be true (server returns 500).
+
+    UniquenessRequest:
+      allOf:
+        - $ref: "#/components/schemas/LivenessRequest"
+        - type: object
+          required: [groupName]
+          properties:
+            groupName:
+              type: string
+
+    LivenessSuccessResponse:
+      allOf:
+        - $ref: "#/components/schemas/FaceTecProcessEnvelope"
+        - type: object
+          required: [userId]
+          properties:
+            userId:
+              type: string
+              format: uuid
+            faceSign:
+              $ref: "#/components/schemas/FaceSignOnboard"
+            selfieFileId:
+              type: string
+              format: uuid
+              description: Same as internal enrollment id when `storeSelfie` was true.
+
+    UniquenessSuccessResponse:
+      $ref: "#/components/schemas/LivenessSuccessResponse"
+
+    MatchRequest:
+      type: object
+      required: [userId, requestBlob]
+      properties:
+        userId:
+          type: string
+          format: uuid
+        requestBlob:
+          type: string
+        storeSelfie:
+          type: boolean
+          default: false
+
+    MatchSuccessResponse:
+      allOf:
+        - $ref: "#/components/schemas/FaceTecProcessEnvelope"
+        - type: object
+          properties:
+            selfieFileId:
+              type: string
+              nullable: true
+              description: Same as `userId` when `storeSelfie` was true; otherwise null.
+
+    MatchFailureBody:
+      allOf:
+        - $ref: "#/components/schemas/FaceTecProcessEnvelope"
+        - type: object
+          required: [errorMessage]
+          properties:
+            errorMessage:
+              type: string
+              example: Liveness check or enrollment 3D failed and was not processed.
+
+    MatchIdDocRequest:
+      type: object
+      required: [userId, image]
+      properties:
+        userId:
+          type: string
+          format: uuid
+        image:
+          type: string
+          description: Base64-encoded ID photo image.
+        minMatchLevel:
+          type: integer
+          default: 7
+          description: Minimum match level (FaceTec parameter).
+
+    ProcessRequestResponse:
+      type: object
+      description: Subset of FaceTec process-request style JSON (see implementation `ProcessRequestResponse`).
+      properties:
+        success:
+          type: boolean
+        didError:
+          type: boolean
+        responseBlob:
+          type: string
+        result:
+          type: object
+          properties:
+            livenessProven:
+              type: boolean
+            matchLevel:
+              type: integer
+        additionalSessionData:
+          type: object
+          additionalProperties: true
+
+    Enrollment3DRecoverableErrorBody:
+      type: object
+      required: [success, responseBlob, didError, additionalSessionData, result, errorMessage]
+      properties:
+        success:
+          type: boolean
+        responseBlob:
+          type: string
+        didError:
+          type: boolean
+        additionalSessionData:
+          $ref: "#/components/schemas/AdditionalSessionData"
+        result:
+          $ref: "#/components/schemas/FaceTecProcessResult"
+        errorMessage:
+          type: string
+          example: Liveness check or enrollment 3D failed and was not processed.
+
+    ConflictErrorBody:
+      type: object
+      required: [errorMessage]
+      properties:
+        errorMessage:
+          type: string
+
+    SimpleErrorMessage:
+      type: object
+      required: [errorMessage]
+      properties:
+        errorMessage:
+          type: string
+
+    FaceTecErrorBody:
+      type: object
+      required: [success, didError, methodName, errorMessage]
+      properties:
+        success:
+          type: boolean
+          enum: [false]
+        didError:
+          type: boolean
+          enum: [true]
+        methodName:
+          type: string
+          example: enrollment3d
+        errorMessage:
+          type: string
+
+    GenericInternalError:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          example: Internal server error
+
+    FaceSignLoginRequest:
+      type: object
+      required: [requestBlob]
+      properties:
+        requestBlob:
+          type: string
+
+    FaceSignLoginNewUserResponse:
+      allOf:
+        - $ref: "#/components/schemas/FaceTecProcessEnvelope"
+        - type: object
+          required: [newUser, userId, newUserConfirmationToken]
+          properties:
+            newUser:
+              type: boolean
+              enum: [true]
+            userId:
+              type: string
+              format: uuid
+            newUserConfirmationToken:
+              type: string
+              description: JWT — confirm with `POST /facesign/confirmation`.
+
+    FaceSignLoginExistingResponse:
+      allOf:
+        - $ref: "#/components/schemas/FaceTecProcessEnvelope"
+        - type: object
+          required: [userId, userAttestmentToken]
+          properties:
+            newUser:
+              type: boolean
+            userId:
+              type: string
+              format: uuid
+            userAttestmentToken:
+              type: string
