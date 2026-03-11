@@ -32,6 +32,7 @@ export interface FaceSignLoginExisting {
  */
 export async function faceSignLogin(
   currentUserId: string,
+  launchId: string,
   enrollIfNew = false,
 ): Promise<FaceSignLoginNew | FaceSignLoginExisting | FaceSignLoginCreated> {
   let results: { identifier: string; matchLevel: number }[] = [];
@@ -66,6 +67,7 @@ export async function faceSignLogin(
 
     agent.writeLog("facesign-user-pending-confirmation", {
       faceSignUserId: currentUserId,
+      launchId,
     });
 
     return {
@@ -82,6 +84,7 @@ export async function faceSignLogin(
       identifiers: results.map((x) => x.identifier),
       currentUserId,
       count: results.length,
+      launchId,
     });
 
     let faceSignUserId = results[0]?.identifier;
@@ -106,7 +109,7 @@ export async function faceSignLogin(
   }
 
   // New user, enroll and onboard
-  agent.writeLog("facesign-new-user", { identifier: currentUserId });
+  agent.writeLog("facesign-new-user", { identifier: currentUserId, launchId });
 
   await enrollUser(currentUserId, FACE_SIGN_GROUP_NAME);
   await insertMember(FACE_SIGN_GROUP_NAME, currentUserId);

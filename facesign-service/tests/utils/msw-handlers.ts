@@ -62,6 +62,7 @@ const defaults = {
     results: [] as Array<{ identifier: string; matchLevel: number }>,
   },
   enroll: { success: true },
+  launchId: crypto.randomUUID(),
   status: {
     running: true,
     success: true,
@@ -89,6 +90,7 @@ export const handlers = [
 
 // Handler factories
 type ProcessRequestResponse = {
+  launchId?: string;
   success?: boolean;
   result?: { livenessProven: boolean; matchLevel?: number };
   didError?: boolean;

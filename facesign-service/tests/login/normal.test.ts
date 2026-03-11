@@ -44,7 +44,7 @@ describe("Login API", () => {
     });
   });
 
-  it("new user (default group and face vector)", async () => {
+  it("new user (just liveness)", async () => {
     server.use(
       processRequestHandler({
         success: true,
@@ -64,32 +64,31 @@ describe("Login API", () => {
 
     const response = await request(app).post("/login").send({
       requestBlob: "test-face-scan",
+      storeAuditTrailImages: true,
     });
 
     expect(response.status).toBe(201);
     expect(response.body).toEqual({
       didError: false,
-      faceSignUserId: expect.any(String),
       responseBlob: "mock-scan-result-blob",
       result: { livenessProven: true },
-      faceSign: null,
       success: true,
+      faceSignUserId: expect.any(String),
+      auditTrailImageId: expect.any(String),
     });
+
+    // New user audit trail image ID should be the same as faceSignUserId
+    expect(response.body.auditTrailImageId).toBe(response.body.faceSignUserId);
 
     expect(agentSpy).toHaveBeenCalledWith("login-request", {
       faceSignUserId: response.body.faceSignUserId,
-      groupName: "facesign-users",
+      groupName: undefined,
       faceVector: true,
       onboardFaceSign: false,
-      storeAuditTrailImages: false,
+      storeAuditTrailImages: true,
     });
 
-    expect(agentSpy).toHaveBeenCalledWith("login-new-user", {
-      identifier: response.body.faceSignUserId,
-      groupName: "facesign-users",
-    });
-
-    expect(insertMemberSpy).toHaveBeenCalledWith("facesign-users", response.body.faceSignUserId);
+    expect(insertMemberSpy).not.toHaveBeenCalled();
 
     // Verify FaceTec API calls
     const processRequest = requestCapture.getLastByEndpoint("/process-request");
@@ -97,8 +96,7 @@ describe("Login API", () => {
       externalDatabaseRefID: response.body.faceSignUserId,
       requestBlob: "test-face-scan",
       storeAsFaceVector: true,
-      storeAuditTrailImages: false,
-      storeIdImage: false,
+      storeAuditTrailImages: true,
     });
   });
 
@@ -127,7 +125,6 @@ describe("Login API", () => {
       faceSignUserId: expect.any(String),
       responseBlob: "mock-scan-result-blob",
       success: true,
-      faceSign: null,
       result: { livenessProven: true },
     });
 
@@ -203,6 +200,8 @@ describe("Login API", () => {
 
     const response = await request(app).post("/login").send({
       requestBlob: "test-face-scan",
+      storeAuditTrailImages: true,
+      groupName: "facesign-users",
     });
 
     expect(response.status).toBe(201);
@@ -211,9 +210,12 @@ describe("Login API", () => {
       responseBlob: "mock-scan-result-blob",
       result: { livenessProven: true },
       success: true,
-      faceSign: null,
       didError: false,
+      auditTrailImageId: expect.any(String),
     });
+
+    // Different audit trail image ID
+    expect(response.body.auditTrailImageId).not.toBe(response.body.faceSignUserId);
 
     expect(agentSpy).toHaveBeenCalledWith("login-duplicate", {
       count: 1,
@@ -250,6 +252,7 @@ describe("Login API", () => {
 
     const response = await request(app).post("/login").send({
       requestBlob: "test-face-scan",
+      groupName: "facesign-users",
     });
 
     expect(response.status).toBe(409);

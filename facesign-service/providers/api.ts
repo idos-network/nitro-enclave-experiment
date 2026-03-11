@@ -11,10 +11,12 @@ export interface StatusResponse {
 
 export class SessionStartError extends Error {
   public readonly responseBody: string;
+  public readonly launchId: string;
 
-  constructor(responseBody: string) {
+  constructor(responseBody: string, launchId: string) {
     super("Session Start Response");
     this.responseBody = responseBody;
+    this.launchId = launchId;
   }
 }
 
@@ -43,7 +45,7 @@ export class FaceTecError extends Error {
 
 function checkSessionStartResponse(response: ProcessRequestResponse) {
   if (response.success === undefined && response.responseBlob !== undefined) {
-    throw new SessionStartError(response.responseBlob);
+    throw new SessionStartError(response.responseBlob, response.launchId);
   }
 }
 
@@ -172,6 +174,37 @@ export async function match3d3d(
   }
 
   const response = (await matchResponse.json()) as ProcessRequestResponse;
+
+  checkSessionStartResponse(response);
+
+  return response;
+}
+
+export async function match3d2dId(
+  externalDatabaseRefID: string,
+  image: string,
+  minMatchLevel: number,
+) {
+  const matchIdDocResponse = await fetch(`${FACETEC_SERVER}match-3d-2d-3rdparty-idphoto`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      externalDatabaseRefID,
+      image,
+      minMatchLevel,
+    }),
+  });
+
+  if (!matchIdDocResponse.ok) {
+    throw new FaceTecError("match3d2dId", {
+      code: matchIdDocResponse.status,
+      body: await matchIdDocResponse.text(),
+    });
+  }
+
+  const response = (await matchIdDocResponse.json()) as ProcessRequestResponse;
 
   checkSessionStartResponse(response);
 
