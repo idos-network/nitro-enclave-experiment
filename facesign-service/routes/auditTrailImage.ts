@@ -1,8 +1,8 @@
 import type { Request, Response } from "express";
 import agent from "../providers/agent.ts";
-import { getAuditTrailImage } from "../providers/db.ts";
+import { getAuditTrailImage, deleteAuditTrailImage } from "../providers/db.ts";
 
-export async function auditTrailImage(req: Request, res: Response) {
+export async function handleGetAuditTrailImage(req: Request, res: Response) {
   const { externalDatabaseRefID } = req.params;
 
   if (!externalDatabaseRefID) {
@@ -32,7 +32,7 @@ export async function auditTrailImage(req: Request, res: Response) {
   return res.status(200).contentType("image/jpeg").send(imageBuffer);
 }
 
-export async function deleteAuditTrailImage(req: Request, res: Response) {
+export async function handleDeleteAuditTrailImage(req: Request, res: Response) {
   const { externalDatabaseRefID } = req.params;
 
   if (!externalDatabaseRefID) {
@@ -43,7 +43,7 @@ export async function deleteAuditTrailImage(req: Request, res: Response) {
 
   agent.writeLog("delete-audit-trail-image-request", { externalDatabaseRefID });
 
-  // TODO: Delete
+  await deleteAuditTrailImage(externalDatabaseRefID);
 
   return res.status(201).json({ message: "Audit trail image deleted successfully." });
 }

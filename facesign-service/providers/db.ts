@@ -186,8 +186,8 @@ export async function deleteAuditTrailImage(auditTrailImageId: string) {
 
   await facetecDataDb
     .collection(FACETEC_SESSION_COLLECTION)
-    .updateOne(
-      { externalDatabaseRefID: auditTrailImageId },
+    .updateMany(
+      { externalDatabaseRefID: auditTrailImageId, "data.auditTrailImage": { $exists: true } },
       { $unset: { "data.auditTrailImage": "" } },
     );
 }

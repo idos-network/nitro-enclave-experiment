@@ -12,7 +12,7 @@ import morgan from "morgan";
 import { HOST, KEY_1_MULTIBASE_PUBLIC_PATH } from "./env.ts";
 import agent from "./providers/agent.ts";
 import { FaceTecError, getStatus, SessionStartError } from "./providers/api.ts";
-import { auditTrailImage, deleteAuditTrailImage } from "./routes/auditTrailImage.ts";
+import { handleGetAuditTrailImage, handleDeleteAuditTrailImage } from "./routes/auditTrailImage.ts";
 import { confirmation as faceSignConfirmation, login as faceSignLogin } from "./routes/facesign.ts";
 import login from "./routes/login.ts";
 import match from "./routes/match.ts";
@@ -47,9 +47,9 @@ app.post("/login", asyncHandler(login));
 app.post("/match", asyncHandler(match));
 app.post("/facesign", asyncHandler(faceSignLogin));
 app.post("/facesign/confirmation", asyncHandler(faceSignConfirmation));
+app.get("/audit-trail-image/:externalDatabaseRefID", asyncHandler(handleGetAuditTrailImage));
+app.delete("/audit-trail-image/:externalDatabaseRefID", asyncHandler(handleDeleteAuditTrailImage));
 app.post("/match-iddoc", asyncHandler(matchId));
-app.get("/audit-trail-image/:externalDatabaseRefID", asyncHandler(auditTrailImage));
-app.delete("/audit-trail-image/:externalDatabaseRefID", asyncHandler(deleteAuditTrailImage));
 
 // idOS issuer information for VCs
 app.get("/idos/issuers/1", (_req, res) => {
