@@ -1,4 +1,5 @@
 import { FACETEC_SERVER } from "../env.ts";
+import { Enrollment3DRecoverableError, FaceTecError, SessionStartError } from "./errors.ts";
 
 export interface StatusResponse {
   coreServerSDKVersion: string;
@@ -9,43 +10,33 @@ export interface StatusResponse {
   notice: string;
 }
 
-export class SessionStartError extends Error {
-  public readonly responseBody: string;
-  public readonly launchId: string;
-
-  constructor(responseBody: string, launchId: string) {
-    super("Session Start Response");
-    this.responseBody = responseBody;
-    this.launchId = launchId;
-  }
-}
-
-export class FaceTecError extends Error {
-  public readonly methodName: string;
-  public readonly response: {
-    code: number;
-    body: string;
+export interface Enrollment3DResponseData {
+  success: boolean;
+  responseBlob: string;
+  didError: boolean;
+  additionalSessionData: {
+    platform: string;
+    deviceModel: string;
+    userAgent: string;
   };
-  public readonly others: Record<string, unknown> = {};
-
-  constructor(
-    methodName: string,
-    response: {
-      code: number;
-      body: string;
-    },
-    others: Record<string, unknown> = {},
-  ) {
-    super("Unexpected FaceTec API Error");
-    this.methodName = methodName;
-    this.response = response;
-    this.others = others;
-  }
+  result: {
+    livenessProven: boolean;
+  };
 }
 
 function checkSessionStartResponse(response: ProcessRequestResponse) {
   if (response.success === undefined && response.responseBlob !== undefined) {
     throw new SessionStartError(response.responseBlob, response.launchId);
+  }
+}
+
+function checkEnrollment3dRecoverableError(response: ProcessRequestResponse) {
+  if (
+    response.success === false ||
+    response.result?.livenessProven === false ||
+    response.didError === true
+  ) {
+    throw new Enrollment3DRecoverableError(response);
   }
 }
 
@@ -102,22 +93,27 @@ export interface ProcessRequestResponse {
   serverInfo: StatusResponse;
 }
 
-export async function enrollment3d(
-  externalDatabaseRefID: string,
-  requestBlob: string,
-  faceVector: boolean,
-  storeAuditTrailImages: boolean,
-) {
+export async function enrollment3d({
+  userId,
+  requestBlob,
+  faceVector,
+  storeSelfie,
+}: {
+  userId: string;
+  requestBlob: string;
+  faceVector: boolean;
+  storeSelfie: boolean;
+}) {
   const enrollmentResponse = await fetch(`${FACETEC_SERVER}process-request`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      externalDatabaseRefID,
+      externalDatabaseRefID: userId,
       requestBlob,
       storeAsFaceVector: faceVector,
-      storeAuditTrailImages,
+      storeAuditTrailImages: storeSelfie,
       storeIdImage: false,
     }),
   });
@@ -130,7 +126,7 @@ export async function enrollment3d(
         body: await enrollmentResponse.text(),
       },
       {
-        externalDatabaseRefID,
+        userId,
       },
     );
   }
@@ -138,24 +134,29 @@ export async function enrollment3d(
   const response = (await enrollmentResponse.json()) as ProcessRequestResponse;
 
   checkSessionStartResponse(response);
+  checkEnrollment3dRecoverableError(response);
 
   return response;
 }
 
-export async function match3d3d(
-  externalDatabaseRefID: string,
-  requestBlob: string,
-  storeAuditTrailImages: boolean,
-) {
+export async function match3d3d({
+  userId,
+  requestBlob,
+  storeSelfie,
+}: {
+  userId: string;
+  requestBlob: string;
+  storeSelfie: boolean;
+}) {
   const matchResponse = await fetch(`${FACETEC_SERVER}process-request`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      externalDatabaseRefID,
+      externalDatabaseRefID: userId,
       requestBlob,
-      storeAuditTrailImages,
+      storeAuditTrailImages: storeSelfie,
       storeIdImage: false,
     }),
   });
@@ -168,7 +169,7 @@ export async function match3d3d(
         body: await matchResponse.text(),
       },
       {
-        externalDatabaseRefID,
+        userId,
       },
     );
   }
@@ -180,18 +181,22 @@ export async function match3d3d(
   return response;
 }
 
-export async function match3d2dId(
-  externalDatabaseRefID: string,
-  image: string,
-  minMatchLevel: number,
-) {
+export async function match3d2dId({
+  userId,
+  image,
+  minMatchLevel,
+}: {
+  userId: string;
+  image: string;
+  minMatchLevel: number;
+}) {
   const matchIdDocResponse = await fetch(`${FACETEC_SERVER}match-3d-2d-3rdparty-idphoto`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      externalDatabaseRefID,
+      externalDatabaseRefID: userId,
       image,
       minMatchLevel,
     }),
@@ -211,14 +216,20 @@ export async function match3d2dId(
   return response;
 }
 
-export async function searchForDuplicates(externalDatabaseRefID: string, groupName: string) {
+export async function searchForDuplicates({
+  userId,
+  groupName,
+}: {
+  userId: string;
+  groupName: string;
+}) {
   const response = await fetch(`${FACETEC_SERVER}3d-db/search`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      externalDatabaseRefID,
+      externalDatabaseRefID: userId,
       groupName,
       minMatchLevel: 15,
     }),
@@ -232,7 +243,7 @@ export async function searchForDuplicates(externalDatabaseRefID: string, groupNa
         body: await response.text(),
       },
       {
-        externalDatabaseRefID,
+        userId,
         groupName,
       },
     );
@@ -246,14 +257,14 @@ export async function searchForDuplicates(externalDatabaseRefID: string, groupNa
   }>;
 }
 
-export async function enrollUser(externalDatabaseRefID: string, groupName: string) {
+export async function enrollUser({ userId, groupName }: { userId: string; groupName: string }) {
   const response = await fetch(`${FACETEC_SERVER}3d-db/enroll`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      externalDatabaseRefID,
+      externalDatabaseRefID: userId,
       groupName,
     }),
   });
@@ -266,7 +277,7 @@ export async function enrollUser(externalDatabaseRefID: string, groupName: strin
         body: await response.text(),
       },
       {
-        externalDatabaseRefID,
+        userId,
         groupName,
       },
     );

@@ -72,7 +72,7 @@ describe("FaceSign/Login API", () => {
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
       didError: false,
-      faceSignUserId: expect.any(String),
+      userId: expect.any(String),
       responseBlob: "mock-scan-result-blob",
       result: { livenessProven: true },
       success: true,
@@ -84,14 +84,14 @@ describe("FaceSign/Login API", () => {
     const decoded = jwt.verify(response.body.newUserConfirmationToken, publicKey, {
       algorithms: ["ES512"],
     });
-    expect(decoded.sub).toBe(response.body.faceSignUserId);
+    expect(decoded.sub).toBe(response.body.userId);
 
     expect(agentSpy).toHaveBeenCalledWith("facesign-login", {
-      generatedUserId: response.body.faceSignUserId,
+      userId: response.body.userId,
     });
 
     expect(agentSpy).toHaveBeenCalledWith("facesign-user-pending-confirmation", {
-      faceSignUserId: response.body.faceSignUserId,
+      userId: response.body.userId,
       launchId,
     });
 
@@ -100,7 +100,7 @@ describe("FaceSign/Login API", () => {
     // Verify FaceTec API calls
     const processRequest = requestCapture.getLastByEndpoint("/process-request");
     expect(processRequest?.body).toMatchObject({
-      externalDatabaseRefID: response.body.faceSignUserId,
+      externalDatabaseRefID: response.body.userId,
       requestBlob: "test-face-scan",
       storeAuditTrailImages: false,
       storeIdImage: false,
@@ -108,7 +108,7 @@ describe("FaceSign/Login API", () => {
 
     const searchRequest = requestCapture.getLastByEndpoint("/3d-db/search");
     expect(searchRequest?.body).toMatchObject({
-      externalDatabaseRefID: response.body.faceSignUserId,
+      externalDatabaseRefID: response.body.userId,
       groupName: GROUP_NAME,
       minMatchLevel: 15,
     });
@@ -140,14 +140,17 @@ describe("FaceSign/Login API", () => {
     });
 
     expect(agentSpy).toHaveBeenCalledWith("facesign-login", {
-      generatedUserId: expect.any(String),
+      userId: expect.any(String),
     });
 
-    expect(agentSpy).toHaveBeenCalledWith("facesign-enrollment-failed", {
+    expect(agentSpy).toHaveBeenCalledWith("enrollment3d-recoverable-error", {
       success: false,
+      launchId: expect.any(String),
+      error: "Liveness check or enrollment 3D failed and was not processed.",
+      result: {
+        livenessProven: false,
+      },
       didError: true,
-      error: undefined,
-      result: { livenessProven: false },
     });
   });
 
@@ -179,7 +182,7 @@ describe("FaceSign/Login API", () => {
 
     expect(response.status).toBe(201);
     expect(response.body).toEqual({
-      faceSignUserId: resultId,
+      userId: resultId,
       responseBlob: "mock-scan-result-blob",
       success: true,
       didError: false,
@@ -190,10 +193,14 @@ describe("FaceSign/Login API", () => {
 
     expect(oldestSpy).not.toHaveBeenCalledWith([resultId]);
 
-    expect(agentSpy).toHaveBeenCalledWith("facesign-duplicate", {
+    expect(agentSpy).toHaveBeenCalledWith("group-resolution-existing-user", {
       count: 1,
-      currentUserId: expect.any(String),
-      identifiers: [resultId],
+      groupName: "pinocchio-users",
+      process: "facesign",
+      resolvedUserId: resultId,
+      userId: expect.any(String),
+      launchId: expect.any(String),
+      matchedUserIds: [resultId],
     });
 
     expect(db.insertMember).not.toHaveBeenCalled();
@@ -233,7 +240,7 @@ describe("FaceSign/Login API", () => {
 
     expect(response.status).toBe(201);
     expect(response.body).toEqual({
-      faceSignUserId: resultId3, // 3 is the oldest (because it was returned by getOldestFaceSignUserId)
+      userId: resultId3, // 3 is the oldest (because it was returned by getOldestFaceSignUserId)
       responseBlob: "mock-scan-result-blob",
       success: true,
       result: { livenessProven: true },
@@ -250,10 +257,14 @@ describe("FaceSign/Login API", () => {
 
     expect(db.insertMember).not.toHaveBeenCalled();
 
-    expect(agentSpy).toBeCalledWith("facesign-duplicate", {
+    expect(agentSpy).toBeCalledWith("group-resolution-ffr-resolved", {
       count: 3,
-      currentUserId: expect.any(String),
-      identifiers: [resultId, resultId2, resultId3],
+      groupName: "pinocchio-users",
+      process: "facesign",
+      resolvedUserId: resultId3,
+      userId: expect.any(String),
+      launchId: expect.any(String),
+      matchedUserIds: [resultId, resultId2, resultId3],
     });
 
     expect(oldestSpy).toHaveBeenCalledWith([resultId, resultId2, resultId3]);

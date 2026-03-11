@@ -161,7 +161,11 @@ export async function getAuditTrailImage(
   let payloadForDecrypt: any = image;
 
   // Check for proper binary type = 6, data = array
-  if (typeof payloadForDecrypt === "object" && payloadForDecrypt.type === 6 && Array.isArray(payloadForDecrypt.data)) {
+  if (
+    typeof payloadForDecrypt === "object" &&
+    payloadForDecrypt.type === 6 &&
+    Array.isArray(payloadForDecrypt.data)
+  ) {
     payloadForDecrypt = new Binary(payloadForDecrypt.data, 6);
   } else if (Buffer.isBuffer(payloadForDecrypt)) {
     payloadForDecrypt = new Binary(payloadForDecrypt, 6);
@@ -181,15 +185,24 @@ export async function getAuditTrailImage(
   return Buffer.from(decrypted.buffer, "base64");
 }
 
-export async function deleteAuditTrailImage(auditTrailImageId: string) {
+export async function deleteAuditTrailImage(externalDatabaseRefID: string) {
   const { facetecDataDb } = await connectDB();
 
   await facetecDataDb
     .collection(FACETEC_SESSION_COLLECTION)
-    .updateMany(
-      { externalDatabaseRefID: auditTrailImageId, "data.auditTrailImage": { $exists: true } },
-      { $unset: { "data.auditTrailImage": "" } },
-    );
+    .updateOne({ externalDatabaseRefID }, { $unset: { "data.auditTrailImage": "" } });
+}
+
+export async function deleteAuditTrailImagesOlderThan14Days() {
+  const { facetecDataDb } = await connectDB();
+
+  await facetecDataDb.collection(FACETEC_SESSION_COLLECTION).updateMany(
+    {
+      "data.auditTrailImage": { $exists: true },
+      "callData.date": { $lt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000) },
+    },
+    { $unset: { "data.auditTrailImage": "" } },
+  );
 }
 
 export async function countMembersInGroup(groupName: string) {
@@ -204,20 +217,20 @@ export async function getMembers(groupName: string) {
   return members.map((x) => x.faceSignUserId);
 }
 
-export async function insertMember(groupName: string, faceSignUserId: string) {
+export async function insertMember({ groupName, userId }: { groupName: string; userId: string }) {
   const { db } = await connectDB();
 
   try {
     const result = await db.collection(DB_COLLECTION_NAME).insertOne({
       groupName,
-      faceSignUserId,
+      faceSignUserId: userId,
       createdAt: new Date(),
     });
 
     return result;
   } catch (err) {
     if (err instanceof MongoServerError && err.code === 11000) {
-      console.log("faceSignId already exists:", faceSignUserId);
+      console.log("faceSignId already exists:", userId);
       return null;
     }
 

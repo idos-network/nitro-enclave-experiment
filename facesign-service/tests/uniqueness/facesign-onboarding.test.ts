@@ -13,7 +13,7 @@ import {
 } from "../utils/msw-handlers.ts";
 import { server } from "../utils/msw-server.ts";
 
-describe("Login/Facesign Onboarding API", () => {
+describe("Uniqueness + Facesign Onboarding API", () => {
   it("new user", async () => {
     server.use(
       processRequestHandler({
@@ -32,43 +32,49 @@ describe("Login/Facesign Onboarding API", () => {
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
-    const response = await request(app).post("/login").send({
+    const response = await request(app).post("/relay/uniqueness").send({
       requestBlob: "test-face-scan",
       faceVector: false,
       onboardFaceSign: true,
-      groupName: "facesign-users",
+      groupName: "test-users",
     });
 
     expect(response.status).toBe(201);
     expect(response.body).toEqual({
       didError: false,
-      faceSignUserId: expect.any(String),
+      userId: expect.any(String),
       responseBlob: "mock-scan-result-blob",
       result: { livenessProven: true },
       faceSign: {
         newUser: true,
-        faceSignUserId: expect.any(String),
+        userId: expect.any(String),
         userAttestmentToken: expect.any(String),
       },
       success: true,
     });
 
     // User IDs should match
-    expect(response.body.faceSignUserId).toBe(response.body.faceSign.faceSignUserId);
+    expect(response.body.userId).toBe(response.body.faceSign.userId);
 
     // Check only faceSign stuff
-    expect(agentSpy).toHaveBeenCalledWith("facesign-new-user", {
-      identifier: response.body.faceSignUserId,
+    expect(agentSpy).toHaveBeenCalledWith("group-resolution-new-user-enrolled", {
+      groupName: "pinocchio-users",
+      userId: response.body.userId,
+      process: "facesign",
+      launchId: expect.any(String),
     });
 
-    expect(insertMemberSpy).toHaveBeenCalledWith("facesign-users", response.body.faceSignUserId);
+    expect(insertMemberSpy).toHaveBeenCalledWith({
+      groupName: "pinocchio-users",
+      userId: response.body.userId,
+    });
 
     // Check jwt
     const decoded = jwt.verify(response.body.faceSign.userAttestmentToken, publicKey, {
       algorithms: ["ES512"],
     }) as { sub: string; iat: number };
 
-    expect(decoded.sub).toBe(response.body.faceSign.faceSignUserId);
+    expect(decoded.sub).toBe(response.body.faceSign.userId);
   });
 
   it("existing user", async () => {
@@ -94,7 +100,7 @@ describe("Login/Facesign Onboarding API", () => {
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
-    const response = await request(app).post("/login").send({
+    const response = await request(app).post("/relay/uniqueness").send({
       requestBlob: "test-face-scan",
       faceVector: false,
       onboardFaceSign: true,
@@ -104,28 +110,32 @@ describe("Login/Facesign Onboarding API", () => {
     expect(response.status).toBe(201);
     expect(response.body).toEqual({
       didError: false,
-      faceSignUserId: expect.any(String),
+      userId: expect.any(String),
       responseBlob: "mock-scan-result-blob",
       result: { livenessProven: true },
       faceSign: {
         newUser: false,
-        faceSignUserId: "existing-user-id",
+        userId: "existing-user-id",
         userAttestmentToken: expect.any(String),
       },
       success: true,
     });
 
     // User IDs should not match
-    expect(response.body.faceSignUserId).not.toBe(response.body.faceSign.faceSignUserId);
+    expect(response.body.userId).not.toBe(response.body.faceSign.userId);
 
     // Check only faceSign stuff
-    expect(agentSpy).toHaveBeenCalledWith("facesign-duplicate", {
-      identifiers: ["existing-user-id"],
-      currentUserId: response.body.faceSignUserId,
+    expect(agentSpy).toHaveBeenCalledWith("group-resolution-existing-user", {
+      matchedUserIds: ["existing-user-id"],
+      groupName: "pinocchio-users",
+      process: "facesign",
+      resolvedUserId: "existing-user-id",
+      userId: response.body.userId,
+      launchId: expect.any(String),
       count: 1,
     });
 
-    expect(insertMemberSpy).toHaveBeenCalledTimes(1);
+    expect(insertMemberSpy).toHaveBeenCalledTimes(1); // for the original group, not facesign
 
     // Check jwt
     const decoded = jwt.verify(response.body.faceSign.userAttestmentToken, publicKey, {

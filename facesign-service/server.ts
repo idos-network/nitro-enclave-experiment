@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { readFileSync } from "node:fs";
 import cors from "cors";
 import express, {
@@ -8,20 +9,38 @@ import express, {
 } from "express";
 import helmet from "helmet";
 import morgan from "morgan";
+import cron from "node-cron";
 
+// Configurations and providers
 import { HOST, KEY_1_MULTIBASE_PUBLIC_PATH } from "./env.ts";
 import agent from "./providers/agent.ts";
-import { FaceTecError, getStatus, SessionStartError } from "./providers/api.ts";
-import { handleGetAuditTrailImage, handleDeleteAuditTrailImage } from "./routes/auditTrailImage.ts";
+import { getStatus } from "./providers/api.ts";
+import { deleteAuditTrailImagesOlderThan14Days } from "./providers/db.ts";
+import {
+  Enrollment3DRecoverableError,
+  FaceTecError,
+  FFRError,
+  InternalServerError,
+  SessionStartError,
+} from "./providers/errors.ts";
+// FaceSign Routes
 import { confirmation as faceSignConfirmation, login as faceSignLogin } from "./routes/facesign.ts";
-import login from "./routes/login.ts";
+// idOS Relay Routes
+import liveness from "./routes/liveness.ts";
 import match from "./routes/match.ts";
-import matchId from "./routes/match-id.ts";
+import matchIdDoc from "./routes/match-id-doc.ts";
+import selfie from "./routes/selfie.ts";
+import uniqueness from "./routes/uniqueness.ts";
+import { runWithRequestContext } from "./utils/request-context.ts";
 
 const app = express();
 
 app.use(helmet());
 app.use(cors());
+app.use((req, _res, next) => {
+  const requestId = req.header("x-request-id") || crypto.randomUUID();
+  runWithRequestContext({ requestId }, next);
+});
 app.use(morgan("dev"));
 app.use(express.json({ limit: "50mb" }));
 
@@ -43,13 +62,16 @@ export const asyncHandler = (
   };
 };
 
-app.post("/login", asyncHandler(login));
-app.post("/match", asyncHandler(match));
+// idOS Relay Routes
+app.post("/relay/liveness", asyncHandler(liveness));
+app.post("/relay/uniqueness", asyncHandler(uniqueness));
+app.post("/relay/match", asyncHandler(match));
+app.post("/relay/match-id-doc", asyncHandler(matchIdDoc));
+app.get("/relay/selfie/:selfieId", asyncHandler(selfie));
+
+// FaceSign routes
 app.post("/facesign", asyncHandler(faceSignLogin));
 app.post("/facesign/confirmation", asyncHandler(faceSignConfirmation));
-app.get("/audit-trail-image/:externalDatabaseRefID", asyncHandler(handleGetAuditTrailImage));
-app.delete("/audit-trail-image/:externalDatabaseRefID", asyncHandler(handleDeleteAuditTrailImage));
-app.post("/match-iddoc", asyncHandler(matchId));
 
 // idOS issuer information for VCs
 app.get("/idos/issuers/1", (_req, res) => {
@@ -73,6 +95,34 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
     return res.status(200).json({
       responseBlob: err.responseBody,
       sessionStart: true,
+      launchId: err.launchId,
+    });
+  }
+
+  if (err instanceof Enrollment3DRecoverableError) {
+    agent.writeLog("enrollment3d-recoverable-error", {
+      success: err.response.success,
+      launchId: err.response.launchId,
+      error: err.message,
+      didError: err.response.didError,
+      result: err.response.result,
+    });
+
+    return res.status(400).json({
+      success: err.response.success,
+      responseBlob: err.response.responseBlob,
+      didError: err.response.didError,
+      additionalSessionData: err.response.additionalSessionData,
+      result: err.response.result,
+      errorMessage: "Liveness check or enrollment 3D failed and was not processed.",
+    });
+  }
+
+  if (err instanceof FFRError) {
+    agent.writeLog("ffr-error", { message: err.message });
+
+    return res.status(409).json({
+      errorMessage: err.message,
     });
   }
 
@@ -91,9 +141,25 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
     });
   }
 
+  if (err instanceof InternalServerError) {
+    agent.writeLog("general-error", { message: err.message });
+
+    return res.status(500).json({
+      errorMessage: err.message,
+    });
+  }
+
   console.error(err);
   agent.writeLog("general-error", { message: err.message, stack: err.stack });
   res.status(500).json({ error: "Internal server error" });
+});
+
+// Cron job to delete audit trail images older than 14 days
+cron.schedule("0 0 * * *", async () => {
+  agent.writeLog("delete-audit-trail-images-cron-job", {
+    message: "Deleting audit trail images older than 14 days",
+  });
+  await deleteAuditTrailImagesOlderThan14Days();
 });
 
 export default app;

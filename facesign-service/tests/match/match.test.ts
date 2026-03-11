@@ -1,23 +1,23 @@
 // biome-ignore-all lint/suspicious/noExplicitAny: Test files often need any
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
-import agent from "../providers/agent.ts";
-import app from "../server.ts";
+import agent from "../../providers/agent.ts";
+import app from "../../server.ts";
 import {
   processRequestErrorHandler,
   processRequestHandler,
   requestCapture,
   sessionStartHandler,
-} from "./utils/msw-handlers.ts";
-import { server } from "./utils/msw-server.ts";
+} from "../utils/msw-handlers.ts";
+import { server } from "../utils/msw-server.ts";
 
-describe("Match Login API", () => {
+describe("Match API", () => {
   it("return new session", async () => {
     server.use(sessionStartHandler("mock-session-result-blob"));
 
-    const response = await request(app).post("/match").send({
+    const response = await request(app).post("/relay/match").send({
       requestBlob: "test-face-scan",
-      externalUserId: "test-user-id",
+      userId: "test-user-id",
     });
 
     expect(response.status).toBe(200);
@@ -36,10 +36,10 @@ describe("Match Login API", () => {
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
-    const response = await request(app).post("/match").send({
+    const response = await request(app).post("/relay/match").send({
       requestBlob: "test-face-scan",
-      externalUserId: "test-user-id",
-      storeAuditTrailImages: true,
+      userId: "test-user-id",
+      storeSelfie: true,
     });
 
     expect(response.status).toBe(201);
@@ -48,18 +48,18 @@ describe("Match Login API", () => {
       responseBlob: "mock-scan-result-blob",
       result: { livenessProven: true, matchLevel: 15 },
       success: true,
-      auditTrailImageId: expect.any(String),
+      selfieFileId: expect.any(String),
     });
 
     expect(agentSpy).toHaveBeenCalledWith("match-request", {
-      externalUserId: "test-user-id",
-      storeAuditTrailImages: true,
+      userId: "test-user-id",
+      storeSelfie: true,
     });
 
     expect(agentSpy).toHaveBeenCalledWith("match-3d-3d-done", {
       identifier: "test-user-id",
       matchLevel: 15,
-      auditTrailImageId: expect.any(String),
+      selfieFileId: expect.any(String),
     });
 
     // Verify FaceTec API calls
@@ -82,9 +82,9 @@ describe("Match Login API", () => {
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
-    const response = await request(app).post("/match").send({
+    const response = await request(app).post("/relay/match").send({
       requestBlob: "test-face-scan",
-      externalUserId: "test-user-id",
+      userId: "test-user-id",
     });
 
     expect(response.status).toBe(400);
@@ -98,41 +98,8 @@ describe("Match Login API", () => {
 
     expect(agentSpy).toHaveBeenCalledWith("match-3d-3d-failed", {
       success: false,
-      externalUserId: "test-user-id",
+      userId: "test-user-id",
       result: { livenessProven: false },
-    });
-  });
-
-  it("liveness done, but no match (no result)", async () => {
-    server.use(
-      processRequestHandler(
-        {
-          success: false,
-          didError: false,
-          responseBlob: "invalid-result-blob",
-        },
-        false,
-      ),
-    );
-
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
-
-    const response = await request(app).post("/match").send({
-      requestBlob: "test-face-scan",
-      externalUserId: "test-user-id",
-    });
-
-    expect(response.status).toBe(409);
-    expect(response.body).toEqual({
-      errorMessage: "No match found for the provided face scan.",
-      success: false,
-      didError: false,
-      responseBlob: "invalid-result-blob",
-    });
-
-    expect(agentSpy).toHaveBeenCalledWith("match-3d-3d-no-match", {
-      success: false,
-      externalUserId: "test-user-id",
     });
   });
 
@@ -148,23 +115,23 @@ describe("Match Login API", () => {
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
-    const response = await request(app).post("/match").send({
+    const response = await request(app).post("/relay/match").send({
       requestBlob: "test-face-scan",
-      externalUserId: "test-user-id",
+      userId: "test-user-id",
     });
 
-    expect(response.status).toBe(409);
+    expect(response.status).toBe(400);
     expect(response.body).toEqual({
-      errorMessage: "No match found for the provided face scan.",
+      errorMessage: "Liveness check or enrollment 3D failed and was not processed.",
       success: false,
       didError: false,
       responseBlob: "invalid-result-blob",
       result: { livenessProven: true },
     });
 
-    expect(agentSpy).toHaveBeenCalledWith("match-3d-3d-no-match", {
+    expect(agentSpy).toHaveBeenCalledWith("match-3d-3d-failed", {
       success: false,
-      externalUserId: "test-user-id",
+      userId: "test-user-id",
       result: { livenessProven: true },
     });
   });
@@ -174,9 +141,9 @@ describe("Match Login API", () => {
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
-    const response = await request(app).post("/match").send({
+    const response = await request(app).post("/relay/match").send({
       requestBlob: "test-face-scan",
-      externalUserId: "test-user-id",
+      userId: "test-user-id",
     });
 
     expect(response.status).toBe(500);
@@ -190,7 +157,7 @@ describe("Match Login API", () => {
     expect(agentSpy).toHaveBeenCalledWith("facetec-api-error", {
       methodName: "match3d3d",
       others: {
-        externalDatabaseRefID: "test-user-id",
+        userId: "test-user-id",
       },
       response: {
         body: "Some unexpected error",
