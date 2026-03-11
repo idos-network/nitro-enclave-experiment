@@ -12,9 +12,11 @@ import morgan from "morgan";
 import { HOST, KEY_1_MULTIBASE_PUBLIC_PATH } from "./env.ts";
 import agent from "./providers/agent.ts";
 import { FaceTecError, getStatus, SessionStartError } from "./providers/api.ts";
+import { handleGetAuditTrailImage, handleDeleteAuditTrailImage } from "./routes/auditTrailImage.ts";
 import { confirmation as faceSignConfirmation, login as faceSignLogin } from "./routes/facesign.ts";
 import login from "./routes/login.ts";
 import match from "./routes/match.ts";
+import matchId from "./routes/match-id.ts";
 
 const app = express();
 
@@ -45,6 +47,9 @@ app.post("/login", asyncHandler(login));
 app.post("/match", asyncHandler(match));
 app.post("/facesign", asyncHandler(faceSignLogin));
 app.post("/facesign/confirmation", asyncHandler(faceSignConfirmation));
+app.get("/audit-trail-image/:externalDatabaseRefID", asyncHandler(handleGetAuditTrailImage));
+app.delete("/audit-trail-image/:externalDatabaseRefID", asyncHandler(handleDeleteAuditTrailImage));
+app.post("/match-iddoc", asyncHandler(matchId));
 
 // idOS issuer information for VCs
 app.get("/idos/issuers/1", (_req, res) => {
@@ -63,7 +68,8 @@ app.get("/idos/keys/1", (_req, res) => {
 
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   if (err instanceof SessionStartError) {
-    agent.writeLog("session-start-response-blob", {});
+    agent.writeLog("session-start-response-blob", { launchId: err.launchId });
+
     return res.status(200).json({
       responseBlob: err.responseBody,
       sessionStart: true,

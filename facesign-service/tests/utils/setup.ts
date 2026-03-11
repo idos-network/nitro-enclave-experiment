@@ -7,6 +7,8 @@ vi.mock("../../providers/db.ts", () => ({
   countMembersInGroup: vi.fn(),
   getMembers: vi.fn(),
   getOldestFaceSignUserId: vi.fn(),
+  getAuditTrailImage: vi.fn(),
+  deleteAuditTrailImage: vi.fn(),
 }));
 
 vi.mock("../../providers/agent.ts", () => ({

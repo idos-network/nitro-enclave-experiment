@@ -45,11 +45,14 @@ describe("FaceSign/Login API", () => {
   });
 
   it("new user", async () => {
+    const launchId = crypto.randomUUID();
+
     server.use(
       processRequestHandler({
         success: true,
         result: { livenessProven: true },
         didError: false,
+        launchId,
         responseBlob: "mock-scan-result-blob",
       }),
       searchHandler([]),
@@ -89,6 +92,7 @@ describe("FaceSign/Login API", () => {
 
     expect(agentSpy).toHaveBeenCalledWith("facesign-user-pending-confirmation", {
       faceSignUserId: response.body.faceSignUserId,
+      launchId,
     });
 
     expect(insertMemberSpy).not.toHaveBeenCalled();

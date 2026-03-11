@@ -16,12 +16,14 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@aws-sdk/credential-provider-node": "^3.907.0",
     "check-disk-space": "^3.4.0",
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
     "mongodb": "^6.19.0",
+		"mongodb-client-encryption": "^6.5.0",
     "morgan": "^1.10.1",
     "os-utils": "^0.0.14",
     "pm2": "^6.0.13"
