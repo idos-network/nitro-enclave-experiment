@@ -12,7 +12,7 @@
     "clientKind": "git"
   },
   "files": {
-    "includes": ["**", "!**/node_modules/**/*"]
+    "includes": ["**", "!**/node_modules/**/*", "!redoc-static.html"]
   },
   "linter": {
     "enabled": true,

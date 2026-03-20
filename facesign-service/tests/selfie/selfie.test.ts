@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import agent from "../../providers/agent.ts";
 import * as db from "../../providers/db.ts";
 import app from "../../server.ts";
+import { relayAuthorizationHeader } from "../utils/helper.ts";
 
 function binaryParser(res: any, callback: any) {
   const chunks: Buffer[] = [];
@@ -29,6 +30,7 @@ describe("Selfie API", () => {
 
     const response = await request(app)
       .get("/relay/selfie/test-external-id")
+      .set(relayAuthorizationHeader())
       .buffer(true)
       .parse(binaryParser);
 
@@ -47,7 +49,9 @@ describe("Selfie API", () => {
     const getAuditTrailImageSpy = vi.spyOn(db, "getAuditTrailImage").mockResolvedValue(null);
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
-    const response = await request(app).get("/relay/selfie/test-external-id");
+    const response = await request(app)
+      .get("/relay/selfie/test-external-id")
+      .set(relayAuthorizationHeader());
 
     expect(response.status).toBe(404);
     expect(response.body).toEqual({
