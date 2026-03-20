@@ -127,10 +127,7 @@ type Match3d2dIdResponse = {
   launchId?: string;
 };
 
-export const match3d2dIdHandler = (
-  response: Match3d2dIdResponse = {},
-  defaultResult = true,
-) =>
+export const match3d2dIdHandler = (response: Match3d2dIdResponse = {}, defaultResult = true) =>
   postHandler("match-3d-2d-3rdparty-idphoto", () => ({
     ...(defaultResult ? defaults.match3d2dId : {}),
     ...response,

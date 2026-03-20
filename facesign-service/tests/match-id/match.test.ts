@@ -3,10 +3,7 @@ import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 import agent from "../../providers/agent.ts";
 import app from "../../server.ts";
-import {
-  match3d2dIdHandler,
-  requestCapture,
-} from "../utils/msw-handlers.ts";
+import { match3d2dIdHandler, requestCapture } from "../utils/msw-handlers.ts";
 import { server } from "../utils/msw-server.ts";
 
 describe("Match ID document API", () => {

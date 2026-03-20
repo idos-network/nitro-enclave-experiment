@@ -134,6 +134,8 @@ describe("Liveness + Facesign Onboarding API", () => {
       count: 1,
     });
 
+    expect(insertMemberSpy).not.toHaveBeenCalled();
+
     // Check jwt
     const decoded = jwt.verify(response.body.faceSign.userAttestmentToken, publicKey, {
       algorithms: ["ES512"],

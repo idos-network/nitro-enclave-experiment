@@ -217,20 +217,17 @@ describe("Uniqueness API", () => {
 
     expect(response.status).toBe(409);
     expect(response.body).toEqual({
-      errorMessage:
-        "Enrollment process failed, multiple users found with the same face-vector.",
+      errorMessage: "Enrollment process failed, multiple users found with the same face-vector.",
     });
 
-    expect(agentSpy).toBeCalledWith(
-      "group-resolution-ffr-rejected", {
-        launchId: expect.any(String),
-        process: "uniqueness",
-        matchedUserIds: [resultId, resultId2],
-        count: 2,
-        userId: expect.any(String),
-        groupName: "facesign-users",
-      },
-    );
+    expect(agentSpy).toBeCalledWith("group-resolution-ffr-rejected", {
+      launchId: expect.any(String),
+      process: "uniqueness",
+      matchedUserIds: [resultId, resultId2],
+      count: 2,
+      userId: expect.any(String),
+      groupName: "facesign-users",
+    });
 
     expect(insertMemberSpy).not.toHaveBeenCalled();
   });

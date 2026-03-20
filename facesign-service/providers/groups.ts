@@ -132,7 +132,9 @@ export async function findOrEnrollInGroup({
     const resolvedUserId = results[0]?.identifier;
 
     if (!resolvedUserId) {
-      throw new InternalServerError("Group search identifier is empty in the results, check server logs.");
+      throw new InternalServerError(
+        "Group search identifier is empty in the results, check server logs.",
+      );
     }
 
     agent.writeLog("group-resolution-existing-user", {

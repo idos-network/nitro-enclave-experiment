@@ -139,8 +139,7 @@ export async function enrollment3d({
   return response;
 }
 
-export async function match3d3d(
-  {
+export async function match3d3d({
   userId,
   requestBlob,
   storeSelfie,
@@ -148,8 +147,7 @@ export async function match3d3d(
   userId: string;
   requestBlob: string;
   storeSelfie: boolean;
-  }
-) {
+}) {
   const matchResponse = await fetch(`${FACETEC_SERVER}process-request`, {
     method: "POST",
     headers: {

@@ -96,7 +96,7 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   }
 
   if (err instanceof Enrollment3DRecoverableError) {
-    agent.writeLog("enrollment3d-recoverable-error", { 
+    agent.writeLog("enrollment3d-recoverable-error", {
       success: err.response.success,
       launchId: err.response.launchId,
       error: err.message,

@@ -25,12 +25,7 @@ export interface LivenessResponseData extends Enrollment3DResponseData {
 export default async function handler(req: Request, res: Response) {
   const userId: string = crypto.randomUUID();
 
-  const {
-    requestBlob,
-    faceVector = true,
-    onboardFaceSign = false,
-    storeSelfie = false,
-  } = req.body;
+  const { requestBlob, faceVector = true, onboardFaceSign = false, storeSelfie = false } = req.body;
 
   agent.writeLog("liveness-request", {
     userId,
