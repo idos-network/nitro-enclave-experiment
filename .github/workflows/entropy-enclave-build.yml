@@ -1,7 +1,8 @@
 name: "Entropy enclave build"
 
 on:
-  pull_request:
+  push:
+    branches: [master, main]
 
 # The following permissions are required when "enable-ghcr-push" is true
 permissions:
