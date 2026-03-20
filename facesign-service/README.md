@@ -339,23 +339,3 @@ Body:
   error: "No audit trail image available."
 }
 ```
-
-# DELETE /audit-trail-image/:auditTrailImageId
-
-This endpoint remove an audit trail image from DB if available.
-
-1. Image deleted (200)
-  
-```javascript
-{
-  message: "Audit trail image deleted sucesfully."
-}
-```
-
-2. Image not found or missing external id (400)
-
-```javascript
-{
-  errorMessage: "External database reference ID is required."
-}
-```

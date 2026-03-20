@@ -120,8 +120,8 @@ export default async function handler(req: Request, res: Response) {
         launchId,
       });
 
-      await enrollUser(faceSignUserId, groupName);
-      await insertMember(groupName, faceSignUserId);
+      await enrollUser({ externalDatabaseRefID: faceSignUserId, groupName });
+      await insertMember({ groupName, faceSignUserId });
     } else if (results.length > 1) {
       agent.writeLog("login-duplicate-error", {
         identifiers: results.map((x) => x.identifier),

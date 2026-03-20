@@ -246,7 +246,7 @@ export async function searchForDuplicates(externalDatabaseRefID: string, groupNa
   }>;
 }
 
-export async function enrollUser(externalDatabaseRefID: string, groupName: string) {
+export async function enrollUser({externalDatabaseRefID, groupName}: {externalDatabaseRefID: string, groupName: string}) {
   const response = await fetch(`${FACETEC_SERVER}3d-db/enroll`, {
     method: "POST",
     headers: {

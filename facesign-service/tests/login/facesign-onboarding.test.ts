@@ -61,7 +61,7 @@ describe("Login/Facesign Onboarding API", () => {
       identifier: response.body.faceSignUserId,
     });
 
-    expect(insertMemberSpy).toHaveBeenCalledWith("facesign-users", response.body.faceSignUserId);
+    expect(insertMemberSpy).toHaveBeenCalledWith({ groupName: "facesign-users", faceSignUserId: response.body.faceSignUserId });
 
     // Check jwt
     const decoded = jwt.verify(response.body.faceSign.userAttestmentToken, publicKey, {

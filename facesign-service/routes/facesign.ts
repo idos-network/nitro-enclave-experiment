@@ -93,8 +93,8 @@ export const confirmation = async (req: Request, res: Response) => {
   }
 
   // Enroll user in 3d-db so they can be matched later
-  await enrollUser(faceSignUserId, FACE_SIGN_GROUP_NAME);
-  await insertMember(faceSignUserId, FACE_SIGN_GROUP_NAME);
+  await enrollUser({ externalDatabaseRefID: faceSignUserId, groupName: FACE_SIGN_GROUP_NAME });
+  await insertMember({ groupName: FACE_SIGN_GROUP_NAME, faceSignUserId });
 
   const userAttestmentToken = jwt.sign(
     { sub: faceSignUserId },

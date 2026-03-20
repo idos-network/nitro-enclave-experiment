@@ -204,7 +204,7 @@ export async function getMembers(groupName: string) {
   return members.map((x) => x.faceSignUserId);
 }
 
-export async function insertMember(groupName: string, faceSignUserId: string) {
+export async function insertMember({groupName, faceSignUserId}: {groupName: string, faceSignUserId: string}) {
   const { db } = await connectDB();
 
   try {

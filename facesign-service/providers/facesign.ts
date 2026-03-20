@@ -111,8 +111,8 @@ export async function faceSignLogin(
   // New user, enroll and onboard
   agent.writeLog("facesign-new-user", { identifier: currentUserId, launchId });
 
-  await enrollUser(currentUserId, FACE_SIGN_GROUP_NAME);
-  await insertMember(FACE_SIGN_GROUP_NAME, currentUserId);
+  await enrollUser({ externalDatabaseRefID: currentUserId, groupName: FACE_SIGN_GROUP_NAME });
+  await insertMember({ groupName: FACE_SIGN_GROUP_NAME, faceSignUserId: currentUserId });
 
   const userAttestmentToken = jwt.sign(
     { sub: currentUserId },

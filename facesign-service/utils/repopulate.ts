@@ -12,7 +12,7 @@ async function repopulate3dDb() {
 
   for (const member of members) {
     try {
-      await enrollUser(member, GROUP_NAME);
+      await enrollUser({ externalDatabaseRefID: member, groupName: GROUP_NAME });
       console.log(`Enrolled user ${member} into 3d-db`);
     } catch (err) {
       console.error(`Failed to enroll user ${member}:`, err);

@@ -48,7 +48,6 @@ app.post("/match", asyncHandler(match));
 app.post("/facesign", asyncHandler(faceSignLogin));
 app.post("/facesign/confirmation", asyncHandler(faceSignConfirmation));
 app.get("/audit-trail-image/:externalDatabaseRefID", asyncHandler(handleGetAuditTrailImage));
-app.delete("/audit-trail-image/:externalDatabaseRefID", asyncHandler(handleDeleteAuditTrailImage));
 app.post("/match-iddoc", asyncHandler(matchId));
 
 // idOS issuer information for VCs
@@ -73,6 +72,7 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
     return res.status(200).json({
       responseBlob: err.responseBody,
       sessionStart: true,
+      launchId: err.launchId,
     });
   }
 
