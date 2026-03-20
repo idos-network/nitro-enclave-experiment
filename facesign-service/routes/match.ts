@@ -41,7 +41,7 @@ export default async function handler(req: Request, res: Response) {
 
   return res.status(201).json({
     ...alwaysToReturn,
-    // During matching, there is no enrollment record, only Reverification3D3D
+    // During matching, there is no enrollment record, only Reverification3D3D record
     auditTrailImageId: storeAuditTrailImages ? externalUserId : null,
   });
 }

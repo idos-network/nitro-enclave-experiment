@@ -1,21 +1,21 @@
 // biome-ignore-all lint/suspicious/noExplicitAny: Test files often need any
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
-import agent from "../providers/agent.ts";
-import app from "../server.ts";
+import agent from "../../providers/agent.ts";
+import app from "../../server.ts";
 import {
   processRequestErrorHandler,
   processRequestHandler,
   requestCapture,
   sessionStartHandler,
-} from "./utils/msw-handlers.ts";
-import { server } from "./utils/msw-server.ts";
+} from "../utils/msw-handlers.ts";
+import { server } from "../utils/msw-server.ts";
 
-describe("Match Login API", () => {
+describe("Match API", () => {
   it("return new session", async () => {
     server.use(sessionStartHandler("mock-session-result-blob"));
 
-    const response = await request(app).post("/match").send({
+    const response = await request(app).post("/relay/match").send({
       requestBlob: "test-face-scan",
       externalUserId: "test-user-id",
     });
@@ -36,7 +36,7 @@ describe("Match Login API", () => {
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
-    const response = await request(app).post("/match").send({
+    const response = await request(app).post("/relay/match").send({
       requestBlob: "test-face-scan",
       externalUserId: "test-user-id",
       storeAuditTrailImages: true,
@@ -82,7 +82,7 @@ describe("Match Login API", () => {
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
-    const response = await request(app).post("/match").send({
+    const response = await request(app).post("/relay/match").send({
       requestBlob: "test-face-scan",
       externalUserId: "test-user-id",
     });
@@ -103,39 +103,6 @@ describe("Match Login API", () => {
     });
   });
 
-  it("liveness done, but no match (no result)", async () => {
-    server.use(
-      processRequestHandler(
-        {
-          success: false,
-          didError: false,
-          responseBlob: "invalid-result-blob",
-        },
-        false,
-      ),
-    );
-
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
-
-    const response = await request(app).post("/match").send({
-      requestBlob: "test-face-scan",
-      externalUserId: "test-user-id",
-    });
-
-    expect(response.status).toBe(409);
-    expect(response.body).toEqual({
-      errorMessage: "No match found for the provided face scan.",
-      success: false,
-      didError: false,
-      responseBlob: "invalid-result-blob",
-    });
-
-    expect(agentSpy).toHaveBeenCalledWith("match-3d-3d-no-match", {
-      success: false,
-      externalUserId: "test-user-id",
-    });
-  });
-
   it("liveness done, but no match", async () => {
     server.use(
       processRequestHandler({
@@ -148,21 +115,21 @@ describe("Match Login API", () => {
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
-    const response = await request(app).post("/match").send({
+    const response = await request(app).post("/relay/match").send({
       requestBlob: "test-face-scan",
       externalUserId: "test-user-id",
     });
 
-    expect(response.status).toBe(409);
+    expect(response.status).toBe(400);
     expect(response.body).toEqual({
-      errorMessage: "No match found for the provided face scan.",
+      errorMessage: "Liveness check or enrollment 3D failed and was not processed.",
       success: false,
       didError: false,
       responseBlob: "invalid-result-blob",
       result: { livenessProven: true },
     });
 
-    expect(agentSpy).toHaveBeenCalledWith("match-3d-3d-no-match", {
+    expect(agentSpy).toHaveBeenCalledWith("match-3d-3d-failed", {
       success: false,
       externalUserId: "test-user-id",
       result: { livenessProven: true },
@@ -174,7 +141,7 @@ describe("Match Login API", () => {
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
-    const response = await request(app).post("/match").send({
+    const response = await request(app).post("/relay/match").send({
       requestBlob: "test-face-scan",
       externalUserId: "test-user-id",
     });

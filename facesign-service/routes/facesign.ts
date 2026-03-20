@@ -11,19 +11,20 @@ import { faceSignLogin } from "../providers/facesign.ts";
 
 // FACESIGN - Login route
 export const login = async (req: Request, res: Response) => {
-  const generatedUserId: string = crypto.randomUUID();
-  agent.writeLog("facesign-login", { generatedUserId });
+  const userId: string = crypto.randomUUID();
+
+  agent.writeLog("facesign-login", { userId });
 
   const { requestBlob } = req.body;
 
   // First check if liveness is proven
   const { success, result, responseBlob, didError, additionalSessionData, launchId } =
-    await enrollment3d(
-      generatedUserId,
+    await enrollment3d({
+      userId,
       requestBlob,
-      false, // We need face maps
-      false, // We don't need audit trail images
-    );
+      faceVector: false, // FaceSign DB has face maps
+      storeAuditTrailImages: false, // There is no selfie to be exported
+    });
 
   // Always return required fields for SDK
   const alwaysToReturn = {
@@ -34,16 +35,7 @@ export const login = async (req: Request, res: Response) => {
     additionalSessionData,
   };
 
-  if (!success || !result.livenessProven || didError) {
-    agent.writeLog("facesign-enrollment-failed", { success, result, didError, launchId });
-
-    return res.status(400).json({
-      ...alwaysToReturn,
-      errorMessage: "Liveness check or enrollment 3D failed and was not processed.",
-    });
-  }
-
-  const faceSignLoginResult = await faceSignLogin(generatedUserId, launchId, false);
+  const faceSignLoginResult = await faceSignLogin({ userId, launchId, enrollIfNew: false });
 
   return res.status(faceSignLoginResult.newUser ? 200 : 201).json({
     ...alwaysToReturn,
@@ -84,28 +76,28 @@ export const confirmation = async (req: Request, res: Response) => {
     return res.status(400).json({ errorMessage: "Token already expired" });
   }
 
-  const faceSignUserId = result.sub;
+  const userId = result.sub;
 
   // Check duplications (race-condition)
-  const searchResult = await searchForDuplicates(faceSignUserId, FACE_SIGN_GROUP_NAME);
+  const searchResult = await searchForDuplicates({ userId, groupName: FACE_SIGN_GROUP_NAME });
   if (!searchResult.success || searchResult.results.length > 0) {
     return res.status(409).json({ errorMessage: "User already exists" });
   }
 
   // Enroll user in 3d-db so they can be matched later
-  await enrollUser({ externalDatabaseRefID: faceSignUserId, groupName: FACE_SIGN_GROUP_NAME });
-  await insertMember({ groupName: FACE_SIGN_GROUP_NAME, faceSignUserId });
+  await enrollUser({ userId, groupName: FACE_SIGN_GROUP_NAME });
+  await insertMember({ groupName: FACE_SIGN_GROUP_NAME, userId });
 
   const userAttestmentToken = jwt.sign(
-    { sub: faceSignUserId },
+    { sub: userId },
     readFileSync(JWT_PRIVATE_KEY, "utf-8"),
     { algorithm: "ES512" }, // Token contains "iat" which is used in entropy-service to check token age
   );
 
   agent.writeLog("facesign-user-confirmed", {
-    userId: faceSignUserId,
+    userId,
     ip: req.ip,
   });
 
-  return res.status(200).json({ faceSignUserId, userAttestmentToken });
+  return res.status(200).json({ userId, userAttestmentToken });
 };

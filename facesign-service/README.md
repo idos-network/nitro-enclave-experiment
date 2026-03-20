@@ -50,12 +50,12 @@ Methods are mapped to status response codes in this favor:
   },
 
   // FaceSign userId (when groupName is provided)
-  faceSignUserId: "user-uuid",
+  userId: "user-uuid",
 
   // When FaceSign onboarding is required
   faceSign: {
     newUser: boolean, // user has been created, no profile
-    faceSignUserId: string,
+    userId: string,
     userAttestmentToken: string,
   },
 

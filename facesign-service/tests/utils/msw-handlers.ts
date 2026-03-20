@@ -56,10 +56,17 @@ const defaults = {
     result: { livenessProven: true },
     didError: false,
     responseBlob: "mock-scan-result-blob",
+    launchId: crypto.randomUUID(),
   },
   search: {
     success: true,
     results: [] as Array<{ identifier: string; matchLevel: number }>,
+  },
+  match3d2dId: {
+    success: true,
+    result: { matchLevel: 7 },
+    didError: false,
+    launchId: crypto.randomUUID(),
   },
   enroll: { success: true },
   launchId: crypto.randomUUID(),
@@ -80,6 +87,7 @@ const defaults = {
 // Default handlers
 export const handlers = [
   postHandler("process-request", () => defaults.processRequest),
+  postHandler("match-3d-2d-3rdparty-idphoto", () => defaults.match3d2dId),
   postHandler("3d-db/search", () => defaults.search),
   postHandler("3d-db/enroll", () => defaults.enroll),
   http.get(`${FACETEC_SERVER}status`, ({ request }) => {
@@ -111,6 +119,25 @@ export const processRequestErrorHandler = (status: number, text: string) =>
 
 export const sessionStartHandler = (responseBlob = "mock-session-result-blob") =>
   postHandler("process-request", () => ({ responseBlob }));
+
+type Match3d2dIdResponse = {
+  success?: boolean;
+  result?: { matchLevel: number };
+  didError?: boolean;
+  launchId?: string;
+};
+
+export const match3d2dIdHandler = (
+  response: Match3d2dIdResponse = {},
+  defaultResult = true,
+) =>
+  postHandler("match-3d-2d-3rdparty-idphoto", () => ({
+    ...(defaultResult ? defaults.match3d2dId : {}),
+    ...response,
+  }));
+
+export const match3d2dIdErrorHandler = (status: number, text: string) =>
+  postHandler("match-3d-2d-3rdparty-idphoto", () => new HttpResponse(text, { status }));
 
 type SearchResult = { identifier: string; matchLevel: number };
 

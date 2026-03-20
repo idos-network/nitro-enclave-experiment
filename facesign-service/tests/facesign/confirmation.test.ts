@@ -92,11 +92,11 @@ describe("FaceSign/Confirmation API", () => {
 
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({
-      faceSignUserId: userId,
+      userId,
       userAttestmentToken: expect.any(String),
     });
 
-    expect(insertMemberSpy).toHaveBeenCalledWith({ groupName: GROUP_NAME, faceSignUserId: userId });
+    expect(insertMemberSpy).toHaveBeenCalledWith({ groupName: GROUP_NAME, userId });
 
     // Verify FaceTec API calls
     const enrollRequest = requestCapture.getLastByEndpoint("/3d-db/enroll");
