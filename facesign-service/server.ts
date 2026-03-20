@@ -23,17 +23,15 @@ import {
   InternalServerError,
   SessionStartError,
 } from "./providers/errors.ts";
-import { getRequestId, runWithRequestContext } from "./utils/request-context.ts";
-
 // FaceSign Routes
 import { confirmation as faceSignConfirmation, login as faceSignLogin } from "./routes/facesign.ts";
-
 // idOS Relay Routes
 import liveness from "./routes/liveness.ts";
 import match from "./routes/match.ts";
 import matchIdDoc from "./routes/match-id-doc.ts";
 import selfie from "./routes/selfie.ts";
 import uniqueness from "./routes/uniqueness.ts";
+import { runWithRequestContext } from "./utils/request-context.ts";
 
 const app = express();
 
