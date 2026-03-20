@@ -13,9 +13,11 @@ info:
     - **400** — Recoverable client/session error (liveness not proven, match failed, invalid token, etc.).
     - **409** — Non-recoverable conflict (e.g. duplicate face-vector in uniqueness, user already exists on confirmation).
     - **500** — FaceTec API or internal server error.
+
+    **`/relay/*`** requires `Authorization: Bearer <JWT>` (ES512) and env **`RELAY_JWT_PUBLIC_KEY`** set to the PEM text of the verifying public key; if missing, **503**. Other paths are unauthenticated unless you use an external gateway.
   version: 1.0.0
 
-# No auth on these routes today; callers may sit behind their own gateway.
+# Relay operations override with `RelayJwt`; health, FaceSign, and idOS paths stay open.
 security: []
 
 servers:
@@ -77,6 +79,8 @@ paths:
       tags: [Relay]
       summary: 3D liveness / enrollment (no group deduplication)
       operationId: postRelayLiveness
+      security:
+        - RelayJwt: []
       parameters:
         - $ref: "#/components/parameters/XRequestId"
       requestBody:
@@ -104,6 +108,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Enrollment3DRecoverableErrorBody"
+        "401":
+          $ref: "#/components/responses/UnauthorizedRelay"
+        "503":
+          $ref: "#/components/responses/RelayAuthNotConfigured"
         "500":
           $ref: "#/components/responses/FaceTecOrInternalError"
 
@@ -112,6 +120,8 @@ paths:
       tags: [Relay]
       summary: Uniqueness / group enrollment with deduplication
       operationId: postRelayUniqueness
+      security:
+        - RelayJwt: []
       parameters:
         - $ref: "#/components/parameters/XRequestId"
       requestBody:
@@ -145,6 +155,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ConflictErrorBody"
+        "401":
+          $ref: "#/components/responses/UnauthorizedRelay"
+        "503":
+          $ref: "#/components/responses/RelayAuthNotConfigured"
         "500":
           $ref: "#/components/responses/FaceTecOrInternalError"
 
@@ -153,6 +167,8 @@ paths:
       tags: [Relay]
       summary: 3D–3D match against an enrolled user
       operationId: postRelayMatch
+      security:
+        - RelayJwt: []
       parameters:
         - $ref: "#/components/parameters/XRequestId"
       requestBody:
@@ -180,6 +196,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/MatchFailureBody"
+        "401":
+          $ref: "#/components/responses/UnauthorizedRelay"
+        "503":
+          $ref: "#/components/responses/RelayAuthNotConfigured"
         "500":
           $ref: "#/components/responses/FaceTecOrInternalError"
 
@@ -188,6 +208,8 @@ paths:
       tags: [Relay]
       summary: Match 3D enrollment to 2D ID photo (FaceTec `match-3d-2d-3rdparty-idphoto`)
       operationId: postRelayMatchIdDoc
+      security:
+        - RelayJwt: []
       parameters:
         - $ref: "#/components/parameters/XRequestId"
       requestBody:
@@ -209,6 +231,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ProcessRequestResponse"
+        "401":
+          $ref: "#/components/responses/UnauthorizedRelay"
+        "503":
+          $ref: "#/components/responses/RelayAuthNotConfigured"
         "500":
           $ref: "#/components/responses/FaceTecOrInternalError"
 
@@ -217,6 +243,8 @@ paths:
       tags: [Relay]
       summary: Retrieve stored audit-trail selfie (JPEG bytes)
       operationId: getRelaySelfie
+      security:
+        - RelayJwt: []
       parameters:
         - name: selfieId
           in: path
@@ -238,6 +266,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SimpleErrorMessage"
+        "401":
+          $ref: "#/components/responses/UnauthorizedRelay"
+        "503":
+          $ref: "#/components/responses/RelayAuthNotConfigured"
         "404":
           description: No image stored for this id.
           content:
@@ -376,6 +408,14 @@ paths:
                 type: string
 
 components:
+  securitySchemes:
+    RelayJwt:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        ES512 JWT. Must be signed with the private key that matches the server's `RELAY_JWT_PUBLIC_KEY` env value (PEM text of the EC public key — same key material as FaceSign JWTs in this deployment unless you use a separate pair).
+
   parameters:
     XRequestId:
       name: x-request-id
@@ -387,6 +427,20 @@ components:
       description: Optional correlation id; server generates one if omitted.
 
   responses:
+    UnauthorizedRelay:
+      description: "Missing or invalid `Authorization: Bearer` JWT (wrong signature, expired, or malformed)."
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/SimpleErrorMessage"
+
+    RelayAuthNotConfigured:
+      description: Env `RELAY_JWT_PUBLIC_KEY` is unset or empty — relay Bearer verification is not configured.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/SimpleErrorMessage"
+
     FaceTecOrInternalError:
       description: FaceTec API error, internal error, or uncaught exception.
       content:
@@ -497,7 +551,7 @@ components:
               format: uuid
             faceSign:
               $ref: "#/components/schemas/FaceSignOnboard"
-            selfieFileId:
+            selfieImageId:
               type: string
               format: uuid
               description: Same as internal enrollment id when `storeSelfie` was true.
@@ -523,7 +577,7 @@ components:
         - $ref: "#/components/schemas/FaceTecProcessEnvelope"
         - type: object
           properties:
-            selfieFileId:
+            selfieImageId:
               type: string
               nullable: true
               description: Same as `userId` when `storeSelfie` was true; otherwise null.

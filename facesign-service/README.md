@@ -40,3 +40,5 @@ On pushes to `main` / `master` that change `openapi.yaml`, [FaceSign API docs (G
 - **500** — FaceTec API error or internal error (see `FaceTecErrorBody` / generic error schemas in the spec).
 
 Optional header: **`x-request-id`** — correlation id; omitted values are replaced with a generated UUID per request.
+
+**Relay auth:** all **`/relay/*`** routes require **`Authorization: Bearer <JWT>`**. The token must be **ES512**. Set env **`RELAY_JWT_PUBLIC_KEY`** to the **full PEM text** of the matching EC public key (not a file path). If it is unset or empty, relay routes respond with **503**.
