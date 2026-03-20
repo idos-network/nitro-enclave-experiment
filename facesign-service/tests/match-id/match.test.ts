@@ -3,6 +3,7 @@ import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 import agent from "../../providers/agent.ts";
 import app from "../../server.ts";
+import { relayAuthorizationHeader } from "../utils/helper.ts";
 import { match3d2dIdHandler, requestCapture } from "../utils/msw-handlers.ts";
 import { server } from "../utils/msw-server.ts";
 
@@ -18,11 +19,14 @@ describe("Match ID document API", () => {
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
-    const response = await request(app).post("/relay/match-id-doc").send({
-      userId: "test-user-id",
-      image: "test-image",
-      minMatchLevel: 7,
-    });
+    const response = await request(app)
+      .post("/relay/match-id-doc")
+      .set(relayAuthorizationHeader())
+      .send({
+        userId: "test-user-id",
+        image: "test-image",
+        minMatchLevel: 7,
+      });
 
     expect(response.status).toBe(201);
     expect(response.body).toEqual({

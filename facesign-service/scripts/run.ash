@@ -55,6 +55,7 @@ mount /tmp -o remount,exec
 sed -i "s#uri: INSERT YOUR MONGO URL HERE#uri: \"${MONGO_URI//&/\\&}\"#" $HOME_FACETEC_CUSTOM_SERVER/deploy/config.yaml
 sed -i "s#export const MONGO_URI = \"INSERT YOUR MONGO URL HERE\";#export const MONGO_URI = \"${MONGO_URI//&/\\&}\";#" $HOME_FACESIGN_SERVICE/env.ts
 sed -i "s#export const HOST = \"INSERT YOUR HOST HERE\";#export const HOST = \"${HOST//&/\\&}\";#" $HOME_FACESIGN_SERVICE/env.ts
+sed -i "s#export const RELAY_JWT_PUBLIC_KEY_BASE_64 = \"INSERT YOUR RELAY JWT PUBLIC KEY HERE\";#export const RELAY_JWT_PUBLIC_KEY_BASE_64 = \"${RELAY_JWT_PUBLIC_KEY_BASE_64//&/\\&}\";#" $HOME_FACESIGN_SERVICE/env.ts
 
 echo "Fetching FaceTec SDK server core jar from S3"
 aws s3 sync "s3://$FACETEC_SDK_BUCKET/FaceTec-Server-Webservice/FaceTecSDK-Server-Core-$FACETEC_SDK_VERSION/libs/" /home/FaceTec_Server_Core/libs  --region eu-west-1

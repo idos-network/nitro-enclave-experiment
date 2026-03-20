@@ -36,12 +36,12 @@ export default async function handler(req: Request, res: Response) {
   agent.writeLog("match-3d-3d-done", {
     identifier: userId,
     matchLevel: result.matchLevel,
-    selfieFileId: storeSelfie ? userId : null,
+    selfieImageId: storeSelfie ? userId : null,
   });
 
   return res.status(201).json({
     ...alwaysToReturn,
     // During matching, there is no enrollment record, only Reverification3D3D record
-    selfieFileId: storeSelfie ? userId : null,
+    selfieImageId: storeSelfie ? userId : null,
   });
 }

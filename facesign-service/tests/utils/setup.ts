@@ -1,4 +1,4 @@
-import { privateKey } from "./helper.ts";
+import { privateKey, relayPublicKey } from "./helper.ts";
 import { requestCapture } from "./msw-handlers.ts";
 import { server } from "./msw-server.ts";
 
@@ -17,6 +17,14 @@ vi.mock("../../providers/agent.ts", () => ({
     connect: vi.fn(),
   },
 }));
+
+vi.mock("../../env.ts", async () => {
+  const actualEnv = await vi.importActual<typeof import("../../env.ts")>("../../env.ts");
+  return {
+    ...actualEnv,
+    RELAY_JWT_PUBLIC_KEY_BASE_64: Buffer.from(relayPublicKey, "utf-8").toString("base64"),
+  };
+});
 
 vi.mock("fs", async () => {
   const actualFs = await vi.importActual<typeof import("fs")>("fs");
