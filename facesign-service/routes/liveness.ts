@@ -29,14 +29,14 @@ export default async function handler(req: Request, res: Response) {
     requestBlob,
     faceVector = true,
     onboardFaceSign = false,
-    storeAuditTrailImages = false,
+    storeSelfie = false,
   } = req.body;
 
   agent.writeLog("liveness-request", {
     userId,
     faceVector,
     onboardFaceSign,
-    storeAuditTrailImages,
+    storeSelfie,
   });
 
   if (faceVector && onboardFaceSign) {
@@ -45,7 +45,7 @@ export default async function handler(req: Request, res: Response) {
 
   // First check if liveness is proven
   const { success, result, responseBlob, didError, additionalSessionData, launchId } =
-    await enrollment3d({ userId, requestBlob, faceVector, storeAuditTrailImages });
+    await enrollment3d({ userId, requestBlob, faceVector, storeSelfie });
 
   // Always return required fields for SDK
   const response: LivenessResponseData = {
@@ -59,7 +59,7 @@ export default async function handler(req: Request, res: Response) {
 
   // If the user is already enrolled, we will return a different
   // userId, which can't be used to get the audit trail image.
-  if (storeAuditTrailImages) {
+  if (storeSelfie) {
     response.selfieFileId = userId;
   }
 

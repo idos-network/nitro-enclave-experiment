@@ -3,15 +3,15 @@ import agent from "../providers/agent.ts";
 import { match3d3d } from "../providers/api.ts";
 
 export default async function handler(req: Request, res: Response) {
-  const { requestBlob, externalUserId, storeAuditTrailImages = false } = req.body;
+  const { requestBlob, userId, storeSelfie = false } = req.body;
 
-  agent.writeLog("match-request", { externalUserId, storeAuditTrailImages });
+  agent.writeLog("match-request", { userId, storeSelfie });
 
-  const { success, result, responseBlob, didError, additionalSessionData } = await match3d3d(
-    externalUserId,
+  const { success, result, responseBlob, didError, additionalSessionData } = await match3d3d({
+    userId,
     requestBlob,
-    storeAuditTrailImages,
-  );
+    storeSelfie,
+  });
 
   // Always return required fields for SDK
   const alwaysToReturn = {
@@ -25,7 +25,7 @@ export default async function handler(req: Request, res: Response) {
   if (!success || didError) {
     // Otherwise we are using FeatureFlag for max 5 attempts
     // so we should return failure status.
-    agent.writeLog("match-3d-3d-failed", { success, result, externalUserId });
+    agent.writeLog("match-3d-3d-failed", { success, result, userId });
 
     return res.status(400).json({
       ...alwaysToReturn,
@@ -34,14 +34,14 @@ export default async function handler(req: Request, res: Response) {
   }
 
   agent.writeLog("match-3d-3d-done", {
-    identifier: externalUserId,
+    identifier: userId,
     matchLevel: result.matchLevel,
-    auditTrailImageId: storeAuditTrailImages ? externalUserId : null,
+    selfieFileId: storeSelfie ? userId : null,
   });
 
   return res.status(201).json({
     ...alwaysToReturn,
     // During matching, there is no enrollment record, only Reverification3D3D record
-    auditTrailImageId: storeAuditTrailImages ? externalUserId : null,
+    selfieFileId: storeSelfie ? userId : null,
   });
 }

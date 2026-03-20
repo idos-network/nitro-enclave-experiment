@@ -23,7 +23,7 @@ export const login = async (req: Request, res: Response) => {
       userId,
       requestBlob,
       faceVector: false, // FaceSign DB has face maps
-      storeAuditTrailImages: false, // There is no selfie to be exported
+      storeSelfie: false, // There is no selfie to be exported
     });
 
   // Always return required fields for SDK

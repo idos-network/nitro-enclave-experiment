@@ -30,12 +30,14 @@ vi.mock("fs", async () => {
 // Use "bypass" for unhandled requests to allow supertest requests to the Express app
 beforeAll(() => {
   server.listen({ onUnhandledRequest: "bypass" });
+  vi.resetAllMocks();
 });
 
 // Reset handlers and captured requests after each test
 afterEach(() => {
   server.resetHandlers();
   requestCapture.clear();
+  vi.resetAllMocks();
 });
 
 // Close MSW server after all tests

@@ -17,7 +17,7 @@ describe("Match API", () => {
 
     const response = await request(app).post("/relay/match").send({
       requestBlob: "test-face-scan",
-      externalUserId: "test-user-id",
+      userId: "test-user-id",
     });
 
     expect(response.status).toBe(200);
@@ -38,8 +38,8 @@ describe("Match API", () => {
 
     const response = await request(app).post("/relay/match").send({
       requestBlob: "test-face-scan",
-      externalUserId: "test-user-id",
-      storeAuditTrailImages: true,
+      userId: "test-user-id",
+      storeSelfie: true,
     });
 
     expect(response.status).toBe(201);
@@ -48,18 +48,18 @@ describe("Match API", () => {
       responseBlob: "mock-scan-result-blob",
       result: { livenessProven: true, matchLevel: 15 },
       success: true,
-      auditTrailImageId: expect.any(String),
+      selfieFileId: expect.any(String),
     });
 
     expect(agentSpy).toHaveBeenCalledWith("match-request", {
-      externalUserId: "test-user-id",
-      storeAuditTrailImages: true,
+      userId: "test-user-id",
+      storeSelfie: true,
     });
 
     expect(agentSpy).toHaveBeenCalledWith("match-3d-3d-done", {
       identifier: "test-user-id",
       matchLevel: 15,
-      auditTrailImageId: expect.any(String),
+      selfieFileId: expect.any(String),
     });
 
     // Verify FaceTec API calls
@@ -84,7 +84,7 @@ describe("Match API", () => {
 
     const response = await request(app).post("/relay/match").send({
       requestBlob: "test-face-scan",
-      externalUserId: "test-user-id",
+      userId: "test-user-id",
     });
 
     expect(response.status).toBe(400);
@@ -98,7 +98,7 @@ describe("Match API", () => {
 
     expect(agentSpy).toHaveBeenCalledWith("match-3d-3d-failed", {
       success: false,
-      externalUserId: "test-user-id",
+      userId: "test-user-id",
       result: { livenessProven: false },
     });
   });
@@ -117,7 +117,7 @@ describe("Match API", () => {
 
     const response = await request(app).post("/relay/match").send({
       requestBlob: "test-face-scan",
-      externalUserId: "test-user-id",
+      userId: "test-user-id",
     });
 
     expect(response.status).toBe(400);
@@ -131,7 +131,7 @@ describe("Match API", () => {
 
     expect(agentSpy).toHaveBeenCalledWith("match-3d-3d-failed", {
       success: false,
-      externalUserId: "test-user-id",
+      userId: "test-user-id",
       result: { livenessProven: true },
     });
   });
@@ -143,7 +143,7 @@ describe("Match API", () => {
 
     const response = await request(app).post("/relay/match").send({
       requestBlob: "test-face-scan",
-      externalUserId: "test-user-id",
+      userId: "test-user-id",
     });
 
     expect(response.status).toBe(500);
@@ -157,7 +157,7 @@ describe("Match API", () => {
     expect(agentSpy).toHaveBeenCalledWith("facetec-api-error", {
       methodName: "match3d3d",
       others: {
-        externalDatabaseRefID: "test-user-id",
+        userId: "test-user-id",
       },
       response: {
         body: "Some unexpected error",

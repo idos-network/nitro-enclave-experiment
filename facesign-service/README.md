@@ -2,7 +2,7 @@
 
 ## API description
 
-All methods are using `/process-request` of FaceTec SDK.
+Most of the methods are using `/process-request` of FaceTec SDK.
 Methods are mapped to status response codes in this favor:
 
 * 200 - standard session from facetec
@@ -11,14 +11,13 @@ Methods are mapped to status response codes in this favor:
 * 409 - non-recoverable error
 * 500 - facetec error
 
-### POST /login
+### POST /relay/liveness
 
 **Inputs:**
    * requestBlob - facetec stuff
-   * groupName - optional (default: null)
    * faceVector - optional (default: true)
    * onboardFaceSign - optional (default: false)
-   * storeAuditTrailImages - optional (default: false)
+   * storeSelfie - optional (default: false)
   
 **Outputs:**
 
@@ -59,8 +58,85 @@ Methods are mapped to status response codes in this favor:
     userAttestmentToken: string,
   },
 
-  // When storeAuditTrailImages is true
-  auditTrailImageId: "audit-trail-image-id"
+  // When storeSelfie is true
+  selfieFileId: "selfie-file-image-id"
+}
+```
+
+3. User login failed or liveness was not proven (status: **400**)
+
+- this is a recoverable error, the user have to start again
+
+```javascript
+{
+  // FaceTec standard response
+  success: true,
+  didError: false,
+  responseBlob: "string",
+  additionalSessionData: {
+    platform: "string",
+    deviceModel: "string",
+    userAgent: "string",
+  },
+  result: {
+    livenessProven: boolean,
+  },
+
+  // FaceSign service customs
+  errorMessage: "Liveness check or enrollment 3D failed and was not processed."
+}
+```
+
+### POST /relay/uniqueness
+
+**Inputs:**
+   * requestBlob - facetec stuff
+   * groupName - required
+   * faceVector - optional (default: true)
+   * onboardFaceSign - optional (default: false)
+   * storeSelfie - optional (default: false)
+  
+**Outputs:**
+
+1. SessionStarted (status: **200**) - FaceTec internals, no success, just responseBlob
+
+```javascript
+{
+  responseBlob: "string"
+}
+```
+
+2. New user login or reused user login (status: **201**)
+
+- this is a happy path scenario
+
+```javascript
+{
+  // FaceTec standard response
+  success: true,
+  didError: false,
+  responseBlob: "string",
+  additionalSessionData: {
+    platform: "string",
+    deviceModel: "string",
+    userAgent: "string",
+  },
+  result: {
+    livenessProven: boolean,
+  },
+
+  // FaceSign userId (when groupName is provided)
+  userId: "user-uuid",
+
+  // When FaceSign onboarding is required
+  faceSign: {
+    newUser: boolean, // user has been created, no profile
+    userId: string,
+    userAttestmentToken: string,
+  },
+
+  // When storeSelfie is true
+  selfieFileId: "audit-trail-image-id"
 }
 ```
 
@@ -114,13 +190,12 @@ Methods are mapped to status response codes in this favor:
 }
 ```
 
-### POST /match
-
+### POST /relay/match
 
 **Inputs:**
+   * userId - to whom we should match
    * requestBlob - facetec stuff
-   * externalDatabaseRefID - to whom we should match
-   * storeAuditTrailImages - optional (default: false)
+   * storeSelfie - optional (default: false)
   
 **Outputs:**
 
@@ -152,8 +227,8 @@ Methods are mapped to status response codes in this favor:
     matchLevel: number,
   },
 
-  // Image (when storeAuditTrailImages is true)
-  storeAuditTrailImages: "uuid"
+  // Image (when storeSelfie is true)
+  selfieFileId: "uuid"
 }
 ```
 
@@ -178,28 +253,6 @@ Methods are mapped to status response codes in this favor:
 
   // FaceSign service customs
   errorMessage: "Liveness check or enrollment 3D failed and was not processed."
-}
-```
-
-4. Liveness proven, but no match (status: **409**)
-
-- this is non recoverable error, matching has been done, but with no success
-
-```javascript
-{
-  // FaceTec standard response
-  success: false,
-  didError: false,
-  responseBlob: "string",
-  additionalSessionData: {
-    platform: "string",
-    deviceModel: "string",
-    userAgent: "string",
-  },
-  result: {
-    livenessProven: true,
-    matchLevel: 0, // not sure about this
-  },
 }
 ```
 
@@ -233,7 +286,7 @@ Methods are mapped to status response codes in this favor:
   },
 
   // FaceSign service customs
-  faceSignUserId: "user-uuid",
+  userId: "user-uuid",
   userAttestmentToken: "jwt token for entropy service",
 }
 ```
@@ -258,7 +311,7 @@ Methods are mapped to status response codes in this favor:
   },
 
   // FaceSign service customs
-  faceSignUserId: "user-uuid",
+  userId: "user-uuid",
   newUserConfirmationToken: "jwt token to confirm users creation",
 }
 ```
@@ -303,7 +356,7 @@ Body:
 
 ```javascript
 {
-  faceSignUserId: "UUID",
+  userId: "UUID",
   userAttestmentToken: "token for entropy service",
 }
 ```
@@ -324,7 +377,7 @@ Body:
 }
 ```
 
-# GET /audit-trail-image/:auditTrailImageId
+# GET /relay/selfie/:selfieFileId
 
 1. This endpoint returns base64 audit trail image if available (status: **200**):
 
@@ -332,10 +385,37 @@ Body:
 [base64string]
 ```
 
-2. No image available (status: **400**):
+2. No image available (status: **404**):
 
 ```javascript
 {
-  error: "No audit trail image available."
+  error: "No selfie image was found."
+}
+```
+
+# POST /relay/match-id-doc
+
+**Inputs:**
+   * userId - required
+   * image - base64 string image
+   * minLevelMatch - optional (default: 7 - max)
+
+
+1. Ok path (status: **200**):
+
+```javascript
+{
+  success: true,
+  didError: false,
+  result: { matchLevel: 7 },
+}
+```
+
+2. Not match
+```
+{
+  success: false,
+  didError: false,
+  result: { matchLevel: 2 },
 }
 ```

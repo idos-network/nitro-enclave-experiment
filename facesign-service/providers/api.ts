@@ -97,12 +97,12 @@ export async function enrollment3d({
   userId,
   requestBlob,
   faceVector,
-  storeAuditTrailImages,
+  storeSelfie,
 }: {
   userId: string;
   requestBlob: string;
   faceVector: boolean;
-  storeAuditTrailImages: boolean;
+  storeSelfie: boolean;
 }) {
   const enrollmentResponse = await fetch(`${FACETEC_SERVER}process-request`, {
     method: "POST",
@@ -113,7 +113,7 @@ export async function enrollment3d({
       externalDatabaseRefID: userId,
       requestBlob,
       storeAsFaceVector: faceVector,
-      storeAuditTrailImages,
+      storeAuditTrailImages: storeSelfie,
       storeIdImage: false,
     }),
   });
@@ -140,9 +140,15 @@ export async function enrollment3d({
 }
 
 export async function match3d3d(
-  externalDatabaseRefID: string,
-  requestBlob: string,
-  storeAuditTrailImages: boolean,
+  {
+  userId,
+  requestBlob,
+  storeSelfie,
+}: {
+  userId: string;
+  requestBlob: string;
+  storeSelfie: boolean;
+  }
 ) {
   const matchResponse = await fetch(`${FACETEC_SERVER}process-request`, {
     method: "POST",
@@ -150,9 +156,9 @@ export async function match3d3d(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      externalDatabaseRefID,
+      externalDatabaseRefID: userId,
       requestBlob,
-      storeAuditTrailImages,
+      storeAuditTrailImages: storeSelfie,
       storeIdImage: false,
     }),
   });
@@ -165,7 +171,7 @@ export async function match3d3d(
         body: await matchResponse.text(),
       },
       {
-        externalDatabaseRefID,
+        userId,
       },
     );
   }

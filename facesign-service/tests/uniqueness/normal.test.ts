@@ -63,6 +63,7 @@ describe("Uniqueness API", () => {
       requestBlob: "test-face-scan",
       groupName: "test-users",
       faceVector: false,
+      storeSelfie: true,
     });
 
     expect(response.status).toBe(201);
@@ -72,6 +73,7 @@ describe("Uniqueness API", () => {
       responseBlob: "mock-scan-result-blob",
       success: true,
       result: { livenessProven: true },
+      selfieFileId: expect.any(String),
     });
 
     expect(agentSpy).toHaveBeenCalledWith(
@@ -89,7 +91,7 @@ describe("Uniqueness API", () => {
       externalDatabaseRefID: response.body.userId,
       requestBlob: "test-face-scan",
       storeAsFaceVector: false,
-      storeAuditTrailImages: false,
+      storeAuditTrailImages: true,
       storeIdImage: false,
     });
   });
@@ -153,7 +155,7 @@ describe("Uniqueness API", () => {
 
     const response = await request(app).post("/relay/uniqueness").send({
       requestBlob: "test-face-scan",
-      storeAuditTrailImages: true,
+      storeSelfie: true,
       groupName: "facesign-users",
     });
 

@@ -5,10 +5,7 @@ import agent from "../../providers/agent.ts";
 import app from "../../server.ts";
 import {
   match3d2dIdHandler,
-  processRequestErrorHandler,
-  processRequestHandler,
   requestCapture,
-  sessionStartHandler,
 } from "../utils/msw-handlers.ts";
 import { server } from "../utils/msw-server.ts";
 

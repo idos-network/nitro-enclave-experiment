@@ -64,7 +64,7 @@ describe("Liveness API", () => {
 
     const response = await request(app).post("/relay/liveness").send({
       requestBlob: "test-face-scan",
-      storeAuditTrailImages: true,
+      storeSelfie: true,
     });
 
     expect(response.status).toBe(201);
@@ -84,7 +84,7 @@ describe("Liveness API", () => {
       userId: response.body.userId,
       faceVector: true,
       onboardFaceSign: false,
-      storeAuditTrailImages: true,
+      storeSelfie: true,
     });
 
     expect(insertMemberSpy).not.toHaveBeenCalled();
