@@ -49,7 +49,9 @@ describe("Selfie API", () => {
     const getAuditTrailImageSpy = vi.spyOn(db, "getAuditTrailImage").mockResolvedValue(null);
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
-    const response = await request(app).get("/relay/selfie/test-external-id").set(relayAuthorizationHeader());
+    const response = await request(app)
+      .get("/relay/selfie/test-external-id")
+      .set(relayAuthorizationHeader());
 
     expect(response.status).toBe(404);
     expect(response.body).toEqual({

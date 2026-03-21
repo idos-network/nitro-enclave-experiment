@@ -3,13 +3,13 @@ import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 import agent from "../../providers/agent.ts";
 import app from "../../server.ts";
+import { relayAuthorizationHeader } from "../utils/helper.ts";
 import {
   processRequestErrorHandler,
   processRequestHandler,
   requestCapture,
   sessionStartHandler,
 } from "../utils/msw-handlers.ts";
-import { relayAuthorizationHeader } from "../utils/helper.ts";
 import { server } from "../utils/msw-server.ts";
 
 describe("Match API", () => {

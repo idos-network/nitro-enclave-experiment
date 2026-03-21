@@ -32,12 +32,15 @@ describe("Liveness + Facesign Onboarding API", () => {
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
-    const response = await request(app).post("/relay/liveness").set(relayAuthorizationHeader()).send({
-      requestBlob: "test-face-scan",
-      faceVector: false,
-      onboardFaceSign: true,
-      groupName: "facesign-users",
-    });
+    const response = await request(app)
+      .post("/relay/liveness")
+      .set(relayAuthorizationHeader())
+      .send({
+        requestBlob: "test-face-scan",
+        faceVector: false,
+        onboardFaceSign: true,
+        groupName: "facesign-users",
+      });
 
     expect(response.status).toBe(201);
     expect(response.body).toEqual({
@@ -100,11 +103,14 @@ describe("Liveness + Facesign Onboarding API", () => {
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
-    const response = await request(app).post("/relay/liveness").set(relayAuthorizationHeader()).send({
-      requestBlob: "test-face-scan",
-      onboardFaceSign: true,
-      faceVector: false,
-    });
+    const response = await request(app)
+      .post("/relay/liveness")
+      .set(relayAuthorizationHeader())
+      .send({
+        requestBlob: "test-face-scan",
+        onboardFaceSign: true,
+        faceVector: false,
+      });
 
     expect(response.status).toBe(201);
     expect(response.body).toEqual({

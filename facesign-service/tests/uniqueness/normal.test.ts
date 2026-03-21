@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import agent from "../../providers/agent.ts";
 import * as db from "../../providers/db.ts";
 import app from "../../server.ts";
+import { relayAuthorizationHeader } from "../utils/helper.ts";
 import {
   processRequestErrorHandler,
   processRequestHandler,
@@ -13,17 +14,19 @@ import {
   searchHandler,
   sessionStartHandler,
 } from "../utils/msw-handlers.ts";
-import { relayAuthorizationHeader } from "../utils/helper.ts";
 import { server } from "../utils/msw-server.ts";
 
 describe("Uniqueness API", () => {
   it("return new session", async () => {
     server.use(sessionStartHandler("mock-session-result-blob"));
 
-    const response = await request(app).post("/relay/uniqueness").set(relayAuthorizationHeader()).send({
-      requestBlob: "test-face-scan",
-      groupName: "test-users",
-    });
+    const response = await request(app)
+      .post("/relay/uniqueness")
+      .set(relayAuthorizationHeader())
+      .send({
+        requestBlob: "test-face-scan",
+        groupName: "test-users",
+      });
 
     expect(response.status).toBe(200);
     expect(response.body.responseBlob).toBe("mock-session-result-blob");
@@ -33,10 +36,13 @@ describe("Uniqueness API", () => {
   it("fail with error", async () => {
     server.use(processRequestErrorHandler(500, "Server error"));
 
-    const response = await request(app).post("/relay/uniqueness").set(relayAuthorizationHeader()).send({
-      requestBlob: "test-face-scan",
-      groupName: "test-users",
-    });
+    const response = await request(app)
+      .post("/relay/uniqueness")
+      .set(relayAuthorizationHeader())
+      .send({
+        requestBlob: "test-face-scan",
+        groupName: "test-users",
+      });
 
     expect(response.status).toBe(500);
     expect(response.body).toEqual({
@@ -60,12 +66,15 @@ describe("Uniqueness API", () => {
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
-    const response = await request(app).post("/relay/uniqueness").set(relayAuthorizationHeader()).send({
-      requestBlob: "test-face-scan",
-      groupName: "test-users",
-      faceVector: false,
-      storeSelfie: true,
-    });
+    const response = await request(app)
+      .post("/relay/uniqueness")
+      .set(relayAuthorizationHeader())
+      .send({
+        requestBlob: "test-face-scan",
+        groupName: "test-users",
+        faceVector: false,
+        storeSelfie: true,
+      });
 
     expect(response.status).toBe(201);
     expect(response.body).toEqual({
@@ -109,10 +118,13 @@ describe("Uniqueness API", () => {
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
-    const response = await request(app).post("/relay/uniqueness").set(relayAuthorizationHeader()).send({
-      requestBlob: "test-face-scan",
-      groupName: "test-users",
-    });
+    const response = await request(app)
+      .post("/relay/uniqueness")
+      .set(relayAuthorizationHeader())
+      .send({
+        requestBlob: "test-face-scan",
+        groupName: "test-users",
+      });
 
     expect(response.status).toBe(400);
     expect(response.body).toEqual({
@@ -154,11 +166,14 @@ describe("Uniqueness API", () => {
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
-    const response = await request(app).post("/relay/uniqueness").set(relayAuthorizationHeader()).send({
-      requestBlob: "test-face-scan",
-      storeSelfie: true,
-      groupName: "facesign-users",
-    });
+    const response = await request(app)
+      .post("/relay/uniqueness")
+      .set(relayAuthorizationHeader())
+      .send({
+        requestBlob: "test-face-scan",
+        storeSelfie: true,
+        groupName: "facesign-users",
+      });
 
     expect(response.status).toBe(201);
     expect(response.body).toEqual({
@@ -211,10 +226,13 @@ describe("Uniqueness API", () => {
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
-    const response = await request(app).post("/relay/uniqueness").set(relayAuthorizationHeader()).send({
-      requestBlob: "test-face-scan",
-      groupName: "facesign-users",
-    });
+    const response = await request(app)
+      .post("/relay/uniqueness")
+      .set(relayAuthorizationHeader())
+      .send({
+        requestBlob: "test-face-scan",
+        groupName: "facesign-users",
+      });
 
     expect(response.status).toBe(409);
     expect(response.body).toEqual({
