@@ -20,6 +20,8 @@ On pushes to `main` / `master` that change `openapi.yaml`, [FaceSign API docs (G
 
 **One-time setup:** in the GitHub repo go to **Settings → Pages → Build and deployment**, set **Source** to **GitHub Actions** (not “Deploy from a branch”). After the first successful run, the site URL is shown on the workflow run and under **Settings → Pages** (typically `https://<owner>.github.io/<repo>/`).
 
+**If deploy fails with `HttpError: Not Found`:** the Pages API returns 404 when Actions-based publishing is not active for this repository. Fix it by opening **Settings → Pages**, choosing **GitHub Actions** under **Build and deployment**, and saving (you may need to pick a suggested workflow once; ours will run from `.github/workflows/facesign-api-docs.yml`). Also confirm the repo is allowed to use GitHub Pages: **public** repos can use Pages on the free plan; **private** repos need a plan that includes Pages ([GitHub Pages docs](https://docs.github.com/en/pages/getting-started-with-github-pages/github-pages-limits)). On **GitHub Enterprise Server**, older instances need different action versions—see [deploy-pages issues](https://github.com/actions/deploy-pages/issues).
+
 ### Endpoints (summary)
 
 | Area | Methods |
