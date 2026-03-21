@@ -2,7 +2,7 @@ name: FaceSign API docs (GitHub Pages)
 
 on:
   push:
-    branches: [main, master, feature/store-audit-trail-images]
+    branches: [main, master, feature/add_authorization_for_relay]
     paths:
       - "facesign-service/openapi.yaml"
       - ".github/workflows/facesign-api-docs.yml"

@@ -9,3 +9,4 @@ export const FACETEC_SESSION_COLLECTION = "Session";
 export const KEY_1_MULTIBASE_PUBLIC_PATH = "./multibase_key_1_public.txt";
 export const HOST = "INSERT YOUR HOST HERE";
 export const JWT_PRIVATE_KEY = "./jwt_token_private.pem";
+export const RELAY_JWT_PUBLIC_KEY = "INSERT YOUR RELAY JWT PUBLIC KEY PATH HERE";

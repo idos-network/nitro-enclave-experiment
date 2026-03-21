@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import agent from "../../providers/agent.ts";
 import * as db from "../../providers/db.ts";
 import app from "../../server.ts";
+import { relayAuthorizationHeader } from "../utils/helper.ts";
 import {
   processRequestErrorHandler,
   processRequestHandler,
@@ -19,9 +20,12 @@ describe("Liveness API", () => {
   it("return new session", async () => {
     server.use(sessionStartHandler("mock-session-result-blob"));
 
-    const response = await request(app).post("/relay/liveness").send({
-      requestBlob: "test-face-scan",
-    });
+    const response = await request(app)
+      .post("/relay/liveness")
+      .set(relayAuthorizationHeader())
+      .send({
+        requestBlob: "test-face-scan",
+      });
 
     expect(response.status).toBe(200);
     expect(response.body.responseBlob).toBe("mock-session-result-blob");
@@ -31,9 +35,12 @@ describe("Liveness API", () => {
   it("fail with error", async () => {
     server.use(processRequestErrorHandler(500, "Server error"));
 
-    const response = await request(app).post("/relay/liveness").send({
-      requestBlob: "test-face-scan",
-    });
+    const response = await request(app)
+      .post("/relay/liveness")
+      .set(relayAuthorizationHeader())
+      .send({
+        requestBlob: "test-face-scan",
+      });
 
     expect(response.status).toBe(500);
     expect(response.body).toEqual({
@@ -62,10 +69,13 @@ describe("Liveness API", () => {
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
-    const response = await request(app).post("/relay/liveness").send({
-      requestBlob: "test-face-scan",
-      storeSelfie: true,
-    });
+    const response = await request(app)
+      .post("/relay/liveness")
+      .set(relayAuthorizationHeader())
+      .send({
+        requestBlob: "test-face-scan",
+        storeSelfie: true,
+      });
 
     expect(response.status).toBe(201);
     expect(response.body).toEqual({
@@ -111,9 +121,12 @@ describe("Liveness API", () => {
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
-    const response = await request(app).post("/relay/liveness").send({
-      requestBlob: "test-face-scan",
-    });
+    const response = await request(app)
+      .post("/relay/liveness")
+      .set(relayAuthorizationHeader())
+      .send({
+        requestBlob: "test-face-scan",
+      });
 
     expect(response.status).toBe(400);
     expect(response.body).toEqual({
@@ -133,5 +146,22 @@ describe("Liveness API", () => {
       },
       didError: true,
     });
+  });
+
+  it("returns 401 without bearer token", async () => {
+    const response = await request(app).post("/relay/liveness").send({
+      requestBlob: "test-face-scan",
+    });
+    expect(response.status).toBe(401);
+    expect(response.body).toEqual({ errorMessage: "Missing or invalid Authorization header." });
+  });
+
+  it("returns 401 for invalid bearer token", async () => {
+    const response = await request(app)
+      .post("/relay/liveness")
+      .set({ Authorization: "Bearer not-a-jwt" })
+      .send({ requestBlob: "test-face-scan" });
+    expect(response.status).toBe(401);
+    expect(response.body).toEqual({ errorMessage: "Invalid or expired bearer token." });
   });
 });

@@ -9,6 +9,12 @@ const { privateKey, publicKey } = generateKeyPairSync("ec", {
   publicKeyEncoding: { type: "spki", format: "pem" },
 });
 
+const { privateKey: relayPrivateKey, publicKey: relayPublicKey } = generateKeyPairSync("ec", {
+  namedCurve: "secp521r1",
+  privateKeyEncoding: { type: "pkcs8", format: "pem" },
+  publicKeyEncoding: { type: "spki", format: "pem" },
+});
+
 type TokenOptions = {
   sub: string;
   action?: string;
@@ -25,4 +31,13 @@ export function makeNewUserConfirmationToken({
   return jwt.sign({ sub, action, iat }, key, { algorithm: "ES512" });
 }
 
-export { privateKey, publicKey };
+/** ES512 JWT for `Authorization: Bearer` on `/relay/*` (sign with private key; service verifies with public). */
+export function makeRelayBearerToken(sub = "relay-test") {
+  return jwt.sign({ sub }, relayPrivateKey, { algorithm: "ES512", expiresIn: "1h" });
+}
+
+export function relayAuthorizationHeader() {
+  return { Authorization: `Bearer ${makeRelayBearerToken()}` };
+}
+
+export { privateKey, publicKey, relayPrivateKey, relayPublicKey };

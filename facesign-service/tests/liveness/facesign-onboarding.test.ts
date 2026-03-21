@@ -5,7 +5,7 @@ import request from "supertest";
 import agent from "../../providers/agent.ts";
 import * as db from "../../providers/db.ts";
 import app from "../../server.ts";
-import { publicKey } from "../utils/helper.ts";
+import { publicKey, relayAuthorizationHeader } from "../utils/helper.ts";
 import {
   processRequestHandler,
   searchHandler,
@@ -32,7 +32,7 @@ describe("Liveness + Facesign Onboarding API", () => {
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
-    const response = await request(app).post("/relay/liveness").send({
+    const response = await request(app).post("/relay/liveness").set(relayAuthorizationHeader()).send({
       requestBlob: "test-face-scan",
       faceVector: false,
       onboardFaceSign: true,
@@ -100,7 +100,7 @@ describe("Liveness + Facesign Onboarding API", () => {
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
-    const response = await request(app).post("/relay/liveness").send({
+    const response = await request(app).post("/relay/liveness").set(relayAuthorizationHeader()).send({
       requestBlob: "test-face-scan",
       onboardFaceSign: true,
       faceVector: false,

@@ -13,13 +13,14 @@ import {
   searchHandler,
   sessionStartHandler,
 } from "../utils/msw-handlers.ts";
+import { relayAuthorizationHeader } from "../utils/helper.ts";
 import { server } from "../utils/msw-server.ts";
 
 describe("Uniqueness API", () => {
   it("return new session", async () => {
     server.use(sessionStartHandler("mock-session-result-blob"));
 
-    const response = await request(app).post("/relay/uniqueness").send({
+    const response = await request(app).post("/relay/uniqueness").set(relayAuthorizationHeader()).send({
       requestBlob: "test-face-scan",
       groupName: "test-users",
     });
@@ -32,7 +33,7 @@ describe("Uniqueness API", () => {
   it("fail with error", async () => {
     server.use(processRequestErrorHandler(500, "Server error"));
 
-    const response = await request(app).post("/relay/uniqueness").send({
+    const response = await request(app).post("/relay/uniqueness").set(relayAuthorizationHeader()).send({
       requestBlob: "test-face-scan",
       groupName: "test-users",
     });
@@ -59,7 +60,7 @@ describe("Uniqueness API", () => {
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
-    const response = await request(app).post("/relay/uniqueness").send({
+    const response = await request(app).post("/relay/uniqueness").set(relayAuthorizationHeader()).send({
       requestBlob: "test-face-scan",
       groupName: "test-users",
       faceVector: false,
@@ -108,7 +109,7 @@ describe("Uniqueness API", () => {
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
-    const response = await request(app).post("/relay/uniqueness").send({
+    const response = await request(app).post("/relay/uniqueness").set(relayAuthorizationHeader()).send({
       requestBlob: "test-face-scan",
       groupName: "test-users",
     });
@@ -153,7 +154,7 @@ describe("Uniqueness API", () => {
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
-    const response = await request(app).post("/relay/uniqueness").send({
+    const response = await request(app).post("/relay/uniqueness").set(relayAuthorizationHeader()).send({
       requestBlob: "test-face-scan",
       storeSelfie: true,
       groupName: "facesign-users",
@@ -210,7 +211,7 @@ describe("Uniqueness API", () => {
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
-    const response = await request(app).post("/relay/uniqueness").send({
+    const response = await request(app).post("/relay/uniqueness").set(relayAuthorizationHeader()).send({
       requestBlob: "test-face-scan",
       groupName: "facesign-users",
     });

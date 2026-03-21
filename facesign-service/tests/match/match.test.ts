@@ -9,13 +9,14 @@ import {
   requestCapture,
   sessionStartHandler,
 } from "../utils/msw-handlers.ts";
+import { relayAuthorizationHeader } from "../utils/helper.ts";
 import { server } from "../utils/msw-server.ts";
 
 describe("Match API", () => {
   it("return new session", async () => {
     server.use(sessionStartHandler("mock-session-result-blob"));
 
-    const response = await request(app).post("/relay/match").send({
+    const response = await request(app).post("/relay/match").set(relayAuthorizationHeader()).send({
       requestBlob: "test-face-scan",
       userId: "test-user-id",
     });
@@ -36,7 +37,7 @@ describe("Match API", () => {
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
-    const response = await request(app).post("/relay/match").send({
+    const response = await request(app).post("/relay/match").set(relayAuthorizationHeader()).send({
       requestBlob: "test-face-scan",
       userId: "test-user-id",
       storeSelfie: true,
@@ -82,7 +83,7 @@ describe("Match API", () => {
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
-    const response = await request(app).post("/relay/match").send({
+    const response = await request(app).post("/relay/match").set(relayAuthorizationHeader()).send({
       requestBlob: "test-face-scan",
       userId: "test-user-id",
     });
@@ -115,7 +116,7 @@ describe("Match API", () => {
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
-    const response = await request(app).post("/relay/match").send({
+    const response = await request(app).post("/relay/match").set(relayAuthorizationHeader()).send({
       requestBlob: "test-face-scan",
       userId: "test-user-id",
     });
@@ -141,7 +142,7 @@ describe("Match API", () => {
 
     const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 
-    const response = await request(app).post("/relay/match").send({
+    const response = await request(app).post("/relay/match").set(relayAuthorizationHeader()).send({
       requestBlob: "test-face-scan",
       userId: "test-user-id",
     });
