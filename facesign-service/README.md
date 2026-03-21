@@ -4,7 +4,7 @@ Node/Express service that fronts FaceTec (`process-request` and related APIs), r
 
 ## API specification
 
-The HTTP contract is defined in **[openapi.yaml](./openapi.yaml)** (OpenAPI 3.0.3). It is maintained to match `server.ts` and the `routes/` handlers.
+Check [ReDoc pages](https://idos-network.github.io/nitro-enclave-experiment/) or you can go directly into **[openapi.yaml](./openapi.yaml)** (OpenAPI 3.0.3). It is maintained to match `server.ts` and the `routes/` handlers.
 
 View or lint locally:
 
