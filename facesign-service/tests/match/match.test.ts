@@ -49,7 +49,7 @@ describe("Match API", () => {
       responseBlob: "mock-scan-result-blob",
       result: { livenessProven: true, matchLevel: 15 },
       success: true,
-      selfieFileId: expect.any(String),
+      selfieImageId: expect.any(String),
     });
 
     expect(agentSpy).toHaveBeenCalledWith("match-request", {
@@ -60,7 +60,7 @@ describe("Match API", () => {
     expect(agentSpy).toHaveBeenCalledWith("match-3d-3d-done", {
       identifier: "test-user-id",
       matchLevel: 15,
-      selfieFileId: expect.any(String),
+      selfieImageId: expect.any(String),
     });
 
     // Verify FaceTec API calls

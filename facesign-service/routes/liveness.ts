@@ -19,7 +19,7 @@ export interface LivenessRequestData {
 export interface LivenessResponseData extends Enrollment3DResponseData {
   userId?: string;
   faceSign?: FaceSignLoginNew | FaceSignLoginExisting | FaceSignLoginCreated;
-  selfieFileId?: string;
+  selfieImageId?: string;
 }
 
 export default async function handler(req: Request, res: Response) {
@@ -55,7 +55,7 @@ export default async function handler(req: Request, res: Response) {
   // If the user is already enrolled, we will return a different
   // userId, which can't be used to get the audit trail image.
   if (storeSelfie) {
-    response.selfieFileId = userId;
+    response.selfieImageId = userId;
   }
 
   // If we want token and onboard user in facesign group

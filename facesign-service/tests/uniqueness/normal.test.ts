@@ -83,7 +83,7 @@ describe("Uniqueness API", () => {
       responseBlob: "mock-scan-result-blob",
       success: true,
       result: { livenessProven: true },
-      selfieFileId: expect.any(String),
+      selfieImageId: expect.any(String),
     });
 
     expect(agentSpy).toHaveBeenCalledWith(
@@ -182,11 +182,11 @@ describe("Uniqueness API", () => {
       result: { livenessProven: true },
       success: true,
       didError: false,
-      selfieFileId: expect.any(String),
+      selfieImageId: expect.any(String),
     });
 
     // Different audit trail image ID
-    expect(response.body.selfieFileId).not.toBe(response.body.userId);
+    expect(response.body.selfieImageId).not.toBe(response.body.userId);
 
     expect(agentSpy).toHaveBeenCalledWith(
       "group-resolution-existing-user",

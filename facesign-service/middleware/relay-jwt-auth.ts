@@ -1,13 +1,13 @@
 import type { RequestHandler } from "express";
 import jwt from "jsonwebtoken";
-import { RELAY_JWT_PUBLIC_KEY } from "../env.ts";
+import { RELAY_JWT_PUBLIC_KEY_BASE_64 } from "../env.ts";
 
 /**
  * Requires `Authorization: Bearer <jwt>` for `/relay/*` routes.
  * Tokens must be ES512 and verifiable with the PEM in env `RELAY_JWT_PUBLIC_KEY`.
  */
 export const relayJwtAuthMiddleware: RequestHandler = (req, res, next) => {
-  const publicPem = RELAY_JWT_PUBLIC_KEY;
+  const publicPem = Buffer.from(RELAY_JWT_PUBLIC_KEY_BASE_64, "base64").toString("utf-8");
 
   if (!publicPem) {
     return res.status(503).json({

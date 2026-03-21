@@ -551,7 +551,7 @@ components:
               format: uuid
             faceSign:
               $ref: "#/components/schemas/FaceSignOnboard"
-            selfieFileId:
+            selfieImageId:
               type: string
               format: uuid
               description: Same as internal enrollment id when `storeSelfie` was true.
@@ -577,7 +577,7 @@ components:
         - $ref: "#/components/schemas/FaceTecProcessEnvelope"
         - type: object
           properties:
-            selfieFileId:
+            selfieImageId:
               type: string
               nullable: true
               description: Same as `userId` when `storeSelfie` was true; otherwise null.

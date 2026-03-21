@@ -19,7 +19,7 @@ export default async function handler(req: Request, res: Response) {
 
   // Audit trail image will be stored in the current enrollment
   // we can't use userId because it can change during the dedup process.
-  const selfieFileId = userId;
+  const selfieImageId = userId;
 
   const {
     requestBlob,
@@ -62,7 +62,7 @@ export default async function handler(req: Request, res: Response) {
   // If the user is already enrolled, we will return a different
   // userId, which can't be used to get the audit trail image.
   if (storeSelfie) {
-    response.selfieFileId = selfieFileId;
+    response.selfieImageId = selfieImageId;
   }
 
   const { groupUserId, newUser } = await findOrEnrollInGroup({

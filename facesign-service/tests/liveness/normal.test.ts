@@ -84,11 +84,11 @@ describe("Liveness API", () => {
       result: { livenessProven: true },
       success: true,
       userId: expect.any(String),
-      selfieFileId: expect.any(String),
+      selfieImageId: expect.any(String),
     });
 
     // New user audit trail image ID should be the same as userId
-    expect(response.body.selfieFileId).toBe(response.body.userId);
+    expect(response.body.selfieImageId).toBe(response.body.userId);
 
     expect(agentSpy).toHaveBeenCalledWith("liveness-request", {
       userId: response.body.userId,

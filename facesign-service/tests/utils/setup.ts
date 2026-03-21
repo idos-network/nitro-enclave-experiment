@@ -22,7 +22,7 @@ vi.mock("../../env.ts", async () => {
   const actualEnv = await vi.importActual<typeof import("../../env.ts")>("../../env.ts");
   return {
     ...actualEnv,
-    RELAY_JWT_PUBLIC_KEY: relayPublicKey,
+    RELAY_JWT_PUBLIC_KEY_BASE_64: Buffer.from(relayPublicKey, "utf-8").toString("base64"),
   };
 });
 
