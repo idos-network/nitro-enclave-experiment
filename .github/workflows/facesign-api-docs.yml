@@ -1,0 +1,45 @@
+name: FaceSign API docs (GitHub Pages)
+
+on:
+  push:
+    branches: [main, master, feature/add-request-id]
+    paths:
+      - "facesign-service/openapi.yaml"
+      - ".github/workflows/facesign-api-docs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-facesign-api
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Redoc static site
+        run: |
+          mkdir -p _site
+          npx --yes @redocly/cli build-docs facesign-service/openapi.yaml -o _site/index.html
+          # Avoid Jekyll touching the upload (harmless for a single HTML bundle).
+          touch _site/.nojekyll
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
