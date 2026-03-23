@@ -182,8 +182,8 @@ class AgentClient {
 		const logEntry = {
 			type,
 			data,
-      requestId: getRequestId(),
-      remoteIp: getRemoteIp(),
+			requestId: getRequestId(),
+			remoteIp: getRemoteIp(),
 			timestamp: new Date().toISOString(),
 		};
 
