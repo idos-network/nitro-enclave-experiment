@@ -32,8 +32,12 @@ export function makeNewUserConfirmationToken({
 }
 
 /** ES512 JWT for `Authorization: Bearer` on `/relay/*` (sign with private key; service verifies with public). */
-export function makeRelayBearerToken(sub = "relay-test") {
-  return jwt.sign({ sub }, relayPrivateKey, { algorithm: "ES512", expiresIn: "1h" });
+export function makeRelayBearerToken(sub = "relay-test", opts?: { iat?: number }) {
+  const payload: { sub: string; iat?: number } = { sub };
+  if (opts?.iat !== undefined) {
+    payload.iat = opts.iat;
+  }
+  return jwt.sign(payload, relayPrivateKey, { algorithm: "ES512", expiresIn: "1h" });
 }
 
 export function relayAuthorizationHeader() {
