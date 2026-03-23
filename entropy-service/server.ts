@@ -7,13 +7,35 @@ import morgan from "morgan";
 import { JWT_PUBLIC_KEY } from "./env.ts";
 import agent from "./providers/agent.ts";
 import { fetchOrCreateFaceSignEntropy } from "./providers/db.ts";
+import { getRequestId, runWithRequestContext } from "./utils/request-context.ts";
+import { rateLimit } from 'express-rate-limit'
+
+morgan.token("requestId", () => getRequestId() ?? "-");
 
 const app = express();
 
+const limiter = rateLimit({
+	windowMs: 15 * 60 * 1000, // 15 minute
+	limit: 100, // Limit each IP to 100 requests per `window` (here, per 15 minute).
+	legacyHeaders: false,
+  standardHeaders: false,
+  ipv6Subnet: 56,
+});
+
+app.set("trust proxy", 1);
 app.use(helmet());
 app.use(cors());
-app.use(morgan("dev"));
+app.use((req, res, next) => {
+  const requestId = req.header("x-request-id") || crypto.randomUUID();
+  res.setHeader("x-request-id", requestId);
+  runWithRequestContext(
+    { requestId, ...(req.ip !== undefined ? { remoteIp: req.ip } : {}) },
+    next,
+  );
+});
+app.use(morgan(":requestId :remote-addr :method :url :status :response-time ms"));
 app.use(express.json({ limit: "50mb" }));
+app.use(limiter);
 
 app.get("/", (_req, res) => {
 	res.status(200).json({ message: "Welcome to the FaceSign entropy API!" });
