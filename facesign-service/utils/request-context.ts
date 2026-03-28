@@ -2,6 +2,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 
 export type RequestContext = {
   requestId: string;
+  remoteIp?: string;
 };
 
 const requestContextStorage = new AsyncLocalStorage<RequestContext>();
@@ -16,4 +17,8 @@ export function getRequestContext() {
 
 export function getRequestId() {
   return getRequestContext()?.requestId;
+}
+
+export function getRemoteIp() {
+  return getRequestContext()?.remoteIp;
 }
