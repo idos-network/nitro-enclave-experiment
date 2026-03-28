@@ -46,6 +46,7 @@ const limiter = rateLimit({
   legacyHeaders: false,
   standardHeaders: false,
   ipv6Subnet: 56,
+  skip: (req) => req.url.startsWith("/relay/"), // This is called from internal network, so we don't need to rate limit it
 });
 
 app.set("trust proxy", "loopback");
