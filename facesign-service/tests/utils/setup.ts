@@ -8,7 +8,6 @@ vi.mock("../../providers/db.ts", () => ({
   getMembers: vi.fn(),
   getOldestFaceSignUserId: vi.fn(),
   getAuditTrailImage: vi.fn(),
-  deleteAuditTrailImage: vi.fn(),
 }));
 
 vi.mock("../../providers/agent.ts", () => ({
@@ -38,7 +37,6 @@ vi.mock("fs", async () => {
 // Use "bypass" for unhandled requests to allow supertest requests to the Express app
 beforeAll(() => {
   server.listen({ onUnhandledRequest: "bypass" });
-  vi.resetAllMocks();
 });
 
 // Reset handlers and captured requests after each test

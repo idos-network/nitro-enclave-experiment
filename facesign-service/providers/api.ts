@@ -203,10 +203,18 @@ export async function match3d2dId({
   });
 
   if (!matchIdDocResponse.ok) {
-    throw new FaceTecError("match3d2dId", {
-      code: matchIdDocResponse.status,
-      body: await matchIdDocResponse.text(),
-    });
+    throw new FaceTecError(
+      "match3d2dId",
+      {
+        code: matchIdDocResponse.status,
+        body: await matchIdDocResponse.text(),
+      },
+      {
+        userId,
+        image,
+        minMatchLevel,
+      },
+    );
   }
 
   const response = (await matchIdDocResponse.json()) as ProcessRequestResponse;

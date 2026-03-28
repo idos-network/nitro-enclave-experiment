@@ -118,7 +118,7 @@ export const processRequestErrorHandler = (status: number, text: string) =>
   postHandler("process-request", () => new HttpResponse(text, { status }));
 
 export const sessionStartHandler = (responseBlob = "mock-session-result-blob") =>
-  postHandler("process-request", () => ({ responseBlob }));
+  postHandler("process-request", () => ({ responseBlob, launchId: crypto.randomUUID() }));
 
 type Match3d2dIdResponse = {
   success?: boolean;

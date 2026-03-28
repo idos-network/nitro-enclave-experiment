@@ -185,14 +185,6 @@ export async function getAuditTrailImage(
   return Buffer.from(decrypted.buffer, "base64");
 }
 
-export async function deleteAuditTrailImage(externalDatabaseRefID: string) {
-  const { facetecDataDb } = await connectDB();
-
-  await facetecDataDb
-    .collection(FACETEC_SESSION_COLLECTION)
-    .updateOne({ externalDatabaseRefID }, { $unset: { "data.auditTrailImage": "" } });
-}
-
 export async function deleteAuditTrailImagesOlderThan14Days() {
   const { facetecDataDb } = await connectDB();
 
