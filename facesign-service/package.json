@@ -25,7 +25,7 @@
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
     "mongodb": "^6.19.0",
-		"mongodb-client-encryption": "^6.5.0",
+    "mongodb-client-encryption": "^6.5.0",
     "morgan": "^1.10.1",
     "node-cron": "^4.2.1",
     "os-utils": "^0.0.14",

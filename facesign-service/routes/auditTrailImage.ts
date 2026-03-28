@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import agent from "../providers/agent.ts";
-import { getAuditTrailImage, deleteAuditTrailImage } from "../providers/db.ts";
+import { deleteAuditTrailImage, getAuditTrailImage } from "../providers/db.ts";
 
 export async function handleGetAuditTrailImage(req: Request, res: Response) {
   const { externalDatabaseRefID } = req.params;
