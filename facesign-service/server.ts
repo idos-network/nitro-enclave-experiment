@@ -8,10 +8,10 @@ import express, {
   type Response,
   type Router,
 } from "express";
+import { rateLimit } from "express-rate-limit";
 import helmet from "helmet";
 import morgan from "morgan";
 import cron from "node-cron";
-
 // Configurations and providers
 import { HOST, KEY_1_MULTIBASE_PUBLIC_PATH } from "./env.ts";
 import { relayJwtAuthMiddleware } from "./middleware/relay-jwt-auth.ts";
@@ -40,15 +40,25 @@ morgan.token("requestId", () => getRequestId() ?? "-");
 
 const app = express();
 
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minute
+  limit: 100, // Limit each IP to 100 requests per `window` (here, per 15 minute).
+  legacyHeaders: false,
+  standardHeaders: false,
+  ipv6Subnet: 56,
+});
+
+app.set("trust proxy", 1);
 app.use(helmet());
 app.use(cors());
 app.use((req, res, next) => {
   const requestId = req.header("x-request-id") || crypto.randomUUID();
   res.setHeader("x-request-id", requestId);
-  runWithRequestContext({ requestId }, next);
+  runWithRequestContext({ requestId, ...(req.ip !== undefined ? { remoteIp: req.ip } : {}) }, next);
 });
-app.use(morgan(":requestId :method :url :status :response-time ms"));
-app.use(express.json({ limit: "50mb" }));
+app.use(morgan(":requestId :remote-addr :method :url :status :response-time ms"));
+app.use(express.json({ limit: "25mb" }));
+app.use(limiter);
 
 app.get("/", (_req, res) => {
   res.json({ message: "FaceSign Service is running" });

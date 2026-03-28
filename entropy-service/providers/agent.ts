@@ -2,6 +2,7 @@ import net from "node:net";
 import checkDiskSpace from "check-disk-space";
 import os from "os-utils";
 import pm2 from "pm2";
+import { getRemoteIp, getRequestId } from "../utils/request-context.ts";
 
 function pm2Stats() {
 	return new Promise((resolve, reject) => {
@@ -181,6 +182,8 @@ class AgentClient {
 		const logEntry = {
 			type,
 			data,
+			requestId: getRequestId(),
+			remoteIp: getRemoteIp(),
 			timestamp: new Date().toISOString(),
 		};
 
