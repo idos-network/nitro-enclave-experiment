@@ -39,6 +39,7 @@ describe("Match Login API", () => {
     const response = await request(app).post("/match").send({
       requestBlob: "test-face-scan",
       externalUserId: "test-user-id",
+      storeAuditTrailImages: true,
     });
 
     expect(response.status).toBe(201);
@@ -47,16 +48,18 @@ describe("Match Login API", () => {
       responseBlob: "mock-scan-result-blob",
       result: { livenessProven: true, matchLevel: 15 },
       success: true,
+      auditTrailImageId: expect.any(String),
     });
 
     expect(agentSpy).toHaveBeenCalledWith("match-request", {
       externalUserId: "test-user-id",
-      storeAuditTrailImages: false,
+      storeAuditTrailImages: true,
     });
 
     expect(agentSpy).toHaveBeenCalledWith("match-3d-3d-done", {
       identifier: "test-user-id",
       matchLevel: 15,
+      auditTrailImageId: expect.any(String),
     });
 
     // Verify FaceTec API calls

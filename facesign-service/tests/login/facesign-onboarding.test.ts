@@ -36,6 +36,7 @@ describe("Login/Facesign Onboarding API", () => {
       requestBlob: "test-face-scan",
       faceVector: false,
       onboardFaceSign: true,
+      groupName: "facesign-users",
     });
 
     expect(response.status).toBe(201);
@@ -97,6 +98,7 @@ describe("Login/Facesign Onboarding API", () => {
       requestBlob: "test-face-scan",
       faceVector: false,
       onboardFaceSign: true,
+      groupName: "facesign-users",
     });
 
     expect(response.status).toBe(201);

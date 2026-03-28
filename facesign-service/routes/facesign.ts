@@ -17,12 +17,13 @@ export const login = async (req: Request, res: Response) => {
   const { requestBlob } = req.body;
 
   // First check if liveness is proven
-  const { success, result, responseBlob, didError, additionalSessionData } = await enrollment3d(
-    generatedUserId,
-    requestBlob,
-    false, // We need face maps
-    false, // We don't need audit trail images
-  );
+  const { success, result, responseBlob, didError, additionalSessionData, launchId } =
+    await enrollment3d(
+      generatedUserId,
+      requestBlob,
+      false, // We need face maps
+      false, // We don't need audit trail images
+    );
 
   // Always return required fields for SDK
   const alwaysToReturn = {
@@ -34,7 +35,7 @@ export const login = async (req: Request, res: Response) => {
   };
 
   if (!success || !result.livenessProven || didError) {
-    agent.writeLog("facesign-enrollment-failed", { success, result, didError });
+    agent.writeLog("facesign-enrollment-failed", { success, result, didError, launchId });
 
     return res.status(400).json({
       ...alwaysToReturn,
@@ -42,7 +43,7 @@ export const login = async (req: Request, res: Response) => {
     });
   }
 
-  const faceSignLoginResult = await faceSignLogin(generatedUserId, false);
+  const faceSignLoginResult = await faceSignLogin(generatedUserId, launchId, false);
 
   return res.status(faceSignLoginResult.newUser ? 200 : 201).json({
     ...alwaysToReturn,

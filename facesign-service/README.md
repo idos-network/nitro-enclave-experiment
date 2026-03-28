@@ -15,9 +15,10 @@ Methods are mapped to status response codes in this favor:
 
 **Inputs:**
    * requestBlob - facetec stuff
-   * groupName - optional
+   * groupName - optional (default: null)
    * faceVector - optional (default: true)
    * onboardFaceSign - optional (default: false)
+   * storeAuditTrailImages - optional (default: false)
   
 **Outputs:**
 
@@ -48,7 +49,7 @@ Methods are mapped to status response codes in this favor:
     livenessProven: boolean,
   },
 
-  // FaceSign service customs
+  // FaceSign userId (when groupName is provided)
   faceSignUserId: "user-uuid",
 
   // When FaceSign onboarding is required
@@ -56,7 +57,10 @@ Methods are mapped to status response codes in this favor:
     newUser: boolean, // user has been created, no profile
     faceSignUserId: string,
     userAttestmentToken: string,
-  }
+  },
+
+  // When storeAuditTrailImages is true
+  auditTrailImageId: "audit-trail-image-id"
 }
 ```
 
@@ -112,6 +116,14 @@ Methods are mapped to status response codes in this favor:
 
 ### POST /match
 
+
+**Inputs:**
+   * requestBlob - facetec stuff
+   * externalDatabaseRefID - to whom we should match
+   * storeAuditTrailImages - optional (default: false)
+  
+**Outputs:**
+
 1. SessionStarted (status: **200**) - FaceTec internals, no success, just responseBlob
 
 ```javascript
@@ -139,6 +151,9 @@ Methods are mapped to status response codes in this favor:
     livenessProven: boolean,
     matchLevel: number,
   },
+
+  // Image (when storeAuditTrailImages is true)
+  storeAuditTrailImages: "uuid"
 }
 ```
 
@@ -306,5 +321,41 @@ Body:
 ```javascript
 {
   errorMessage: "User already exists",
+}
+```
+
+# GET /audit-trail-image/:auditTrailImageId
+
+1. This endpoint returns base64 audit trail image if available (status: **200**):
+
+```
+[base64string]
+```
+
+2. No image available (status: **400**):
+
+```javascript
+{
+  error: "No audit trail image available."
+}
+```
+
+# DELETE /audit-trail-image/:auditTrailImageId
+
+This endpoint remove an audit trail image from DB if available.
+
+1. Image deleted (200)
+  
+```javascript
+{
+  message: "Audit trail image deleted sucesfully."
+}
+```
+
+2. Image not found or missing external id (400)
+
+```javascript
+{
+  errorMessage: "External database reference ID is required."
 }
 ```
