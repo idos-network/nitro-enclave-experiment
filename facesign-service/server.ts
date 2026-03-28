@@ -180,7 +180,14 @@ cron.schedule("0 0 * * *", async () => {
   agent.writeLog("delete-audit-trail-images-cron-job", {
     message: "Deleting audit trail images older than 14 days",
   });
-  await deleteAuditTrailImagesOlderThan14Days();
+
+  try {
+    await deleteAuditTrailImagesOlderThan14Days();
+  } catch (error: unknown) {
+    agent.writeLog("delete-audit-trail-images-cron-job-error", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
 });
 
 export default app;

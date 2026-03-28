@@ -6,6 +6,7 @@ export class SessionStartError extends Error {
 
   constructor(responseBody: string, launchId: string) {
     super("Session Start Response");
+    this.name = "SessionStartError";
     this.responseBody = responseBody;
     this.launchId = launchId;
   }
@@ -16,6 +17,7 @@ export class Enrollment3DRecoverableError extends Error {
 
   constructor(response: ProcessRequestResponse) {
     super("Liveness check or enrollment 3D failed and was not processed.");
+    this.name = "Enrollment3DRecoverableError";
     this.response = response;
   }
 }
@@ -37,12 +39,23 @@ export class FaceTecError extends Error {
     others: Record<string, unknown> = {},
   ) {
     super("Unexpected FaceTec API Error");
+    this.name = "FaceTecError";
     this.methodName = methodName;
     this.response = response;
     this.others = others;
   }
 }
 
-export class FFRError extends Error {}
+export class FFRError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "FFRError";
+  }
+}
 
-export class InternalServerError extends Error {}
+export class InternalServerError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "InternalServerError";
+  }
+}

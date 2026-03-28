@@ -29,5 +29,11 @@ export default async function selfie(req: Request, res: Response) {
     });
   }
 
-  return res.status(200).contentType("image/jpeg").send(imageBuffer);
+  return res
+    .status(200)
+    .set("Cache-Control", "no-store, max-age=0")
+    .set("Pragma", "no-cache")
+    .set("Expires", "0")
+    .contentType("image/jpeg")
+    .send(imageBuffer);
 }

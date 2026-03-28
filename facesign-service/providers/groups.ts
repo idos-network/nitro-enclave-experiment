@@ -1,11 +1,6 @@
 import agent from "./agent.ts";
 import { enrollUser, searchForDuplicates } from "./api.ts";
-import {
-  countMembersInGroup,
-  deleteAuditTrailImage,
-  getOldestFaceSignUserId,
-  insertMember,
-} from "./db.ts";
+import { countMembersInGroup, getOldestFaceSignUserId, insertMember } from "./db.ts";
 import { FFRError, InternalServerError } from "./errors.ts";
 
 export async function findOrEnrollInGroup({
@@ -49,7 +44,6 @@ export async function findOrEnrollInGroup({
       );
     }
 
-    console.log("Group does not exist, creating one by enrolling first user.");
     agent.writeLog("group-resolution-bootstrap-group", {
       process,
       userId,
@@ -101,7 +95,7 @@ export async function findOrEnrollInGroup({
       launchId,
     });
 
-    await deleteAuditTrailImage(userId);
+    // The audit trail will be deleted in 14 days by cron job
 
     // Non-recoverable error
     throw new FFRError(
@@ -113,19 +107,19 @@ export async function findOrEnrollInGroup({
     // FFRs are allowed in facesign process
     const matchedUserIds = results.map((x) => x.identifier);
 
-    userId = await getOldestFaceSignUserId(matchedUserIds);
+    const resolvedUserId = await getOldestFaceSignUserId(matchedUserIds);
 
     agent.writeLog("group-resolution-ffr-resolved", {
       process,
       userId,
-      resolvedUserId: userId,
+      resolvedUserId,
       matchedUserIds,
       count: results.length,
       groupName,
       launchId,
     });
 
-    return { groupUserId: userId, newUser: false };
+    return { groupUserId: resolvedUserId, newUser: false };
   }
 
   if (results.length === 1) {
