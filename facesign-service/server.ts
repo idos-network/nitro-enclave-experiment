@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { readFileSync } from "node:fs";
 import cors from "cors";
 import express, {
@@ -22,21 +23,24 @@ import {
   InternalServerError,
   SessionStartError,
 } from "./providers/errors.ts";
-
 // FaceSign Routes
 import { confirmation as faceSignConfirmation, login as faceSignLogin } from "./routes/facesign.ts";
-
 // idOS Relay Routes
 import liveness from "./routes/liveness.ts";
 import match from "./routes/match.ts";
 import matchIdDoc from "./routes/match-id-doc.ts";
 import selfie from "./routes/selfie.ts";
 import uniqueness from "./routes/uniqueness.ts";
+import { runWithRequestContext } from "./utils/request-context.ts";
 
 const app = express();
 
 app.use(helmet());
 app.use(cors());
+app.use((req, _res, next) => {
+  const requestId = req.header("x-request-id") || crypto.randomUUID();
+  runWithRequestContext({ requestId }, next);
+});
 app.use(morgan("dev"));
 app.use(express.json({ limit: "50mb" }));
 
