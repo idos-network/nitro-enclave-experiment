@@ -48,7 +48,7 @@ const limiter = rateLimit({
   ipv6Subnet: 56,
 });
 
-app.set("trust proxy", 1);
+app.set("trust proxy", "loopback");
 app.use(helmet());
 app.use(cors());
 app.use((req, res, next) => {
