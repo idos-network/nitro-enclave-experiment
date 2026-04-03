@@ -77,7 +77,7 @@ paths:
   /relay/liveness:
     post:
       tags: [Relay]
-      summary: 3D liveness / enrollment (no group deduplication)
+      summary: 3D liveness check
       operationId: postRelayLiveness
       security:
         - RelayJwt: []
@@ -118,7 +118,7 @@ paths:
   /relay/uniqueness:
     post:
       tags: [Relay]
-      summary: Uniqueness / group enrollment with deduplication
+      summary: Liveness 3D check + 3D-DB group de-duplication
       operationId: postRelayUniqueness
       security:
         - RelayJwt: []
@@ -165,7 +165,7 @@ paths:
   /relay/match:
     post:
       tags: [Relay]
-      summary: 3D–3D match against an enrolled user
+      summary: 3D–3D match against an enrolled user and optional group de-duplication
       operationId: postRelayMatch
       security:
         - RelayJwt: []
@@ -185,7 +185,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/SessionStartResponse"
         "201":
-          description: Match completed successfully.
+          description: Match (and uniqueness if required) completed successfully.
           content:
             application/json:
               schema:
@@ -196,6 +196,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/MatchFailureBody"
+        "409":
+          description: Non-recoverable duplicate face-vector (FFR) during uniqueness.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConflictErrorBody"
         "401":
           $ref: "#/components/responses/UnauthorizedRelay"
         "503":
@@ -568,6 +574,9 @@ components:
           format: uuid
         requestBlob:
           type: string
+        groupName:
+          type: string
+          description: "This is uniqueness + match when liveness was done first"
         storeSelfie:
           type: boolean
           default: false
@@ -581,6 +590,19 @@ components:
               type: string
               nullable: true
               description: Same as `userId` when `storeSelfie` was true; otherwise null.
+            groupResolution:
+              type: object
+              nullable: true
+              description: "When group is provided (uniqueness process is used), we need to know the userId"
+              properties:
+                userId:
+                  type: string
+                  format: uuid
+                newUser:
+                  type: boolean
+              required:
+                - userId
+                - newUser
 
     MatchFailureBody:
       allOf:
