@@ -592,7 +592,6 @@ components:
               description: Same as `userId` when `storeSelfie` was true; otherwise null.
             groupResolution:
               type: object
-              nullable: true
               description: "When group is provided (uniqueness process is used), we need to know the userId"
               properties:
                 userId:
