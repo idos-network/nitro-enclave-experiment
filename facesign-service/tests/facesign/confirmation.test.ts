@@ -2,6 +2,7 @@
 import { generateKeyPairSync } from "node:crypto";
 import { ObjectId } from "mongodb";
 import request from "supertest";
+import agent from "../../providers/agent.ts";
 import { describe, expect, it, vi } from "vitest";
 import * as db from "../../providers/db.ts";
 import app from "../../server.ts";
@@ -63,12 +64,19 @@ describe("FaceSign/Confirmation API", () => {
       action: "confirmation",
     });
 
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+
     const response = await request(app).post("/facesign/confirmation").send({
       newUserConfirmationToken: token,
     });
 
     expect(response.status).toBe(409);
     expect(response.body.errorMessage).toBe("User already exists");
+
+    expect(agentSpy).toHaveBeenCalledWith("facesign-user-already-exists", {
+      userId,
+      searchResult: { success: true, results: [{ identifier: "different-user-id", matchLevel: 15 }] },
+    });
   });
 
   it("everything ok", async () => {
