@@ -78,8 +78,12 @@ export const confirmation = async (req: Request, res: Response) => {
 
   const userId = result.sub;
 
-  // Check duplications (race-condition)
-  const searchResult = await searchForDuplicates({ userId, groupName: FACE_SIGN_GROUP_NAME });
+  // Check duplications (race-condition, minMatchLevel = 15 because facesign only allows minMatchLevel = 15)
+  const searchResult = await searchForDuplicates({
+    userId,
+    groupName: FACE_SIGN_GROUP_NAME,
+    minMatchLevel: 15,
+  });
   if (!searchResult.success || searchResult.results.length > 0) {
     return res.status(409).json({ errorMessage: "User already exists" });
   }

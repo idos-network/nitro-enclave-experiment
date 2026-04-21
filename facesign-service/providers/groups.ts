@@ -9,10 +9,12 @@ export async function findOrEnrollInGroup({
   launchId,
   process,
   enrollIfNew,
+  minMatchLevel,
 }: {
   userId: string;
   groupName: string;
   launchId: string;
+  minMatchLevel: number;
   enrollIfNew: boolean;
   process: "uniqueness" | "facesign";
 }): Promise<{
@@ -22,7 +24,11 @@ export async function findOrEnrollInGroup({
   // Try to onboard into provided group name (deduplication)
   let results: { identifier: string; matchLevel: number }[] = [];
 
-  const searchResult = await searchForDuplicates({ userId, groupName });
+  if (process === "facesign" && minMatchLevel !== 15) {
+    throw new Error("Invalid combination of parameters, facesign allows minMatchLevel = 15 only.");
+  }
+
+  const searchResult = await searchForDuplicates({ userId, groupName, minMatchLevel });
 
   if (searchResult.success) {
     results = searchResult.results;
@@ -64,6 +70,7 @@ export async function findOrEnrollInGroup({
       userId,
       groupName,
       launchId,
+      minMatchLevel,
     });
 
     await enrollUser({ userId, groupName });
@@ -79,6 +86,7 @@ export async function findOrEnrollInGroup({
       userId,
       groupName,
       launchId,
+      minMatchLevel,
     });
 
     return { groupUserId: userId, newUser: true };
@@ -93,6 +101,7 @@ export async function findOrEnrollInGroup({
       count: results.length,
       groupName,
       launchId,
+      minMatchLevel,
     });
 
     // The audit trail will be deleted in 14 days by cron job
@@ -117,6 +126,7 @@ export async function findOrEnrollInGroup({
       count: results.length,
       groupName,
       launchId,
+      minMatchLevel,
     });
 
     return { groupUserId: resolvedUserId, newUser: false };
@@ -139,6 +149,7 @@ export async function findOrEnrollInGroup({
       count: results.length,
       groupName,
       launchId,
+      minMatchLevel,
     });
 
     return {

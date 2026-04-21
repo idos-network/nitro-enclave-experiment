@@ -92,6 +92,7 @@ describe("Uniqueness API", () => {
         process: "uniqueness",
         userId: response.body.userId,
         groupName: "test-users",
+        minMatchLevel: 15,
       }),
     );
 
@@ -103,6 +104,13 @@ describe("Uniqueness API", () => {
       storeAsFaceVector: false,
       storeAuditTrailImages: true,
       storeIdImage: false,
+    });
+
+    const search3dDb = requestCapture.getLastByEndpoint("/3d-db/search");
+    expect(search3dDb?.body).toMatchObject({
+      externalDatabaseRefID: response.body.userId,
+      groupName: "test-users",
+      minMatchLevel: 15,
     });
   });
 
@@ -143,6 +151,68 @@ describe("Uniqueness API", () => {
       launchId: expect.any(String),
       error: "Liveness check or enrollment 3D failed and was not processed.",
       didError: true,
+    });
+  });
+
+  it("new user (different group and faceMap instead of vectors, minMatchLevel = 14)", async () => {
+    server.use(
+      processRequestHandler({
+        success: true,
+        result: { livenessProven: true },
+        didError: false,
+        responseBlob: "mock-scan-result-blob",
+      }),
+      searchHandler([]),
+    );
+
+    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+
+    const response = await request(app)
+      .post("/relay/uniqueness")
+      .set(relayAuthorizationHeader())
+      .send({
+        requestBlob: "test-face-scan",
+        groupName: "test-users",
+        faceVector: false,
+        storeSelfie: true,
+        minMatchLevel: 14,
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body).toEqual({
+      didError: false,
+      userId: expect.any(String),
+      responseBlob: "mock-scan-result-blob",
+      success: true,
+      result: { livenessProven: true },
+      selfieImageId: expect.any(String),
+    });
+
+    expect(agentSpy).toHaveBeenCalledWith(
+      "group-resolution-new-user-enrolled",
+      expect.objectContaining({
+        process: "uniqueness",
+        userId: response.body.userId,
+        groupName: "test-users",
+        minMatchLevel: 14,
+      }),
+    );
+
+    // Verify FaceTec API calls
+    const processRequest = requestCapture.getLastByEndpoint("/process-request");
+    expect(processRequest?.body).toMatchObject({
+      externalDatabaseRefID: response.body.userId,
+      requestBlob: "test-face-scan",
+      storeAsFaceVector: false,
+      storeAuditTrailImages: true,
+      storeIdImage: false,
+    });
+
+    const search3dDb = requestCapture.getLastByEndpoint("/3d-db/search");
+    expect(search3dDb?.body).toMatchObject({
+      externalDatabaseRefID: response.body.userId,
+      groupName: "test-users",
+      minMatchLevel: 14,
     });
   });
 
@@ -239,13 +309,14 @@ describe("Uniqueness API", () => {
       errorMessage: "Enrollment process failed, multiple users found with the same face-vector.",
     });
 
-    expect(agentSpy).toBeCalledWith("group-resolution-ffr-rejected", {
+    expect(agentSpy).toHaveBeenCalledWith("group-resolution-ffr-rejected", {
       launchId: expect.any(String),
       process: "uniqueness",
       matchedUserIds: [resultId, resultId2],
       count: 2,
       userId: expect.any(String),
       groupName: "facesign-users",
+      minMatchLevel: 15,
     });
 
     expect(insertMemberSpy).not.toHaveBeenCalled();

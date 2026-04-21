@@ -537,6 +537,9 @@ components:
         - type: object
           required: [groupName]
           properties:
+            minMatchLevel:
+              type: number
+              default: 15
             groupName:
               type: string
 

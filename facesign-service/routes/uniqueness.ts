@@ -24,6 +24,7 @@ export default async function handler(req: Request, res: Response) {
   const {
     requestBlob,
     groupName,
+    minMatchLevel = 15,
     faceVector = true,
     onboardFaceSign = false,
     storeSelfie = false,
@@ -35,6 +36,7 @@ export default async function handler(req: Request, res: Response) {
     faceVector,
     onboardFaceSign,
     storeSelfie,
+    minMatchLevel,
   });
 
   if (faceVector && onboardFaceSign) {
@@ -43,6 +45,10 @@ export default async function handler(req: Request, res: Response) {
 
   if (!groupName) {
     throw new Error("Group name is required.");
+  }
+
+  if (minMatchLevel > 15 || minMatchLevel < 0) {
+    throw new Error("Min match level must be between 0 and 15.");
   }
 
   // First check if liveness is proven
@@ -71,6 +77,7 @@ export default async function handler(req: Request, res: Response) {
     launchId,
     process: "uniqueness",
     enrollIfNew: true,
+    minMatchLevel,
   });
 
   if (!newUser) {

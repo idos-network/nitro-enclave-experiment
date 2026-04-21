@@ -227,9 +227,11 @@ export async function match3d2dId({
 export async function searchForDuplicates({
   userId,
   groupName,
+  minMatchLevel,
 }: {
   userId: string;
   groupName: string;
+  minMatchLevel: number;
 }) {
   const response = await fetch(`${FACETEC_SERVER}3d-db/search`, {
     method: "POST",
@@ -239,7 +241,7 @@ export async function searchForDuplicates({
     body: JSON.stringify({
       externalDatabaseRefID: userId,
       groupName,
-      minMatchLevel: 15,
+      minMatchLevel,
     }),
   });
 

@@ -44,6 +44,7 @@ export async function faceSignLogin({
     launchId,
     process: "facesign",
     enrollIfNew,
+    minMatchLevel: 15,
   });
 
   // New user but not enrolled yet
