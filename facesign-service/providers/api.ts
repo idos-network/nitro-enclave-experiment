@@ -22,6 +22,7 @@ export interface Enrollment3DResponseData {
   result: {
     livenessProven: boolean;
   };
+  launchId?: string;
 }
 
 function checkSessionStartResponse(response: ProcessRequestResponse) {

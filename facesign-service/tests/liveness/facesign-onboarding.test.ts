@@ -53,6 +53,7 @@ describe("Liveness + Facesign Onboarding API", () => {
         userId: expect.any(String),
         userAttestmentToken: expect.any(String),
       },
+      launchId: expect.any(String),
       success: true,
     });
 
@@ -123,6 +124,7 @@ describe("Liveness + Facesign Onboarding API", () => {
         userId: "existing-user-id",
         userAttestmentToken: expect.any(String),
       },
+      launchId: expect.any(String),
       success: true,
     });
 

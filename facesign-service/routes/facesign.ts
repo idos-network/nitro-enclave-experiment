@@ -81,6 +81,10 @@ export const confirmation = async (req: Request, res: Response) => {
   // Check duplications (race-condition)
   const searchResult = await searchForDuplicates({ userId, groupName: FACE_SIGN_GROUP_NAME });
   if (!searchResult.success || searchResult.results.length > 0) {
+    agent.writeLog("facesign-user-already-exists", {
+      userId,
+      searchResult,
+    });
     return res.status(409).json({ errorMessage: "User already exists" });
   }
 
