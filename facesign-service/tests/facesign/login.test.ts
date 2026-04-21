@@ -201,6 +201,7 @@ describe("FaceSign/Login API", () => {
       userId: expect.any(String),
       launchId: expect.any(String),
       matchedUserIds: [resultId],
+      minMatchLevel: 15,
     });
 
     expect(db.insertMember).not.toHaveBeenCalled();
@@ -257,7 +258,7 @@ describe("FaceSign/Login API", () => {
 
     expect(db.insertMember).not.toHaveBeenCalled();
 
-    expect(agentSpy).toBeCalledWith("group-resolution-ffr-resolved", {
+    expect(agentSpy).toHaveBeenCalledWith("group-resolution-ffr-resolved", {
       count: 3,
       groupName: "pinocchio-users",
       process: "facesign",
@@ -265,6 +266,7 @@ describe("FaceSign/Login API", () => {
       userId: expect.any(String),
       launchId: expect.any(String),
       matchedUserIds: [resultId, resultId2, resultId3],
+      minMatchLevel: 15,
     });
 
     expect(oldestSpy).toHaveBeenCalledWith([resultId, resultId2, resultId3]);

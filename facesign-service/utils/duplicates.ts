@@ -1,5 +1,5 @@
 import { MongoClient } from "mongodb";
-import { GROUP_NAME, MONGO_URI } from "../env.ts";
+import { FACE_SIGN_GROUP_NAME, MONGO_URI } from "../env.ts";
 import { searchForDuplicates } from "../providers/api.ts";
 
 const client = new MongoClient(MONGO_URI, {
@@ -7,20 +7,45 @@ const client = new MongoClient(MONGO_URI, {
   wtimeoutMS: 2500,
 });
 
-async function checkDuplicates() {
+interface CheckDuplicatesOptions {
+  groupName: string;
+  minMatchLevel: number;
+}
+
+function getCheckDuplicatesOptions(): CheckDuplicatesOptions {
+  const [groupNameArg, minMatchLevelArg] = process.argv.slice(2);
+  const groupName = groupNameArg?.trim() || FACE_SIGN_GROUP_NAME;
+  const minMatchLevel = minMatchLevelArg ? Number(minMatchLevelArg) : 15;
+
+  if (!Number.isFinite(minMatchLevel)) {
+    throw new Error("`minMatchLevel` must be a valid number.");
+  }
+
+  return {
+    groupName,
+    minMatchLevel,
+  };
+}
+
+async function checkDuplicates({
+  groupName,
+  minMatchLevel,
+}: CheckDuplicatesOptions): Promise<void> {
   console.log("Checking sessions vs 3d-db duplicates...");
 
   await client.connect();
   const database = await client.db("facetec-sdk-data");
 
-  console.log("Connected to MongoDB, starting to check...");
+  console.log(
+    `Connected to MongoDB, starting to check group "${groupName}" with minMatchLevel ${minMatchLevel}...`,
+  );
 
   const cursor = database
     .collection("Session")
     .find({ success: true }, { projection: { externalDatabaseRefID: 1, _id: 0 } });
 
   let i = 0;
-  const problematicUserId = new Set();
+  const problematicUserId = new Set<string>();
 
   for await (const { externalDatabaseRefID } of cursor) {
     try {
@@ -32,7 +57,8 @@ async function checkDuplicates() {
 
       const searchResult = await searchForDuplicates({
         userId: externalDatabaseRefID,
-        groupName: GROUP_NAME,
+        groupName,
+        minMatchLevel,
       });
 
       if (searchResult.success && searchResult.results.length > 1) {
@@ -49,4 +75,7 @@ async function checkDuplicates() {
   console.log("Problematic user ids:", Array.from(problematicUserId).join(", "));
 }
 
-checkDuplicates();
+checkDuplicates(getCheckDuplicatesOptions()).catch((err) => {
+  console.error("Fatal error while checking duplicates:", err);
+  process.exit(1);
+});

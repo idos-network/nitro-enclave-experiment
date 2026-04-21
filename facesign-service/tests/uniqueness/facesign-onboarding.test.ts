@@ -64,6 +64,7 @@ describe("Uniqueness + Facesign Onboarding API", () => {
       groupName: "pinocchio-users",
       userId: response.body.userId,
       process: "facesign",
+      minMatchLevel: 15,
       launchId: expect.any(String),
     });
 
@@ -138,6 +139,7 @@ describe("Uniqueness + Facesign Onboarding API", () => {
       resolvedUserId: "existing-user-id",
       userId: response.body.userId,
       launchId: expect.any(String),
+      minMatchLevel: 15,
       count: 1,
     });
 

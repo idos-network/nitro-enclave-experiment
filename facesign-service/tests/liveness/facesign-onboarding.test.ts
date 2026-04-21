@@ -65,6 +65,7 @@ describe("Liveness + Facesign Onboarding API", () => {
       userId: response.body.userId,
       process: "facesign",
       launchId: expect.any(String),
+      minMatchLevel: 15,
     });
 
     expect(insertMemberSpy).toHaveBeenCalledWith({
@@ -138,6 +139,7 @@ describe("Liveness + Facesign Onboarding API", () => {
       userId: response.body.userId,
       launchId: expect.any(String),
       count: 1,
+      minMatchLevel: 15,
     });
 
     expect(insertMemberSpy).not.toHaveBeenCalled();
