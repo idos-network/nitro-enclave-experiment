@@ -8,7 +8,7 @@ echo "🧹 Cleaning up S3"
 aws s3 rm "s3://$S3_BUCKET/FaceTec-Server-Webservice/" --recursive --profile $AWS_PROFILE
 aws s3 rm "s3://$S3_BUCKET/FaceTec-Usage-Log-Server/" --recursive --profile $AWS_PROFILE
 
-echo "📤 Syncing FaceTec SDK to EC2 instance"
+echo "📤 Syncing FaceTec SDK to S3 bucket"
 aws s3 sync ./FaceTec-Server-Webservice/ "s3://$S3_BUCKET/FaceTec-Server-Webservice/" --acl private --profile $AWS_PROFILE
 aws s3 sync ./FaceTec-Usage-Log-Server/ "s3://$S3_BUCKET/FaceTec-Usage-Log-Server/" --acl private --profile $AWS_PROFILE
 
