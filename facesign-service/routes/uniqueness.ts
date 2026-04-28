@@ -47,8 +47,12 @@ export default async function handler(req: Request, res: Response) {
     throw new Error("Group name is required.");
   }
 
-  if (minMatchLevel > 15 || minMatchLevel < 0) {
-    throw new Error("Min match level must be between 0 and 15.");
+  if (typeof minMatchLevel !== "number" || !Number.isFinite(minMatchLevel) || !Number.isInteger(minMatchLevel)) {
+    throw new Error("minMatchLevel must be an integer.");
+  }
+
+  if (minMatchLevel > 15 || minMatchLevel < 12) {
+    throw new Error("Min match level must be between 12 and 15.");
   }
 
   // First check if liveness is proven

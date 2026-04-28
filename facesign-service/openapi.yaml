@@ -540,6 +540,8 @@ components:
             minMatchLevel:
               type: number
               default: 15
+              minimum: 12
+              maximum: 15
             groupName:
               type: string
 
