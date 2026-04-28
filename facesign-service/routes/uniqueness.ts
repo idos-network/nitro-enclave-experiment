@@ -47,7 +47,11 @@ export default async function handler(req: Request, res: Response) {
     throw new Error("Group name is required.");
   }
 
-  if (typeof minMatchLevel !== "number" || !Number.isFinite(minMatchLevel) || !Number.isInteger(minMatchLevel)) {
+  if (
+    typeof minMatchLevel !== "number" ||
+    !Number.isFinite(minMatchLevel) ||
+    !Number.isInteger(minMatchLevel)
+  ) {
     throw new Error("minMatchLevel must be an integer.");
   }
 
