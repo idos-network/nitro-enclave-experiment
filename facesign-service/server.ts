@@ -8,10 +8,12 @@ import express, {
   type Response,
   type Router,
 } from "express";
+import promBundle from "express-prom-bundle";
 import { rateLimit } from "express-rate-limit";
 import helmet from "helmet";
 import morgan from "morgan";
 import cron from "node-cron";
+
 // Configurations and providers
 import { HOST, KEY_1_MULTIBASE_PUBLIC_PATH } from "./env.ts";
 import { relayJwtAuthMiddleware } from "./middleware/relay-jwt-auth.ts";
@@ -28,6 +30,7 @@ import {
 
 // FaceSign Routes
 import { confirmation as faceSignConfirmation, login as faceSignLogin } from "./routes/facesign.ts";
+
 // idOS Relay Routes
 import liveness from "./routes/liveness.ts";
 import match from "./routes/match.ts";
@@ -46,10 +49,20 @@ const limiter = rateLimit({
   legacyHeaders: false,
   standardHeaders: false,
   ipv6Subnet: 56,
-  skip: (req) => req.url.startsWith("/relay/"), // This is called from internal network, so we don't need to rate limit it
+  skip: (req) =>
+    req.url.startsWith("/relay/") || // this has been called from internal network, so we don't need to rate limit it
+    req.url.startsWith("/health") || // this is used to check the health of the service
+    req.url.startsWith("/metrics"), // this is used to get the metrics of the service
 });
 
 app.set("trust proxy", "loopback");
+
+app.use(
+  promBundle({
+    includeMethod: true,
+  }),
+);
+
 app.use(helmet());
 app.use(cors());
 app.use((req, res, next) => {

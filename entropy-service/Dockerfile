@@ -18,6 +18,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends --no-install-su
 # Install AWS CLI v2
 RUN apt-get update && apt-get install -y \
     unzip less groff \
+    --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/awscliv2.zip" \
     && unzip /tmp/awscliv2.zip -d /tmp \
@@ -27,6 +28,7 @@ RUN apt-get update && apt-get install -y \
 # Install Caddy
 RUN apt-get update && apt-get install -y \
     debian-keyring debian-archive-keyring apt-transport-https gnupg \
+    --no-install-recommends \
     && curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg \
     && curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list \
     && chmod o+r /usr/share/keyrings/caddy-stable-archive-keyring.gpg \
@@ -42,7 +44,7 @@ RUN mkdir -p /etc/apt/keyrings \
     && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_${NODE_MAJOR}.x nodistro main" \
        > /etc/apt/sources.list.d/nodesource.list
 
-RUN apt-get update && apt-get install -y nodejs && apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y nodejs --no-install-recommends && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 RUN npm install -g pm2
 
