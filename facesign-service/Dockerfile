@@ -20,6 +20,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Download aws sdk to fetch FaceTec SDK from S3
 RUN apt-get update && apt-get install -y \
     curl unzip less groff \
+    --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/awscliv2.zip" \
     && unzip /tmp/awscliv2.zip -d /tmp \
@@ -40,7 +41,8 @@ RUN aws s3 cp s3://$FACETEC_SDK_BUCKET/FaceTec-Server-Webservice/FaceTec-Server-
 
 # Patch FaceTec server for field level encryption support
 COPY ./facetec-sdk/main.patch /tmp/main.patch
-RUN cd /home/FaceTec_Custom_Server && patch -p1 < /tmp/main.patch
+WORKDIR /home/FaceTec_Custom_Server
+RUN patch -p1 < /tmp/main.patch
 
 WORKDIR /home/FaceTec_Custom_Server/deploy
 RUN mvn -f /home/FaceTec_Custom_Server/pom.xml clean package -Plinux
@@ -71,6 +73,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends --no-install-su
 # Install AWS CLI v2
 RUN apt-get update && apt-get install -y \
     curl unzip less groff \
+    --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/awscliv2.zip" \
     && unzip /tmp/awscliv2.zip -d /tmp \
@@ -80,6 +83,7 @@ RUN apt-get update && apt-get install -y \
 # Install Caddy
 RUN apt-get update && apt-get install -y \
     debian-keyring debian-archive-keyring apt-transport-https curl gnupg \
+    --no-install-recommends \
     && curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg \
     && curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list \
     && chmod o+r /usr/share/keyrings/caddy-stable-archive-keyring.gpg \
@@ -95,7 +99,7 @@ RUN mkdir -p /etc/apt/keyrings \
     && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_${NODE_MAJOR}.x nodistro main" \
        > /etc/apt/sources.list.d/nodesource.list
 
-RUN apt-get update && apt-get install -y nodejs && apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y nodejs --no-install-recommends && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install libmongocrypt0 1.17.x for FLE (according to readme.md)
 RUN curl -s --location https://pgp.mongodb.com/libmongocrypt.asc \
@@ -104,6 +108,7 @@ RUN curl -s --location https://pgp.mongodb.com/libmongocrypt.asc \
 RUN echo "deb https://libmongocrypt.s3.amazonaws.com/apt/ubuntu jammy/libmongocrypt/1.17 universe" \
     | tee /etc/apt/sources.list.d/libmongocrypt.list
 RUN apt-get update && apt-get install -y libmongocrypt-dev \
+    --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Destination directories
@@ -132,8 +137,12 @@ RUN sed -i 's#search2D2DFacePortraitDatabaseRootDirectory: .*#search2D2DFacePort
 RUN sed -i 's#usageLogServerUri: .*#usageLogServerUri: http://localhost:3000/#' ./config.yaml
 RUN printf "#!/bin/bash\njava -cp $HOME_FACETEC_SERVER_CORE/libs/FaceTecSDK-Server-Core-$FACETEC_SDK_VERSION.jar:FaceTec-Server-Webservice.jar com.facetec.facetecserver.app.App" > ./run.ash
 
-# Add feature flags for max 5 attempts
 RUN echo "" >> ./config.yaml
+
+# Add max simultaneous requests
+RUN echo "maxSimultaneousRequests: 50" >> ./config.yaml
+
+# Add feature flags for max 5 attempts
 RUN echo "featureFlags:" >> ./config.yaml
 RUN echo "  ac_lpmft: 5a0b17ec-5121-44c4-b902-3fa24ed6156d" >> ./config.yaml
 
@@ -162,6 +171,13 @@ WORKDIR /home/deploy
 # Setup PM2
 RUN npm install -g pm2
 COPY ./facesign-service/scripts/ecosystem.config.js ./ecosystem.config.js
+
+# Setup node-metrics
+RUN curl -fsSL "https://github.com/prometheus/node_exporter/releases/download/v1.11.0/node_exporter-1.11.0.linux-amd64.tar.gz" -o "/tmp/node_exporter-1.11.0.linux-amd64.tar.gz" \
+    && tar xzf /tmp/node_exporter-1.11.0.linux-amd64.tar.gz -C /tmp \
+    && mv /tmp/node_exporter-1.11.0.linux-amd64/node_exporter /usr/local/bin/ \
+    && rm -rf /tmp/node_exporter-1.11.0.linux-amd64.tar.gz \
+    && rm -rf /tmp/node_exporter-1.11.0.linux-amd64
 
 # Support boot.ash scripts
 COPY ./facesign-service/scripts/run.ash ./

@@ -2,7 +2,47 @@ import net from "node:net";
 import checkDiskSpace from "check-disk-space";
 import os from "os-utils";
 import pm2 from "pm2";
+import { Counter } from "prom-client";
+
 import { getRemoteIp, getRequestId } from "../utils/request-context.ts";
+
+type AgentLogType =
+  | "delete-audit-trail-images-cron-job"
+  | "delete-audit-trail-images-cron-job-error"
+  | "enrollment3d-recoverable-error"
+  | "facetec-api-error"
+  | "facesign-confirmation-error-iat"
+  | "facesign-confirmation-error-validate"
+  | "facesign-login"
+  | "facesign-user-confirmed"
+  | "facesign-user-pending-confirmation"
+  | "ffr-error"
+  | "general-error"
+  | "group-resolution-bootstrap-group"
+  | "group-resolution-db-inconsistent"
+  | "group-resolution-existing-user"
+  | "group-resolution-ffr-rejected"
+  | "group-resolution-ffr-resolved"
+  | "group-resolution-new-user-deferred"
+  | "group-resolution-new-user-enrolled"
+  | "jwt-verify-error"
+  | "liveness-request"
+  | "match-3d-3d-done"
+  | "match-3d-3d-failed"
+  | "match-id-request"
+  | "match-request"
+  | "selfie-failed"
+  | "selfie-request"
+  | "session-start-response-blob"
+  | "uniqueness-request"
+  | "os"
+  | "pm2";
+
+const agentLogEventsTotal = new Counter({
+  name: "facesign_agent_log_events_total",
+  help: "Total number of agent log events by type.",
+  labelNames: ["type"] as const,
+});
 
 function pm2Stats() {
   return new Promise((resolve, reject) => {
@@ -173,7 +213,12 @@ class AgentClient {
     this.reconnectDelay = Math.min(this.reconnectDelay * 2, this.maxReconnectDelay);
   }
 
-  writeLog(type: string, data: unknown) {
+  writeLog(type: AgentLogType, data: unknown) {
+    // Skip deprecated metrics
+    if (!["os", "pm2"].includes(type)) {
+      agentLogEventsTotal.inc({ type });
+    }
+
     if (!this.client || this.client.destroyed) return;
 
     const logEntry = {
