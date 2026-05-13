@@ -173,11 +173,14 @@ RUN npm install -g pm2
 COPY ./facesign-service/scripts/ecosystem.config.js ./ecosystem.config.js
 
 # Setup node-metrics
-RUN curl -fsSL "https://github.com/prometheus/node_exporter/releases/download/v1.11.0/node_exporter-1.11.0.linux-amd64.tar.gz" -o "/tmp/node_exporter-1.11.0.linux-amd64.tar.gz" \
-    && tar xzf /tmp/node_exporter-1.11.0.linux-amd64.tar.gz -C /tmp \
-    && mv /tmp/node_exporter-1.11.0.linux-amd64/node_exporter /usr/local/bin/ \
-    && rm -rf /tmp/node_exporter-1.11.0.linux-amd64.tar.gz \
-    && rm -rf /tmp/node_exporter-1.11.0.linux-amd64
+ARG NODE_EXPORTER_VERSION=1.11.0
+ARG NODE_EXPORTER_SHA256=4f8fbd23b8380b8fb720b125fb9029de261dc5fcd68bfe81ae010c0d32f5f6c3
+RUN curl -fsSL "https://github.com/prometheus/node_exporter/releases/download/v${NODE_EXPORTER_VERSION}/node_exporter-${NODE_EXPORTER_VERSION}.linux-amd64.tar.gz" -o "/tmp/node_exporter-${NODE_EXPORTER_VERSION}.linux-amd64.tar.gz" \
+    && echo "${NODE_EXPORTER_SHA256}  /tmp/node_exporter-${NODE_EXPORTER_VERSION}.linux-amd64.tar.gz" | sha256sum -c - \
+    && tar xzf /tmp/node_exporter-${NODE_EXPORTER_VERSION}.linux-amd64.tar.gz -C /tmp \
+    && mv /tmp/node_exporter-${NODE_EXPORTER_VERSION}.linux-amd64/node_exporter /usr/local/bin/ \
+    && rm -rf /tmp/node_exporter-${NODE_EXPORTER_VERSION}.linux-amd64.tar.gz \
+    && rm -rf /tmp/node_exporter-${NODE_EXPORTER_VERSION}.linux-amd64
 
 # Support boot.ash scripts
 COPY ./facesign-service/scripts/run.ash ./
