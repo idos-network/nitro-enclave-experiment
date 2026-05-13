@@ -37,7 +37,8 @@ module.exports = {
     },
     {
       name: "node-exporter",
-      command: "node_exporter",
+      cwd: "/home/deploy",
+      script: "node_exporter",
       args: "--no-collector.kernel_hung",
       autorestart: true,
     },
