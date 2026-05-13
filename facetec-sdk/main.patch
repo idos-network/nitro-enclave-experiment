@@ -1,5 +1,5 @@
 diff --git a/pom.xml b/pom.xml
-index 0d912d2..d90136d 100644
+index 0d912d2..7eccedb 100644
 --- a/pom.xml
 +++ b/pom.xml
 @@ -21,7 +21,7 @@
@@ -11,7 +11,7 @@ index 0d912d2..d90136d 100644
          </dependency>
        </dependencies>
        <activation>
-@@ -94,13 +94,47 @@
+@@ -94,13 +94,38 @@
      <dependency>
        <groupId>org.mongodb</groupId>
        <artifactId>mongodb-driver-core</artifactId>
@@ -36,16 +36,7 @@ index 0d912d2..d90136d 100644
 +    <!-- Metrics -->
 +    <dependency>
 +      <groupId>io.micrometer</groupId>
-+      <artifactId>micrometer-bom</artifactId>
-+      <version>1.16.5</version>
-+        <type>pom</type>
-+      <scope>compile</scope>
-+    </dependency>
-+
-+    <dependency>
-+      <groupId>io.micrometer</groupId>
 +      <artifactId>micrometer-registry-prometheus</artifactId>
-+      <version>1.16.5</version>
 +    </dependency>
 +
 +    <dependency>
@@ -61,7 +52,7 @@ index 0d912d2..d90136d 100644
      </dependency>
  
      <dependency>
-@@ -114,6 +148,7 @@
+@@ -114,6 +139,7 @@
        <artifactId>eo-yaml</artifactId>
        <version>6.0.1</version>
      </dependency>
@@ -69,8 +60,22 @@ index 0d912d2..d90136d 100644
      <dependency>
        <groupId>commons-codec</groupId>
        <artifactId>commons-codec</artifactId>
+@@ -160,6 +186,13 @@
+         <artifactId>netty-codec-http2</artifactId>
+         <version>4.2.12.Final</version>
+       </dependency>
++      <dependency>
++        <groupId>io.micrometer</groupId>
++        <artifactId>micrometer-bom</artifactId>
++        <version>1.16.5</version>
++        <type>pom</type>
++        <scope>import</scope>
++      </dependency>
+     </dependencies>
+   </dependencyManagement>
+ 
 diff --git a/src/main/java/com/facetec/facetecserver/classes/FaceTecServerState.java b/src/main/java/com/facetec/facetecserver/classes/FaceTecServerState.java
-index f3268e8..3b54f64 100644
+index f3268e8..26c1706 100644
 --- a/src/main/java/com/facetec/facetecserver/classes/FaceTecServerState.java
 +++ b/src/main/java/com/facetec/facetecserver/classes/FaceTecServerState.java
 @@ -13,10 +13,20 @@ import com.google.gson.Gson;
@@ -125,11 +130,11 @@ index f3268e8..3b54f64 100644
 +        meterRegistry.gauge("server.queue.size", threadPoolExecutor, t -> t.getQueue().size());
 +
 +        server.createContext("/metrics", exchange -> {
-+            String response = meterRegistry.scrape();
++            byte[] body = meterRegistry.scrape().getBytes(java.nio.charset.StandardCharsets.UTF_8);
 +            exchange.getResponseHeaders().set("Content-Type", "text/plain; version=0.0.4; charset=utf-8");
-+            exchange.sendResponseHeaders(200, response.getBytes().length);
++            exchange.sendResponseHeaders(200, body.length);
 +            try (OutputStream os = exchange.getResponseBody()) {
-+                os.write(response.getBytes());
++                os.write(body);
 +            }
 +        });
 +
