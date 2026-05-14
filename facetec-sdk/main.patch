@@ -1,8 +1,17 @@
 diff --git a/pom.xml b/pom.xml
-index 0d912d2..e3a0185 100644
+index 0d912d2..7eccedb 100644
 --- a/pom.xml
 +++ b/pom.xml
-@@ -94,13 +94,32 @@
+@@ -21,7 +21,7 @@
+           <groupId>com.facetec.servercore</groupId>
+           <artifactId>server</artifactId>
+           <version>10.0.56</version>
+-<scope>provided</scope>
++          <scope>provided</scope>
+         </dependency>
+       </dependencies>
+       <activation>
+@@ -94,13 +94,38 @@
      <dependency>
        <groupId>org.mongodb</groupId>
        <artifactId>mongodb-driver-core</artifactId>
@@ -24,6 +33,12 @@ index 0d912d2..e3a0185 100644
 +      <version>5.2.1</version>
 +    </dependency>
 +
++    <!-- Metrics -->
++    <dependency>
++      <groupId>io.micrometer</groupId>
++      <artifactId>micrometer-registry-prometheus</artifactId>
++    </dependency>
++
 +    <dependency>
 +      <groupId>software.amazon.awssdk</groupId>
 +      <artifactId>auth</artifactId>
@@ -37,6 +52,100 @@ index 0d912d2..e3a0185 100644
      </dependency>
  
      <dependency>
+@@ -114,6 +139,7 @@
+       <artifactId>eo-yaml</artifactId>
+       <version>6.0.1</version>
+     </dependency>
++
+     <dependency>
+       <groupId>commons-codec</groupId>
+       <artifactId>commons-codec</artifactId>
+@@ -160,6 +186,13 @@
+         <artifactId>netty-codec-http2</artifactId>
+         <version>4.2.12.Final</version>
+       </dependency>
++      <dependency>
++        <groupId>io.micrometer</groupId>
++        <artifactId>micrometer-bom</artifactId>
++        <version>1.16.5</version>
++        <type>pom</type>
++        <scope>import</scope>
++      </dependency>
+     </dependencies>
+   </dependencyManagement>
+ 
+diff --git a/src/main/java/com/facetec/facetecserver/classes/FaceTecServerState.java b/src/main/java/com/facetec/facetecserver/classes/FaceTecServerState.java
+index f3268e8..26c1706 100644
+--- a/src/main/java/com/facetec/facetecserver/classes/FaceTecServerState.java
++++ b/src/main/java/com/facetec/facetecserver/classes/FaceTecServerState.java
+@@ -13,10 +13,20 @@ import com.google.gson.Gson;
+ import com.google.gson.GsonBuilder;
+ import com.sun.net.httpserver.HttpServer;
+ 
++import io.micrometer.core.instrument.binder.jvm.JvmGcMetrics;
++import io.micrometer.core.instrument.binder.jvm.JvmHeapPressureMetrics;
++import io.micrometer.core.instrument.binder.jvm.JvmMemoryMetrics;
++import io.micrometer.core.instrument.binder.system.FileDescriptorMetrics;
++import io.micrometer.core.instrument.binder.system.ProcessorMetrics;
++import io.micrometer.prometheusmetrics.PrometheusConfig;
++import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
++
+ import java.io.IOException;
++import java.io.OutputStream;
+ import java.net.InetSocketAddress;
+ import java.util.UUID;
+ import java.util.concurrent.Executors;
++import java.util.concurrent.ThreadPoolExecutor;
+ import java.util.logging.Level;
+ import java.util.logging.Logger;
+ 
+@@ -124,6 +134,16 @@ public class FaceTecServerState {
+         FaceTecLogging.header("HTTP ENDPOINTS");
+         FaceTecLogging.info("Initializing HTTP endpoints...");
+ 
++        // Create a registry
++        PrometheusMeterRegistry meterRegistry = new PrometheusMeterRegistry(PrometheusConfig.DEFAULT);
++
++        // 1. hook for JVM stats
++        new JvmGcMetrics().bindTo(meterRegistry);
++        new JvmHeapPressureMetrics().bindTo(meterRegistry);
++        new JvmMemoryMetrics().bindTo(meterRegistry);
++        new ProcessorMetrics().bindTo(meterRegistry);
++        new FileDescriptorMetrics().bindTo(meterRegistry);
++
+         // Host on custom port
+         HttpServer server = null;
+         try {
+@@ -135,10 +155,27 @@ public class FaceTecServerState {
+             System.exit(0);
+         }
+ 
++        // 3. create a custom executor so we can get metrics
++        ThreadPoolExecutor threadPoolExecutor = (ThreadPoolExecutor) Executors.newFixedThreadPool(serverConfig.maxSimultaneousRequests);
++        FaceTecLogging.info("- Web thread pool size: " + serverConfig.maxSimultaneousRequests);
++
++        // 4. bind executor metrics
++        meterRegistry.gauge("server.worker.active", threadPoolExecutor, ThreadPoolExecutor::getActiveCount);
++        meterRegistry.gauge("server.worker.pool", threadPoolExecutor, ThreadPoolExecutor::getPoolSize);
++        meterRegistry.gauge("server.queue.size", threadPoolExecutor, t -> t.getQueue().size());
++
++        server.createContext("/metrics", exchange -> {
++            byte[] body = meterRegistry.scrape().getBytes(java.nio.charset.StandardCharsets.UTF_8);
++            exchange.getResponseHeaders().set("Content-Type", "text/plain; version=0.0.4; charset=utf-8");
++            exchange.sendResponseHeaders(200, body.length);
++            try (OutputStream os = exchange.getResponseBody()) {
++                os.write(body);
++            }
++        });
++
+         FaceTecHttpApis.start(server, serverConfig);
+ 
+-        final int maxSimultaneousRequests = Math.max(1, Runtime.getRuntime().availableProcessors() / 2);
+-        server.setExecutor(Executors.newFixedThreadPool(maxSimultaneousRequests));
++        server.setExecutor(threadPoolExecutor);
+         server.start();
+     }
+ 
 diff --git a/src/main/java/com/facetec/facetecserver/database/AWSS3BasicDatabase.java b/src/main/java/com/facetec/facetecserver/database/AWSS3BasicDatabase.java
 index abdb6cf..566cb72 100644
 --- a/src/main/java/com/facetec/facetecserver/database/AWSS3BasicDatabase.java
@@ -566,11 +675,64 @@ index 8618504..a7fdc4e 100644
          // Create records out of FaceTecRequestSessionHistoryResult objects for Liveness 3D and Match 3D3D Sessions.
          if (sessionHistoryFromCancelledSession.sessionHistoryRetrievalStatus == FaceTecSessionHistoryRetrievalStatus.RETRIEVED) {
              Document mainDoc;
+diff --git a/src/main/java/com/facetec/facetecserver/helpers/ConfigParsing.java b/src/main/java/com/facetec/facetecserver/helpers/ConfigParsing.java
+index 4dcb018..3e0bb66 100644
+--- a/src/main/java/com/facetec/facetecserver/helpers/ConfigParsing.java
++++ b/src/main/java/com/facetec/facetecserver/helpers/ConfigParsing.java
+@@ -55,6 +55,7 @@ public class ConfigParsing {
+             String postgreSqlUsername = null;
+ 
+             int port;
++            int maxSimultaneousRequests;
+             String database = config.string("database");
+ 
+             if (database == null) {
+@@ -300,6 +301,22 @@ public class ConfigParsing {
+                 return null;
+             }
+ 
++            String maxSimultaneousRequestsString = config.string("maxSimultaneousRequests");
++
++            if (maxSimultaneousRequestsString == null) {
++                FaceTecLogging.error("Config must have a 'maxSimultaneousRequests' property.");
++                System.exit(0);
++                return null;
++            }
++
++            try {
++                maxSimultaneousRequests = Integer.parseInt(maxSimultaneousRequestsString);
++            }
++            catch (NumberFormatException e) {
++                FaceTecLogging.error("maxSimultaneousRequests property must parse to an int.");
++                System.exit(0);
++                return null;
++            }
+ 
+             String baseURL = config.string("serverBaseURL");
+ 
+@@ -645,7 +662,7 @@ public class ConfigParsing {
+             }
+ 
+             FaceTecLogging.info(FaceTecLoggingConstants.DONE_CHECKING_SERVER_CONFIG);
+-            ServerConfig serverConfig = new ServerConfig(database, mongodbURI, mongoDBDatabaseName, baseURL, port, shouldEnableDebugLogs, deviceKeyIdentifier, serverKey,
++            ServerConfig serverConfig = new ServerConfig(database, mongodbURI, mongoDBDatabaseName, baseURL, port, maxSimultaneousRequests, shouldEnableDebugLogs, deviceKeyIdentifier, serverKey,
+                     faceMapEncryptionKey, faceMapExportPublicKeyForReEncryption, urCodeSignaturePrivateKey, usageLogServerUri, shouldEnableSearch, search3D3DDatabaseRootDirectory,
+                     searchDatabaseExportRootDirectory, search3D3DAccessibilityDatabaseRootDirectory, search3D2DFacePortraitDatabaseRootDirectory, search3D2DKioskPOSDatabaseRootDirectory,
+                     search2D2DIDScanPhotoDatabaseRootDirectory, search2D2DProfilePicDatabaseRootDirectory, search2D2DFacePortraitDatabaseRootDirectory, bucketName, faceMapsDirectory, auditTrailImagesDirectory, ocrTemplatesRootDirectory, urcTemplatesRootDirectory, initializeForPostmanTestSuiteWithServer,
 diff --git a/src/main/java/com/facetec/facetecserver/helpers/ServerConfig.java b/src/main/java/com/facetec/facetecserver/helpers/ServerConfig.java
-index 9a0876a..4d4afce 100644
+index 9a0876a..fb55c30 100644
 --- a/src/main/java/com/facetec/facetecserver/helpers/ServerConfig.java
 +++ b/src/main/java/com/facetec/facetecserver/helpers/ServerConfig.java
-@@ -72,6 +72,9 @@ public class ServerConfig {
+@@ -15,6 +15,8 @@ public class ServerConfig {
+     public final boolean saveOriginalV9IDScans;
+     public final String serverBaseURL;
+     public final int serverPort;
++    public final int maxSimultaneousRequests;
++
+     public final boolean enableDebugLogging;
+ 
+     public final String usageLogServerUri;
+@@ -72,12 +74,16 @@ public class ServerConfig {
  
      public final FaceTecMatchLevel minimumMatchLevel3D2DMatching;
  
@@ -580,7 +742,22 @@ index 9a0876a..4d4afce 100644
      public ServerConfig(
              String database,
              String mongoDBURI,
-@@ -212,5 +215,8 @@ public class ServerConfig {
+             String mongoDBDatabaseName,
+             String serverBaseURL,
+             int serverPort,
++            int maxSimultaneousRequests,
+             boolean enableDebugLogging,
+             String deviceKeyIdentifier,
+             String serverKey,
+@@ -139,6 +145,7 @@ public class ServerConfig {
+ 
+         this.serverBaseURL = serverBaseURL;
+         this.serverPort = serverPort;
++        this.maxSimultaneousRequests = maxSimultaneousRequests;
+         this.enableDebugLogging = enableDebugLogging;
+ 
+         this.usageLogServerUri = usageLogServerUri;
+@@ -212,5 +219,8 @@ public class ServerConfig {
          ArrayList<String> officialIDPhotoQualityValidationChecksEnabledTemp = new ArrayList<>(officialIDPhotoQualityValidationChecksEnabledStringList);
          this.officialIDPhotoQualityValidationChecksEnabled = officialIDPhotoQualityValidationChecksEnabledTemp.toArray(new String[0]);
          this.shouldSaveOriginalSessionRequests = shouldSaveOriginalSessionRequests;

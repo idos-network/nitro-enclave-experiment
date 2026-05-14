@@ -17,5 +17,12 @@ module.exports = {
 			wait_ready: true,
 			autorestart: true,
 		},
+		{
+			name: "node-exporter",
+			cwd: "/usr/local/bin",
+			script: "node_exporter",
+			args: "--no-collector.kernel_hung",
+			autorestart: true,
+		},
 	],
 };

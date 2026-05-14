@@ -42,3 +42,16 @@ On pushes to `main` / `master` that change `openapi.yaml`, [FaceSign API docs (G
 Optional header: **`x-request-id`** — correlation id; omitted values are replaced with a generated UUID per request.
 
 **Relay auth:** all **`/relay/*`** routes require **`Authorization: Bearer <JWT>`**. The token must be **ES512**. Set env **`RELAY_JWT_PUBLIC_KEY`** to the **full PEM text** of the matching EC public key (not a file path). If it is unset or empty, relay routes respond with **503**.
+
+
+## DB optimization
+
+```javascript
+db.Session.createIndex(
+  { "some_dummy_field": 1, "_id": 1 }, 
+  { 
+    partialFilterExpression: { "data.auditTrailImage": { $exists: true } },
+    name: "idx_auditTrail_exists_fallback"
+  }
+)
+```

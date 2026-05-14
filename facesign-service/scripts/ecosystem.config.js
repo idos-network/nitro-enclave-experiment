@@ -35,5 +35,12 @@ module.exports = {
       wait_ready: true,
       autorestart: true,
     },
+    {
+      name: "node-exporter",
+      cwd: "/home/deploy",
+      script: "node_exporter",
+      args: "--no-collector.kernel_hung",
+      autorestart: true,
+    },
   ],
 };

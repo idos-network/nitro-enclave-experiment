@@ -2,7 +2,26 @@ import net from "node:net";
 import checkDiskSpace from "check-disk-space";
 import os from "os-utils";
 import pm2 from "pm2";
+import { Counter } from "prom-client";
 import { getRemoteIp, getRequestId } from "../utils/request-context.ts";
+
+type AgentLogType =
+	| "facesign-entropy-error-verify"
+	| "facesign-entropy-error-validate"
+	| "facesign-entropy-error-iat"
+	| "facesign-entropy-error-expired"
+	| "facesign-entropy-error-invalid"
+	| "facesign-entropy-error-missing"
+	| "facesign-entropy-created"
+	| "facesign-entropy-fetched"
+	| "os"
+	| "pm2";
+
+const agentLogEventsTotal = new Counter({
+	name: "facesign_agent_log_events_total",
+	help: "Total number of agent log events by type.",
+	labelNames: ["type"] as const,
+});
 
 function pm2Stats() {
 	return new Promise((resolve, reject) => {
@@ -176,7 +195,12 @@ class AgentClient {
 		);
 	}
 
-	writeLog(type: string, data: unknown) {
+	writeLog(type: AgentLogType, data: unknown) {
+		// Skip deprecated metrics
+		if (!["os", "pm2"].includes(type)) {
+			agentLogEventsTotal.inc({ type });
+		}
+
 		if (!this.client || this.client.destroyed) return;
 
 		const logEntry = {
