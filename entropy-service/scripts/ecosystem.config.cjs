@@ -19,7 +19,7 @@ module.exports = {
 		},
 		{
 			name: "node-exporter",
-			cwd: "/home/deploy",
+			cwd: "/usr/local/bin",
 			script: "node_exporter",
 			args: "--no-collector.kernel_hung",
 			autorestart: true,
