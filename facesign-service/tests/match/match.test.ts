@@ -49,17 +49,20 @@ describe("Match API", () => {
       responseBlob: "mock-scan-result-blob",
       result: { livenessProven: true, matchLevel: 15 },
       success: true,
+      launchId: expect.any(String),
       selfieImageId: expect.any(String),
     });
 
     expect(agentSpy).toHaveBeenCalledWith("match-request", {
       userId: "test-user-id",
       storeSelfie: true,
+      groupName: undefined,
     });
 
     expect(agentSpy).toHaveBeenCalledWith("match-3d-3d-done", {
       identifier: "test-user-id",
       matchLevel: 15,
+      launchId: expect.any(String),
       selfieImageId: expect.any(String),
     });
 
@@ -92,6 +95,7 @@ describe("Match API", () => {
     expect(response.body).toEqual({
       errorMessage: "Liveness check or enrollment 3D failed and was not processed.",
       success: false,
+      launchId: expect.any(String),
       didError: false,
       responseBlob: "invalid-result-blob",
       result: { livenessProven: false },
@@ -126,6 +130,7 @@ describe("Match API", () => {
       errorMessage: "Liveness check or enrollment 3D failed and was not processed.",
       success: false,
       didError: false,
+      launchId: expect.any(String),
       responseBlob: "invalid-result-blob",
       result: { livenessProven: true },
     });

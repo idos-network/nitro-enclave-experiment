@@ -17,8 +17,8 @@ export interface LivenessRequestData {
 }
 
 export interface LivenessResponseData extends Enrollment3DResponseData {
-  userId?: string;
   faceSign?: FaceSignLoginNew | FaceSignLoginExisting | FaceSignLoginCreated;
+  userId?: string;
   selfieImageId?: string;
 }
 
@@ -47,9 +47,10 @@ export default async function handler(req: Request, res: Response) {
     success,
     responseBlob,
     didError,
-    additionalSessionData, // This can be used for POU credentials
+    additionalSessionData,
     result,
-    userId,
+    launchId,
+    userId, // This is used to tied externalUserId with a face-map
   };
 
   // If the user is already enrolled, we will return a different

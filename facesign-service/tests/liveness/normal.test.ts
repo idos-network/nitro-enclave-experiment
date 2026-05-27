@@ -85,6 +85,7 @@ describe("Liveness API", () => {
       success: true,
       userId: expect.any(String),
       selfieImageId: expect.any(String),
+      launchId: expect.any(String),
     });
 
     // New user audit trail image ID should be the same as userId

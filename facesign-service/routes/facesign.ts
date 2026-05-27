@@ -85,6 +85,10 @@ export const confirmation = async (req: Request, res: Response) => {
     minMatchLevel: 15,
   });
   if (!searchResult.success || searchResult.results.length > 0) {
+    agent.writeLog("facesign-user-already-exists", {
+      userId,
+      searchResult,
+    });
     return res.status(409).json({ errorMessage: "User already exists" });
   }
 
