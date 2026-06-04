@@ -1,22 +1,19 @@
 import { readFileSync } from "node:fs";
 import cors from "cors";
-import express from "express";
+import express, { type Express } from "express";
 import promBundle from "express-prom-bundle";
 import { rateLimit } from "express-rate-limit";
 import helmet from "helmet";
 import jwt from "jsonwebtoken";
-import morgan from "morgan";
 import { JWT_PUBLIC_KEY } from "./env.ts";
-import agent from "./providers/agent.ts";
 import { fetchOrCreateFaceSignEntropy } from "./providers/db.ts";
-import {
-	getRequestId,
-	runWithRequestContext,
-} from "./utils/request-context.ts";
+import loggerMiddleware from "./providers/logger.ts";
+import { writeLog } from "./utils/logger-context.ts";
+import { runWithRequestContext } from "./utils/request-context.ts";
 
-morgan.token("requestId", () => getRequestId() ?? "-");
+const app: Express = express();
 
-const app = express();
+app.use(loggerMiddleware);
 
 const limiter = rateLimit({
 	windowMs: 15 * 60 * 1000, // 15 minute
@@ -46,9 +43,6 @@ app.use((req, res, next) => {
 		next,
 	);
 });
-app.use(
-	morgan(":requestId :remote-addr :method :url :status :response-time ms"),
-);
 app.use(express.json({ limit: "5mb" }));
 app.use(limiter);
 
@@ -64,7 +58,10 @@ app.post("/facesign/entropy", async (req, res) => {
 	// Validate token from body
 	const token = req.body.token;
 
+	writeLog("entropy_request");
+
 	if (!token) {
+		writeLog("entropy_error_missing_token");
 		return res.status(400).json({ error: "Token is required" });
 	}
 
@@ -77,23 +74,17 @@ app.post("/facesign/entropy", async (req, res) => {
 			iat: number;
 		};
 	} catch (error) {
-		agent.writeLog("facesign-entropy-error-verify", {
-			message: "Invalid token",
-			error,
-		});
+		writeLog("entropy_error_invalid_token", { error });
 		return res.status(400).json({ error: "Invalid token" });
 	}
 
 	if (!result.iat || !result.sub) {
-		agent.writeLog("facesign-entropy-error-validate", {
-			message: "Token missing iat or sub",
-		});
+		writeLog("entropy_error_missing_iat_or_sub");
 		return res.status(400).json({ error: "Invalid token" });
 	}
 
 	if (Date.now() / 1000 - result.iat > 1 * 60) {
-		agent.writeLog("facesign-entropy-error-iat", {
-			message: "Token is too old",
+		writeLog("entropy_error_too_old", {
 			iat: result.iat,
 			now: Date.now() / 1000,
 		});
@@ -104,10 +95,11 @@ app.post("/facesign/entropy", async (req, res) => {
 		result.sub as string,
 	);
 
-	agent.writeLog(`facesign-entropy-${insert ? "created" : "fetched"}`, {
-		userId: result.sub,
-		ip: req.ip,
-	});
+	if (insert) {
+		writeLog("entropy_created", { userId: result.sub, ip: req.ip });
+	} else {
+		writeLog("entropy_fetched", { userId: result.sub, ip: req.ip });
+	}
 
 	return res.json({ faceSignUserId: result.sub, entropy });
 });

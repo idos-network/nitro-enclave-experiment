@@ -2,7 +2,7 @@ import { generateKeyPairSync } from "node:crypto";
 import jwt from "jsonwebtoken";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
-import agent from "../providers/agent.ts";
+import * as loggerContext from "../utils/logger-context.ts";
 
 const { privateKey, publicKey } = generateKeyPairSync("ec", {
 	namedCurve: "secp521r1",
@@ -37,7 +37,6 @@ describe("FaceSign Entropy API", () => {
 	});
 
 	it("new user no entropy", async () => {
-		const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 		const entropySpy = vi
 			.spyOn(db, "fetchOrCreateFaceSignEntropy")
 			.mockResolvedValue({
@@ -56,6 +55,8 @@ describe("FaceSign Entropy API", () => {
 			},
 		);
 
+		const writeLogSpy = vi.spyOn(loggerContext, "writeLog");
+
 		const response = await request(app).post("/facesign/entropy").send({
 			token,
 		});
@@ -67,14 +68,14 @@ describe("FaceSign Entropy API", () => {
 		});
 
 		expect(entropySpy).toHaveBeenCalledWith(userId);
-		expect(agentSpy).toHaveBeenCalledWith("facesign-entropy-created", {
+		expect(writeLogSpy).toHaveBeenCalledWith("entropy_request");
+		expect(writeLogSpy).toHaveBeenCalledWith("entropy_created", {
 			userId,
-			ip: "::ffff:127.0.0.1",
+			ip: expect.any(String),
 		});
 	});
 
 	it("user with existing entropy", async () => {
-		const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
 		const entropySpy = vi
 			.spyOn(db, "fetchOrCreateFaceSignEntropy")
 			.mockResolvedValue({
@@ -93,6 +94,8 @@ describe("FaceSign Entropy API", () => {
 			},
 		);
 
+		const writeLogSpy = vi.spyOn(loggerContext, "writeLog");
+
 		const response = await request(app).post("/facesign/entropy").send({
 			token,
 		});
@@ -104,14 +107,15 @@ describe("FaceSign Entropy API", () => {
 		});
 
 		expect(entropySpy).toHaveBeenCalledWith(userId);
-		expect(agentSpy).toHaveBeenCalledWith("facesign-entropy-fetched", {
+		expect(writeLogSpy).toHaveBeenCalledWith("entropy_request");
+		expect(writeLogSpy).toHaveBeenCalledWith("entropy_fetched", {
 			userId,
-			ip: "::ffff:127.0.0.1",
+			ip: expect.any(String),
 		});
 	});
 
 	it("invalid token", async () => {
-		const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+		const writeLogSpy = vi.spyOn(loggerContext, "writeLog");
 
 		const response = await request(app).post("/facesign/entropy").send({
 			token: "invalid-token",
@@ -119,15 +123,14 @@ describe("FaceSign Entropy API", () => {
 
 		expect(response.status).toBe(400);
 		expect(response.body).toEqual({ error: "Invalid token" });
-		expect(agentSpy).toHaveBeenCalledWith("facesign-entropy-error-verify", {
+
+		expect(writeLogSpy).toHaveBeenCalledWith("entropy_request");
+		expect(writeLogSpy).toHaveBeenCalledWith("entropy_error_invalid_token", {
 			error: expect.any(Error),
-			message: "Invalid token",
 		});
 	});
 
 	it("expired token", async () => {
-		const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
-
 		const userId = crypto.randomUUID();
 		const token = jwt.sign(
 			{
@@ -140,14 +143,17 @@ describe("FaceSign Entropy API", () => {
 			},
 		);
 
+		const writeLogSpy = vi.spyOn(loggerContext, "writeLog");
+
 		const response = await request(app).post("/facesign/entropy").send({
 			token,
 		});
 
 		expect(response.status).toBe(400);
 		expect(response.body).toEqual({ error: "Token already expired" });
-		expect(agentSpy).toHaveBeenCalledWith("facesign-entropy-error-iat", {
-			message: "Token is too old",
+
+		expect(writeLogSpy).toHaveBeenCalledWith("entropy_request");
+		expect(writeLogSpy).toHaveBeenCalledWith("entropy_error_too_old", {
 			iat: expect.any(Number),
 			now: expect.any(Number),
 		});

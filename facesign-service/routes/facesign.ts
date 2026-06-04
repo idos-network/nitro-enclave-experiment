@@ -4,16 +4,16 @@ import type { Request, Response } from "express";
 import jwt from "jsonwebtoken";
 
 import { FACE_SIGN_GROUP_NAME, JWT_PRIVATE_KEY } from "../env.ts";
-import agent from "../providers/agent.ts";
 import { enrollment3d, enrollUser, searchForDuplicates } from "../providers/api.ts";
 import { insertMember } from "../providers/db.ts";
 import { faceSignLogin } from "../providers/facesign.ts";
+import { writeLog } from "../utils/logger-context.ts";
 
 // FACESIGN - Login route
 export const login = async (req: Request, res: Response) => {
   const userId: string = crypto.randomUUID();
 
-  agent.writeLog("facesign-login", { userId });
+  writeLog("facesign_login", { userId });
 
   const { requestBlob } = req.body;
 
@@ -55,12 +55,12 @@ export const confirmation = async (req: Request, res: Response) => {
     }) as { sub: string; action: string; iat: number };
   } catch (error) {
     // biome-ignore lint/suspicious/noExplicitAny: Need to access error message
-    agent.writeLog("jwt-verify-error", { error: (error as any)?.message });
+    writeLog("jwt_verify_error", { error: (error as any)?.message });
     return res.status(400).json({ errorMessage: "Invalid or expired token" });
   }
 
   if (!result.iat || !result.sub || result.action !== "confirmation") {
-    agent.writeLog("facesign-confirmation-error-validate", {
+    writeLog("facesign_confirmation_error_validate", {
       message: "Token missing iat or sub",
     });
 
@@ -68,7 +68,7 @@ export const confirmation = async (req: Request, res: Response) => {
   }
 
   if (Date.now() / 1000 - result.iat > 1 * 60) {
-    agent.writeLog("facesign-confirmation-error-iat", {
+    writeLog("facesign_confirmation_error_iat", {
       message: "Token is too old",
       iat: result.iat,
       now: Date.now() / 1000,
@@ -98,7 +98,7 @@ export const confirmation = async (req: Request, res: Response) => {
     { algorithm: "ES512" }, // Token contains "iat" which is used in entropy-service to check token age
   );
 
-  agent.writeLog("facesign-user-confirmed", {
+  writeLog("facesign_user_confirmed", {
     userId,
     ip: req.ip,
   });

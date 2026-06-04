@@ -766,6 +766,23 @@ index 9a0876a..fb55c30 100644
 +        this.fleAwsRegion = System.getenv("AWS_REGION");
      }
  }
+diff --git a/src/main/java/com/facetec/facetecserver/jsonobjects/primitives/CallMetadata.java b/src/main/java/com/facetec/facetecserver/jsonobjects/primitives/CallMetadata.java
+index 3506863..5db8396 100644
+--- a/src/main/java/com/facetec/facetecserver/jsonobjects/primitives/CallMetadata.java
++++ b/src/main/java/com/facetec/facetecserver/jsonobjects/primitives/CallMetadata.java
+@@ -19,7 +19,11 @@ public class CallMetadata {
+     public CallMetadata(String path, HttpExchange httpExchange, JSONObject requestJSON) {
+         this.path = path;
+         this.customID = RequestParsing.getValidCustomIDFromRequestOrLogError(requestJSON);
+-        this.tid = UUID.randomUUID().toString();
++        if (httpExchange.getRequestHeaders().containsKey("x-request-id")) {
++            this.tid = httpExchange.getRequestHeaders().getFirst("x-request-id");
++        } else {
++            this.tid = UUID.randomUUID().toString();
++        }
+         this.date = new Date();
+         this.requestMethod = httpExchange.getRequestMethod();
+         this.epochSecond = Instant.now().getEpochSecond();
 diff --git a/src/main/java/com/facetec/facetecserver/jsonobjects/primitives_v10/CancelledSessionDatabaseMongoRecord.java b/src/main/java/com/facetec/facetecserver/jsonobjects/primitives_v10/CancelledSessionDatabaseMongoRecord.java
 new file mode 100644
 index 0000000..c10339c

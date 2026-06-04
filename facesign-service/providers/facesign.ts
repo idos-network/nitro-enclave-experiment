@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import jwt from "jsonwebtoken";
 import { FACE_SIGN_GROUP_NAME, JWT_PRIVATE_KEY } from "../env.ts";
-import agent from "../providers/agent.ts";
+import { writeLog } from "../utils/logger-context.ts";
 import { findOrEnrollInGroup } from "./groups.ts";
 
 // FaceSign login - new user (waiting for confirmation)
@@ -55,7 +55,7 @@ export async function faceSignLogin({
       { algorithm: "ES512" }, // Token contains "iat" which is used in entropy-service to check token age
     );
 
-    agent.writeLog("facesign-user-pending-confirmation", {
+    writeLog("facesign_user_pending_confirmation", {
       userId: groupUserId,
       launchId,
     });

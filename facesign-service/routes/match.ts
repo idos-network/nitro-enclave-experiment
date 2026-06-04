@@ -1,11 +1,11 @@
 import type { Request, Response } from "express";
-import agent from "../providers/agent.ts";
 import { match3d3d } from "../providers/api.ts";
+import { writeLog } from "../utils/logger-context.ts";
 
 export default async function handler(req: Request, res: Response) {
   const { requestBlob, userId, storeSelfie = false } = req.body;
 
-  agent.writeLog("match-request", { userId, storeSelfie });
+  writeLog("match_request", { userId, storeSelfie });
 
   const { success, result, responseBlob, didError, additionalSessionData } = await match3d3d({
     userId,
@@ -25,7 +25,7 @@ export default async function handler(req: Request, res: Response) {
   if (!success || didError) {
     // Otherwise we are using FeatureFlag for max 5 attempts
     // so we should return failure status.
-    agent.writeLog("match-3d-3d-failed", { success, result, userId });
+    writeLog("match_3d_3d_failed", { success, result, userId });
 
     return res.status(400).json({
       ...alwaysToReturn,
@@ -33,7 +33,7 @@ export default async function handler(req: Request, res: Response) {
     });
   }
 
-  agent.writeLog("match-3d-3d-done", {
+  writeLog("match_3d_3d_done", {
     identifier: userId,
     matchLevel: result.matchLevel,
     selfieImageId: storeSelfie ? userId : null,

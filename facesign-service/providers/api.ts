@@ -1,4 +1,5 @@
 import { FACETEC_SERVER } from "../env.ts";
+import { getRequestId } from "../utils/request-context.ts";
 import { Enrollment3DRecoverableError, FaceTecError, SessionStartError } from "./errors.ts";
 
 export interface StatusResponse {
@@ -44,6 +45,9 @@ export async function getStatus() {
   // https://dev.facetec.com/api-guide#status
   const response = await fetch(`${FACETEC_SERVER}status`, {
     method: "GET",
+    headers: {
+      "x-request-id": getRequestId(),
+    },
   });
 
   if (!response.ok) {
@@ -108,6 +112,7 @@ export async function enrollment3d({
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      "x-request-id": getRequestId(),
     },
     body: JSON.stringify({
       externalDatabaseRefID: userId,
@@ -152,6 +157,7 @@ export async function match3d3d({
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      "x-request-id": getRequestId(),
     },
     body: JSON.stringify({
       externalDatabaseRefID: userId,
@@ -194,6 +200,7 @@ export async function match3d2dId({
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      "x-request-id": getRequestId(),
     },
     body: JSON.stringify({
       externalDatabaseRefID: userId,
@@ -237,6 +244,7 @@ export async function searchForDuplicates({
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      "x-request-id": getRequestId(),
     },
     body: JSON.stringify({
       externalDatabaseRefID: userId,
@@ -272,6 +280,7 @@ export async function enrollUser({ userId, groupName }: { userId: string; groupN
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      "x-request-id": getRequestId(),
     },
     body: JSON.stringify({
       externalDatabaseRefID: userId,

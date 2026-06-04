@@ -16,3 +16,8 @@ ignorePaths:
   - facesign-service/env.ts
   - entropy-service/env.ts
   - renovate.json
+  - facesign-service/redoc-static.html
+  - "**/scripts/logrotate.config"
+  - "**/Dockerfile"
+  - "**/pnpm-lock.yaml"
+  - "**/coverage/**"

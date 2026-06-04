@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { readFileSync } from "node:fs";
 import cors from "cors";
 import express, {
+  type Express,
   type NextFunction,
   type Request,
   type RequestHandler,
@@ -11,14 +12,13 @@ import express, {
 import promBundle from "express-prom-bundle";
 import { rateLimit } from "express-rate-limit";
 import helmet from "helmet";
-import morgan from "morgan";
 import cron from "node-cron";
 
 // Configurations and providers
 import { HOST, KEY_1_MULTIBASE_PUBLIC_PATH } from "./env.ts";
 import { relayJwtAuthMiddleware } from "./middleware/relay-jwt-auth.ts";
-import agent from "./providers/agent.ts";
 import { getStatus } from "./providers/api.ts";
+import { facetecApiErrors } from "./providers/counters.ts";
 import { deleteAuditTrailImagesOlderThan14Days } from "./providers/db.ts";
 import {
   Enrollment3DRecoverableError,
@@ -27,21 +27,20 @@ import {
   InternalServerError,
   SessionStartError,
 } from "./providers/errors.ts";
-
+import loggerMiddleware from "./providers/logger.ts";
 // FaceSign Routes
 import { confirmation as faceSignConfirmation, login as faceSignLogin } from "./routes/facesign.ts";
-
 // idOS Relay Routes
 import liveness from "./routes/liveness.ts";
 import match from "./routes/match.ts";
 import matchIdDoc from "./routes/match-id-doc.ts";
 import selfie from "./routes/selfie.ts";
 import uniqueness from "./routes/uniqueness.ts";
-import { getRequestId, runWithRequestContext } from "./utils/request-context.ts";
+import { writeLog } from "./utils/logger-context.ts";
+import { runWithRequestContext } from "./utils/request-context.ts";
 
-morgan.token("requestId", () => getRequestId() ?? "-");
-
-const app = express();
+const app: Express = express();
+app.use(loggerMiddleware);
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minute
@@ -70,7 +69,6 @@ app.use((req, res, next) => {
   res.setHeader("x-request-id", requestId);
   runWithRequestContext({ requestId, ...(req.ip !== undefined ? { remoteIp: req.ip } : {}) }, next);
 });
-app.use(morgan(":requestId :remote-addr :method :url :status :response-time ms"));
 app.use(express.json({ limit: "25mb" }));
 app.use(limiter);
 
@@ -125,7 +123,9 @@ app.get("/idos/keys/1", (_req, res) => {
 
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   if (err instanceof SessionStartError) {
-    agent.writeLog("session-start-response-blob", { launchId: err.launchId });
+    writeLog("session_start_response_blob", {
+      launchId: err.launchId,
+    });
 
     return res.status(200).json({
       responseBlob: err.responseBody,
@@ -135,7 +135,7 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   }
 
   if (err instanceof Enrollment3DRecoverableError) {
-    agent.writeLog("enrollment3d-recoverable-error", {
+    writeLog("enrollment3d_recoverable_error", {
       success: err.response.success,
       launchId: err.response.launchId,
       error: err.message,
@@ -154,7 +154,9 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   }
 
   if (err instanceof FFRError) {
-    agent.writeLog("ffr-error", { message: err.message });
+    writeLog("ffr_error", {
+      message: err.message,
+    });
 
     return res.status(409).json({
       errorMessage: err.message,
@@ -162,7 +164,9 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   }
 
   if (err instanceof FaceTecError) {
-    agent.writeLog("facetec-api-error", {
+    facetecApiErrors.inc();
+
+    writeLog("facetec_api_error", {
       methodName: err.methodName,
       response: err.response,
       others: err.others,
@@ -177,28 +181,35 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   }
 
   if (err instanceof InternalServerError) {
-    agent.writeLog("general-error", { message: err.message });
+    writeLog("general_error", {
+      message: err.message,
+      error: err,
+    });
 
     return res.status(500).json({
       errorMessage: err.message,
     });
   }
 
-  console.error(err);
-  agent.writeLog("general-error", { message: err.message, stack: err.stack });
+  writeLog("general_error", {
+    message: err.message,
+    stack: err.stack,
+    error: err,
+  });
+
   res.status(500).json({ error: "Internal server error" });
 });
 
 // Cron job to delete audit trail images older than 14 days
 cron.schedule("0 0 * * *", async () => {
-  agent.writeLog("delete-audit-trail-images-cron-job", {
+  writeLog("delete_audit_trail_images_cron_job", {
     message: "Deleting audit trail images older than 14 days",
   });
 
   try {
     await deleteAuditTrailImagesOlderThan14Days();
   } catch (error: unknown) {
-    agent.writeLog("delete-audit-trail-images-cron-job-error", {
+    writeLog("delete_audit_trail_images_cron_job_error", {
       error: error instanceof Error ? error.message : "Unknown error",
     });
   }

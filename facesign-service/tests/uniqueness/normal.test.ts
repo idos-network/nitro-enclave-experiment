@@ -3,9 +3,9 @@
 import { ObjectId } from "mongodb";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
-import agent from "../../providers/agent.ts";
 import * as db from "../../providers/db.ts";
 import app from "../../server.ts";
+import * as logs from "../../utils/logger-context.ts";
 import { relayAuthorizationHeader } from "../utils/helper.ts";
 import {
   processRequestErrorHandler,
@@ -64,7 +64,7 @@ describe("Uniqueness API", () => {
       searchHandler([]),
     );
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+    const writeLogSpy = vi.spyOn(logs, "writeLog").mockImplementation(() => {});
 
     const response = await request(app)
       .post("/relay/uniqueness")
@@ -86,8 +86,8 @@ describe("Uniqueness API", () => {
       selfieImageId: expect.any(String),
     });
 
-    expect(agentSpy).toHaveBeenCalledWith(
-      "group-resolution-new-user-enrolled",
+    expect(writeLogSpy).toHaveBeenCalledWith(
+      "group_resolution_new_user_enrolled",
       expect.objectContaining({
         process: "uniqueness",
         userId: response.body.userId,
@@ -124,7 +124,7 @@ describe("Uniqueness API", () => {
       }),
     );
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+    const writeLogSpy = vi.spyOn(logs, "writeLog").mockImplementation(() => {});
 
     const response = await request(app)
       .post("/relay/uniqueness")
@@ -143,7 +143,7 @@ describe("Uniqueness API", () => {
       result: { livenessProven: false },
     });
 
-    expect(agentSpy).toHaveBeenCalledWith("enrollment3d-recoverable-error", {
+    expect(writeLogSpy).toHaveBeenCalledWith("enrollment3d_recoverable_error", {
       success: false,
       result: {
         livenessProven: false,
@@ -165,7 +165,7 @@ describe("Uniqueness API", () => {
       searchHandler([]),
     );
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+    const writeLogSpy = vi.spyOn(logs, "writeLog").mockImplementation(() => {});
 
     const response = await request(app)
       .post("/relay/uniqueness")
@@ -188,8 +188,8 @@ describe("Uniqueness API", () => {
       selfieImageId: expect.any(String),
     });
 
-    expect(agentSpy).toHaveBeenCalledWith(
-      "group-resolution-new-user-enrolled",
+    expect(writeLogSpy).toHaveBeenCalledWith(
+      "group_resolution_new_user_enrolled",
       expect.objectContaining({
         process: "uniqueness",
         userId: response.body.userId,
@@ -234,7 +234,7 @@ describe("Uniqueness API", () => {
       insertedId: new ObjectId(),
     });
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+    const writeLogSpy = vi.spyOn(logs, "writeLog").mockImplementation(() => {});
 
     const response = await request(app)
       .post("/relay/uniqueness")
@@ -258,8 +258,8 @@ describe("Uniqueness API", () => {
     // Different audit trail image ID
     expect(response.body.selfieImageId).not.toBe(response.body.userId);
 
-    expect(agentSpy).toHaveBeenCalledWith(
-      "group-resolution-existing-user",
+    expect(writeLogSpy).toHaveBeenCalledWith(
+      "group_resolution_existing_user",
       expect.objectContaining({
         process: "uniqueness",
         resolvedUserId: resultId,
@@ -294,7 +294,7 @@ describe("Uniqueness API", () => {
       insertedId: new ObjectId(),
     });
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+    const writeLogSpy = vi.spyOn(logs, "writeLog").mockImplementation(() => {});
 
     const response = await request(app)
       .post("/relay/uniqueness")
@@ -309,7 +309,7 @@ describe("Uniqueness API", () => {
       errorMessage: "Enrollment process failed, multiple users found with the same face-vector.",
     });
 
-    expect(agentSpy).toHaveBeenCalledWith("group-resolution-ffr-rejected", {
+    expect(writeLogSpy).toHaveBeenCalledWith("group_resolution_ffr_rejected", {
       launchId: expect.any(String),
       process: "uniqueness",
       matchedUserIds: [resultId, resultId2],

@@ -332,7 +332,7 @@ paths:
                   description: JWT from `POST /facesign` when status was 200.
       responses:
         "200":
-          description: User enrolled; returns attestation token for entropy service.
+          description: User enrolled; returns attestment token for entropy service.
           content:
             application/json:
               schema:
