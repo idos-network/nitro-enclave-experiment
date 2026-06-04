@@ -1,8 +1,8 @@
 // biome-ignore-all lint/suspicious/noExplicitAny: Test files often need any
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
-import agent from "../../providers/agent.ts";
 import app from "../../server.ts";
+import * as logs from "../../utils/logger-context.ts";
 import { relayAuthorizationHeader } from "../utils/helper.ts";
 import { match3d2dIdHandler, requestCapture } from "../utils/msw-handlers.ts";
 import { server } from "../utils/msw-server.ts";
@@ -17,7 +17,7 @@ describe("Match ID document API", () => {
       }),
     );
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+    const writeLogSpy = vi.spyOn(logs, "writeLog").mockImplementation(() => {});
 
     const response = await request(app)
       .post("/relay/match-id-doc")
@@ -36,7 +36,7 @@ describe("Match ID document API", () => {
       success: true,
     });
 
-    expect(agentSpy).toHaveBeenCalledWith("match-id-request", {
+    expect(writeLogSpy).toHaveBeenCalledWith("match_id_request", {
       userId: "test-user-id",
       minMatchLevel: 7,
     });

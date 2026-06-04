@@ -28,15 +28,15 @@ if [[ "${FACETEC_SDK_BUCKET:-null}" == "null" ]]; then
 fi
 
 # Replace placeholders in Dockerfile
-sed -i "s/INSERT_FACETEC_SDK_VERSION_HERE/$FACETEC_SDK_VERSION/g" ~ec2-user/server/facesign-service/Dockerfile
-sed -i "s/INSERT_S3_SECRETS_BUCKET_HERE/$S3_SECRETS_BUCKET/g" ~ec2-user/server/facesign-service/Dockerfile
-sed -i "s/INSERT_FACETEC_SDK_BUCKET_HERE/$FACETEC_SDK_BUCKET/g" ~ec2-user/server/facesign-service/Dockerfile
+sed -i "s/INSERT_FACETEC_SDK_VERSION_HERE/$FACETEC_SDK_VERSION/g" ~ec2-user/facesign-service/Dockerfile
+sed -i "s/INSERT_S3_SECRETS_BUCKET_HERE/$S3_SECRETS_BUCKET/g" ~ec2-user/facesign-service/Dockerfile
+sed -i "s/INSERT_FACETEC_SDK_BUCKET_HERE/$FACETEC_SDK_BUCKET/g" ~ec2-user/facesign-service/Dockerfile
 
 # Build origin Docker image
 docker build \
     -t "$TARGET_DOCKER_IMAGE" \
-    -f ~ec2-user/server/facesign-service/Dockerfile \
-    ~ec2-user/server/ \
+    -f ~ec2-user/facesign-service/Dockerfile \
+    ~ec2-user/facesign-service/ \
 ;
 
 # Free up memory for build-enclave

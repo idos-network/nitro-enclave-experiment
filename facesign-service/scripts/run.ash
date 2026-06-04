@@ -134,6 +134,8 @@ fi
 echo "Decrypting JWT token private key"
 aws kms decrypt --ciphertext-blob "$(cat $JWT_TOKEN_SECRET_FILE)" --output text --query Plaintext --region eu-west-1 | base64 -d > $HOME_FACESIGN_SERVICE/jwt_token_private.pem
 
-echo "Running PM2-runtime"
+mkdir -p /tmp/vector
+
+echo "Running service with Vector"
 export HOME=/home/deploy
-pm2-runtime ecosystem.config.js
+exec vector --config /etc/vector/vector.yaml

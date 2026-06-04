@@ -1,0 +1,3 @@
+allowBuilds:
+  msw: true
+  mongodb-client-encryption: true

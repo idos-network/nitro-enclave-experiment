@@ -2,9 +2,9 @@
 import jwt from "jsonwebtoken";
 import { ObjectId } from "mongodb";
 import request from "supertest";
-import agent from "../../providers/agent.ts";
 import * as db from "../../providers/db.ts";
 import app from "../../server.ts";
+import * as logs from "../../utils/logger-context.ts";
 import { publicKey, relayAuthorizationHeader } from "../utils/helper.ts";
 import {
   processRequestHandler,
@@ -30,7 +30,7 @@ describe("Uniqueness + Facesign Onboarding API", () => {
       insertedId: new ObjectId(),
     });
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+    const writeLogSpy = vi.spyOn(logs, "writeLog").mockImplementation(() => {});
 
     const response = await request(app)
       .post("/relay/uniqueness")
@@ -60,7 +60,7 @@ describe("Uniqueness + Facesign Onboarding API", () => {
     expect(response.body.userId).toBe(response.body.faceSign.userId);
 
     // Check only faceSign stuff
-    expect(agentSpy).toHaveBeenCalledWith("group-resolution-new-user-enrolled", {
+    expect(writeLogSpy).toHaveBeenCalledWith("group_resolution_new_user_enrolled", {
       groupName: "pinocchio-users",
       userId: response.body.userId,
       process: "facesign",
@@ -102,7 +102,7 @@ describe("Uniqueness + Facesign Onboarding API", () => {
       insertedId: new ObjectId(),
     });
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+    const writeLogSpy = vi.spyOn(logs, "writeLog").mockImplementation(() => {});
 
     const response = await request(app)
       .post("/relay/uniqueness")
@@ -132,7 +132,7 @@ describe("Uniqueness + Facesign Onboarding API", () => {
     expect(response.body.userId).not.toBe(response.body.faceSign.userId);
 
     // Check only faceSign stuff
-    expect(agentSpy).toHaveBeenCalledWith("group-resolution-existing-user", {
+    expect(writeLogSpy).toHaveBeenCalledWith("group_resolution_existing_user", {
       matchedUserIds: ["existing-user-id"],
       groupName: "pinocchio-users",
       process: "facesign",

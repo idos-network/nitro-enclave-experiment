@@ -1,10 +1,10 @@
 import crypto from "node:crypto";
 import type { Request, Response } from "express";
-import agent from "../providers/agent.ts";
 import { enrollment3d } from "../providers/api.ts";
 import { InternalServerError } from "../providers/errors.ts";
 import { faceSignLogin } from "../providers/facesign.ts";
 import { findOrEnrollInGroup } from "../providers/groups.ts";
+import { writeLog } from "../utils/logger-context.ts";
 import type { LivenessRequestData, LivenessResponseData } from "./liveness.ts";
 
 export interface UniquenessRequestData extends LivenessRequestData {
@@ -18,7 +18,7 @@ export default async function handler(req: Request, res: Response) {
   const userId: string = crypto.randomUUID();
 
   // Audit trail image will be stored in the current enrollment
-  // we can't use userId because it can change during the dedup process.
+  // we can't use userId because it can change during the deduplication process.
   const selfieImageId = userId;
 
   const {
@@ -30,7 +30,7 @@ export default async function handler(req: Request, res: Response) {
     storeSelfie = false,
   } = req.body;
 
-  agent.writeLog("uniqueness-request", {
+  writeLog("uniqueness_request", {
     userId,
     groupName,
     faceVector,

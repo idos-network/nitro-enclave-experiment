@@ -1,9 +1,9 @@
 // biome-ignore-all lint/suspicious/noExplicitAny: Test files often need any
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
-import agent from "../../providers/agent.ts";
 import * as db from "../../providers/db.ts";
 import app from "../../server.ts";
+import * as logs from "../../utils/logger-context.ts";
 import { relayAuthorizationHeader } from "../utils/helper.ts";
 
 function binaryParser(res: any, callback: any) {
@@ -26,7 +26,7 @@ describe("Selfie API", () => {
   it("returns selfie image", async () => {
     const imageBuffer = Buffer.from("test-image-data");
     const getAuditTrailImageSpy = vi.spyOn(db, "getAuditTrailImage").mockResolvedValue(imageBuffer);
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+    const writeLogSpy = vi.spyOn(logs, "writeLog").mockImplementation(() => {});
 
     const response = await request(app)
       .get("/relay/selfie/test-external-id")
@@ -40,14 +40,14 @@ describe("Selfie API", () => {
     expect(response.body.equals(imageBuffer)).toBe(true);
 
     expect(getAuditTrailImageSpy).toHaveBeenCalledWith("test-external-id");
-    expect(agentSpy).toHaveBeenCalledWith("selfie-request", {
+    expect(writeLogSpy).toHaveBeenCalledWith("selfie_request", {
       selfieId: "test-external-id",
     });
   });
 
   it("returns 400 when audit trail image is missing", async () => {
     const getAuditTrailImageSpy = vi.spyOn(db, "getAuditTrailImage").mockResolvedValue(null);
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+    const writeLogSpy = vi.spyOn(logs, "writeLog").mockImplementation(() => {});
 
     const response = await request(app)
       .get("/relay/selfie/test-external-id")
@@ -59,7 +59,7 @@ describe("Selfie API", () => {
     });
 
     expect(getAuditTrailImageSpy).toHaveBeenCalledWith("test-external-id");
-    expect(agentSpy).toHaveBeenCalledWith("selfie-failed", {
+    expect(writeLogSpy).toHaveBeenCalledWith("selfie_failed", {
       selfieId: "test-external-id",
       error: "No selfie image found for test-external-id",
     });

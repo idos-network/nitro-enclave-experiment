@@ -1,8 +1,8 @@
 // biome-ignore-all lint/suspicious/noExplicitAny: Test files often need any
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
-import agent from "../../providers/agent.ts";
 import app from "../../server.ts";
+import * as logs from "../../utils/logger-context.ts";
 import { relayAuthorizationHeader } from "../utils/helper.ts";
 import {
   processRequestErrorHandler,
@@ -35,7 +35,7 @@ describe("Match API", () => {
       }),
     );
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+    const writeLogSpy = vi.spyOn(logs, "writeLog").mockImplementation(() => {});
 
     const response = await request(app).post("/relay/match").set(relayAuthorizationHeader()).send({
       requestBlob: "test-face-scan",
@@ -52,12 +52,12 @@ describe("Match API", () => {
       selfieImageId: expect.any(String),
     });
 
-    expect(agentSpy).toHaveBeenCalledWith("match-request", {
+    expect(writeLogSpy).toHaveBeenCalledWith("match_request", {
       userId: "test-user-id",
       storeSelfie: true,
     });
 
-    expect(agentSpy).toHaveBeenCalledWith("match-3d-3d-done", {
+    expect(writeLogSpy).toHaveBeenCalledWith("match_3d_3d_done", {
       identifier: "test-user-id",
       matchLevel: 15,
       selfieImageId: expect.any(String),
@@ -81,7 +81,7 @@ describe("Match API", () => {
       }),
     );
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+    const writeLogSpy = vi.spyOn(logs, "writeLog").mockImplementation(() => {});
 
     const response = await request(app).post("/relay/match").set(relayAuthorizationHeader()).send({
       requestBlob: "test-face-scan",
@@ -97,7 +97,7 @@ describe("Match API", () => {
       result: { livenessProven: false },
     });
 
-    expect(agentSpy).toHaveBeenCalledWith("match-3d-3d-failed", {
+    expect(writeLogSpy).toHaveBeenCalledWith("match_3d_3d_failed", {
       success: false,
       userId: "test-user-id",
       result: { livenessProven: false },
@@ -114,7 +114,7 @@ describe("Match API", () => {
       }),
     );
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+    const writeLogSpy = vi.spyOn(logs, "writeLog").mockImplementation(() => {});
 
     const response = await request(app).post("/relay/match").set(relayAuthorizationHeader()).send({
       requestBlob: "test-face-scan",
@@ -130,7 +130,7 @@ describe("Match API", () => {
       result: { livenessProven: true },
     });
 
-    expect(agentSpy).toHaveBeenCalledWith("match-3d-3d-failed", {
+    expect(writeLogSpy).toHaveBeenCalledWith("match_3d_3d_failed", {
       success: false,
       userId: "test-user-id",
       result: { livenessProven: true },
@@ -140,7 +140,7 @@ describe("Match API", () => {
   it("match error", async () => {
     server.use(processRequestErrorHandler(500, "Some unexpected error"));
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+    const writeLogSpy = vi.spyOn(logs, "writeLog").mockImplementation(() => {});
 
     const response = await request(app).post("/relay/match").set(relayAuthorizationHeader()).send({
       requestBlob: "test-face-scan",
@@ -155,7 +155,7 @@ describe("Match API", () => {
       success: false,
     });
 
-    expect(agentSpy).toHaveBeenCalledWith("facetec-api-error", {
+    expect(writeLogSpy).toHaveBeenCalledWith("facetec_api_error", {
       methodName: "match3d3d",
       others: {
         userId: "test-user-id",

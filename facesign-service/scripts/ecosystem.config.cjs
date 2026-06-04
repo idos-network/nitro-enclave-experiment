@@ -5,19 +5,23 @@ module.exports = {
       cwd: `${process.env.HOME_FACETEC_USAGE_LOGS}/`,
       script: "index.js",
       args: "start",
-      log_file: "/home/FaceTec_Usage_Logs_Server/logs.txt",
-      time: true, // Add timestamps to logs
-      wait_ready: true, // Wait for "ready" signal before considering
-      listen_timeout: 15000, // Wait 15 seconds for "ready" signal
-      min_uptime: 15000, // Server must run for 30 seconds for restart to occur
-      max_restarts: 0, // Don't restart if app doesn't run for 'min_uptime'
-      maxRestarts: 0, // Dupe of 'max_restarts' that works around a PM2 bug
+      time: true,
+      wait_ready: true,
+      listen_timeout: 15000,
+      min_uptime: 15000,
+      max_restarts: 0,
+      maxRestarts: 0,
+      merge_logs: true,
+      log_type: "json",
     },
     {
       name: "FaceSign-service",
       cwd: `${process.env.HOME_FACESIGN_SERVICE}/`,
       script: "npm",
       args: "start",
+      merge_logs: true,
+      log_type: "json",
+      autorestart: true,
     },
     {
       name: "FaceTec_Custom_Server",
@@ -26,6 +30,8 @@ module.exports = {
       args: "-c 'sleep 5 && bash run.ash'",
       wait_ready: true,
       autorestart: true,
+      merge_logs: true,
+      log_type: "json",
     },
     {
       name: "Caddy",
@@ -34,13 +40,17 @@ module.exports = {
       args: "run --config /home/deploy/Caddyfile --adapter caddyfile",
       wait_ready: true,
       autorestart: true,
+      merge_logs: true,
+      log_type: "json",
     },
     {
       name: "node-exporter",
-      cwd: "/home/deploy",
+      cwd: "/usr/local/bin",
       script: "node_exporter",
       args: "--no-collector.kernel_hung",
       autorestart: true,
+      merge_logs: true,
+      log_type: "json",
     },
   ],
 };

@@ -1,6 +1,5 @@
 import crypto from "node:crypto";
 import type { Request, Response } from "express";
-import agent from "../providers/agent.ts";
 import { type Enrollment3DResponseData, enrollment3d } from "../providers/api.ts";
 import {
   type FaceSignLoginCreated,
@@ -8,6 +7,7 @@ import {
   type FaceSignLoginNew,
   faceSignLogin,
 } from "../providers/facesign.ts";
+import { writeLog } from "../utils/logger-context.ts";
 
 export interface LivenessRequestData {
   requestBlob: string;
@@ -27,7 +27,7 @@ export default async function handler(req: Request, res: Response) {
 
   const { requestBlob, faceVector = true, onboardFaceSign = false, storeSelfie = false } = req.body;
 
-  agent.writeLog("liveness-request", {
+  writeLog("liveness_request", {
     userId,
     faceVector,
     onboardFaceSign,

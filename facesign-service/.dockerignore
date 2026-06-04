@@ -1,7 +1,10 @@
-node_modules/
-Dockerfile
-tsconfig.json
-vitest.config.ts
-scripts/
-biome.jsonc
-*.env
+node_modules
+npm-debug.log
+.git
+.gitignore
+README.md
+.env
+*.md
+tests/
+coverage/
+.github/

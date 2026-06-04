@@ -1,5 +1,10 @@
+# Copy Vector from a pinned image.
+FROM timberio/vector@sha256:32fd554fdd6dc3c17b5ec8e983e9889f37b0c87fa3c8cc28aa318d69cf34d392 AS vector
+
 # ---------- Build stage ----------
-FROM ubuntu:latest AS builder
+FROM ubuntu:24.04@sha256:786a8b558f7be160c6c8c4a54f9a57274f3b4fb1491cf65146521ae77ff1dc54 AS builder
+
+ENV DEBIAN_FRONTEND=noninteractive
 
 ENV FACETEC_SDK_VERSION="INSERT_FACETEC_SDK_VERSION_HERE"
 ENV FACETEC_SDK_BUCKET="INSERT_FACETEC_SDK_BUCKET_HERE"
@@ -9,23 +14,26 @@ ARG FACETEC_S3_CUSTOM=s3://$FACETEC_SDK_BUCKET/FaceTec-Server-Webservice/FaceTec
 ARG FACETEC_S3_USAGE_LOGS=s3://$FACETEC_SDK_BUCKET/FaceTec-Usage-Log-Server
 
 # Install build dependencies (Java + Maven + Node.js + libs)
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get install -y --no-install-recommends --no-install-suggests \
+    curl \
     default-jdk \
     libgomp1 \
+    libavcodec-dev \
+    libavutil-dev \
     maven \
     patch \
-    libavcodec-dev libavutil-dev \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
 
 # Download aws sdk to fetch FaceTec SDK from S3
-RUN apt-get update && apt-get install -y \
-    curl unzip less groff \
-    --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/* \
+RUN apt-get update && apt-get install -y --no-install-recommends --no-install-suggests \
+    unzip \
     && curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/awscliv2.zip" \
     && unzip /tmp/awscliv2.zip -d /tmp \
     && /tmp/aws/install \
-    && rm -rf /tmp/aws /tmp/awscliv2.zip
+    && rm -rf /tmp/aws /tmp/awscliv2.zip \
+    && apt-get purge -y --auto-remove unzip \
+    && apt-get clean \
+    && rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
     
 # Copy FaceTec Server Core and Webservice into the image.
 RUN aws s3 sync s3://$FACETEC_SDK_BUCKET/FaceTec-Server-Webservice/FaceTecSDK-Server-Core-$FACETEC_SDK_VERSION/libs /home/FaceTec_Server_Core/libs
@@ -40,7 +48,7 @@ RUN aws s3 cp s3://$FACETEC_SDK_BUCKET/FaceTec-Server-Webservice/FaceTec-Server-
 RUN aws s3 cp s3://$FACETEC_SDK_BUCKET/FaceTec-Server-Webservice/FaceTec-Server-Webservice-$FACETEC_SDK_VERSION/config.yaml /home/FaceTec_Custom_Server/deploy/config.yaml
 
 # Patch FaceTec server for field level encryption support
-COPY ./facetec-sdk/main.patch /tmp/main.patch
+COPY ./scripts/main.patch /tmp/main.patch
 WORKDIR /home/FaceTec_Custom_Server
 RUN patch -p1 < /tmp/main.patch
 
@@ -48,68 +56,94 @@ WORKDIR /home/FaceTec_Custom_Server/deploy
 RUN mvn -f /home/FaceTec_Custom_Server/pom.xml clean package -Plinux
 
 # ---------- Final stage ----------
-FROM ubuntu:latest
+FROM ubuntu:24.04@sha256:786a8b558f7be160c6c8c4a54f9a57274f3b4fb1491cf65146521ae77ff1dc54
+
+ENV DEBIAN_FRONTEND=noninteractive
 
 ENV FACETEC_SDK_VERSION="INSERT_FACETEC_SDK_VERSION_HERE"
 ENV FACETEC_SDK_BUCKET="INSERT_FACETEC_SDK_BUCKET_HERE"
 
 # Install dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends --no-install-suggests \
+    ca-certificates \
+    cryptsetup \
     curl \
     default-jdk \
     iproute2 \
-    libgomp1 \
-    net-tools \
     iptables \
-    openssh-server \
-    socat \
+    jq \
+    libgomp1 \
     libnbd-bin \
     nbd-client \
-    cryptsetup \
-    vim \
-    jq \
-&& rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
+    net-tools \
+    openssh-server \
+    socat \
+    && update-ca-certificates \
+    && rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
 
 # Install AWS CLI v2
-RUN apt-get update && apt-get install -y \
-    curl unzip less groff \
-    --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/* \
+RUN apt-get update && apt-get install -y --no-install-recommends --no-install-suggests \
+    unzip \
     && curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/awscliv2.zip" \
     && unzip /tmp/awscliv2.zip -d /tmp \
     && /tmp/aws/install \
-    && rm -rf /tmp/aws /tmp/awscliv2.zip
+    && rm -rf /tmp/aws /tmp/awscliv2.zip \
+    && apt-get purge -y --auto-remove unzip \
+    && apt-get clean \
+    && rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
 
 # Install Caddy
-RUN apt-get update && apt-get install -y \
-    debian-keyring debian-archive-keyring apt-transport-https curl gnupg \
-    --no-install-recommends \
-    && curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg \
-    && curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list \
+RUN apt-get update && apt-get install -y --no-install-recommends --no-install-suggests \
+    apt-transport-https \
+    debian-archive-keyring \
+    debian-keyring \
+    gnupg \
+    && curl -1sLf "https://dl.cloudsmith.io/public/caddy/stable/gpg.key" | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg \
+    && curl -1sLf "https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt" -o /etc/apt/sources.list.d/caddy-stable.list \
     && chmod o+r /usr/share/keyrings/caddy-stable-archive-keyring.gpg \
     && chmod o+r /etc/apt/sources.list.d/caddy-stable.list \
     && apt-get update \
-    && apt-get install -y caddy \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get install -y --no-install-recommends --no-install-suggests caddy \
+    && apt-get purge -y --auto-remove \
+       apt-transport-https \
+       debian-archive-keyring \
+       debian-keyring \
+       gnupg \
+    && apt-get clean \
+    && rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
 
 # Install nodejs 24.x
-RUN mkdir -p /etc/apt/keyrings \
+RUN apt-get update && apt-get install -y --no-install-recommends --no-install-suggests \
+    gnupg \
+    && mkdir -p /etc/apt/keyrings \
     && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
     && NODE_MAJOR=24 \
     && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_${NODE_MAJOR}.x nodistro main" \
-       > /etc/apt/sources.list.d/nodesource.list
+       > /etc/apt/sources.list.d/nodesource.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends --no-install-suggests nodejs \
+    && apt-get purge -y --auto-remove \
+       gnupg \
+    && apt-get clean \
+    && rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
 
-RUN apt-get update && apt-get install -y nodejs --no-install-recommends && apt-get clean && rm -rf /var/lib/apt/lists/*
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable
 
 # Install libmongocrypt0 1.17.x for FLE (according to readme.md)
-RUN curl -s --location https://pgp.mongodb.com/libmongocrypt.asc \
-    | gpg --dearmor \
-    >/etc/apt/trusted.gpg.d/libmongocrypt.gpg
-RUN echo "deb https://libmongocrypt.s3.amazonaws.com/apt/ubuntu jammy/libmongocrypt/1.17 universe" \
-    | tee /etc/apt/sources.list.d/libmongocrypt.list
-RUN apt-get update && apt-get install -y libmongocrypt-dev \
-    --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends --no-install-suggests \
+    gnupg \
+    && curl -s --location https://pgp.mongodb.com/libmongocrypt.asc \
+      | gpg --dearmor \
+      > /etc/apt/trusted.gpg.d/libmongocrypt.gpg \
+    && echo "deb https://libmongocrypt.s3.amazonaws.com/apt/ubuntu jammy/libmongocrypt/1.17 universe" \
+      > /etc/apt/sources.list.d/libmongocrypt.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends --no-install-suggests libmongocrypt-dev \
+    && apt-get purge -y --auto-remove gnupg \
+    && apt-get clean \
+    && rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
 
 # Destination directories
 ENV HOME_FACETEC_CUSTOM_SERVER=/home/FaceTec_Custom_Server
@@ -162,15 +196,15 @@ RUN sed -i 's#usageLogsDirectory: ""#usageLogsDirectory: "/mnt/encrypted/usage-l
 
 # Setup FaceSign Service
 WORKDIR $HOME_FACESIGN_SERVICE
-COPY ./facesign-service/ .
-RUN npm install
+COPY . .
+RUN pnpm install --prod --frozen-lockfile
 
 # Download or copy all required secrets and setup environment
 WORKDIR /home/deploy
 
 # Setup PM2
-RUN npm install -g pm2
-COPY ./facesign-service/scripts/ecosystem.config.js ./ecosystem.config.js
+RUN npm install -g pm2@7.0.1
+COPY ./scripts/ecosystem.config.cjs ./ecosystem.config.cjs
 
 # Setup node-metrics
 ARG NODE_EXPORTER_VERSION=1.11.0
@@ -183,9 +217,15 @@ RUN curl -fsSL "https://github.com/prometheus/node_exporter/releases/download/v$
     && rm -rf /tmp/node_exporter-${NODE_EXPORTER_VERSION}.linux-amd64
 
 # Support boot.ash scripts
-COPY ./facesign-service/scripts/run.ash ./
-COPY ./facesign-service/scripts/shared ./shared/
+COPY ./scripts/run.ash ./
+COPY ./scripts/shared ./shared/
 
+# Copy vector binary & config
+COPY --from=vector /usr/local/bin/vector /usr/bin/vector
+COPY ./scripts/vector.yaml /etc/vector/vector.yaml
+
+# S3 buckets contains configurations and aws keys arn
+# This will be replaced during the CI/CD process from secrets
 ENV S3_SECRETS_BUCKET="INSERT_S3_SECRETS_BUCKET_HERE"
 
 EXPOSE 8080

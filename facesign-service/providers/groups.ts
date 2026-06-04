@@ -1,4 +1,4 @@
-import agent from "./agent.ts";
+import { writeLog } from "../utils/logger-context.ts";
 import { enrollUser, searchForDuplicates } from "./api.ts";
 import { countMembersInGroup, getOldestFaceSignUserId, insertMember } from "./db.ts";
 import { FFRError, InternalServerError } from "./errors.ts";
@@ -39,7 +39,7 @@ export async function findOrEnrollInGroup({
     // Check if group exists in DB, if yes, we have a problem (most likely recovery from corrupted FS)
     const memberCount = await countMembersInGroup(groupName);
     if (memberCount > 0) {
-      agent.writeLog("group-resolution-db-inconsistent", {
+      writeLog("group_resolution_db_inconsistent", {
         process,
         userId,
         groupName,
@@ -50,7 +50,7 @@ export async function findOrEnrollInGroup({
       );
     }
 
-    agent.writeLog("group-resolution-bootstrap-group", {
+    writeLog("group_resolution_bootstrap_group", {
       process,
       userId,
       groupName,
@@ -65,7 +65,7 @@ export async function findOrEnrollInGroup({
 
   if (newUser && enrollIfNew) {
     // Brand new user, let's enroll in 3d-db#users
-    agent.writeLog("group-resolution-new-user-enrolled", {
+    writeLog("group_resolution_new_user_enrolled", {
       process,
       userId,
       groupName,
@@ -81,7 +81,7 @@ export async function findOrEnrollInGroup({
 
   if (newUser && !enrollIfNew) {
     // Brand new user, but we don't want to enroll it
-    agent.writeLog("group-resolution-new-user-deferred", {
+    writeLog("group_resolution_new_user_deferred", {
       process,
       userId,
       groupName,
@@ -94,7 +94,7 @@ export async function findOrEnrollInGroup({
 
   if (results.length > 1 && process === "uniqueness") {
     // FFRs are not allowed in uniqueness process
-    agent.writeLog("group-resolution-ffr-rejected", {
+    writeLog("group_resolution_ffr_rejected", {
       process,
       userId,
       matchedUserIds: results.map((x) => x.identifier),
@@ -118,7 +118,7 @@ export async function findOrEnrollInGroup({
 
     const resolvedUserId = await getOldestFaceSignUserId(matchedUserIds);
 
-    agent.writeLog("group-resolution-ffr-resolved", {
+    writeLog("group_resolution_ffr_resolved", {
       process,
       userId,
       resolvedUserId,
@@ -141,7 +141,7 @@ export async function findOrEnrollInGroup({
       );
     }
 
-    agent.writeLog("group-resolution-existing-user", {
+    writeLog("group_resolution_existing_user", {
       process,
       userId,
       resolvedUserId,

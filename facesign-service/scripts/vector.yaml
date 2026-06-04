@@ -1,0 +1,191 @@
+data_dir: /tmp/vector
+
+sources:
+  pm2_app:
+    type: exec
+    command: ["pm2-runtime", "ecosystem.config.cjs"]
+    mode: streaming
+    decoding:
+      codec: json
+
+  express_metrics:
+    type: prometheus_scrape
+    endpoints:
+      - http://127.0.0.1:7000/metrics
+    scrape_interval_secs: 15
+
+  caddy_metrics:
+    type: prometheus_scrape
+    endpoints:
+      - https://127.0.0.1:9000/metrics
+    scrape_interval_secs: 15
+
+  node_metrics:
+    type: prometheus_scrape
+    endpoints:
+      - http://127.0.0.1:9100/metrics
+    scrape_interval_secs: 15
+
+  java_metrics:
+    type: prometheus_scrape
+    endpoints:
+      - http://127.0.0.1:5000/metrics
+    scrape_interval_secs: 15
+
+transforms:
+  logs:
+    type: remap
+    inputs:
+      - pm2_app
+    source: |
+      pm2_app_name = .app_name
+      component = pm2_app_name
+
+      if pm2_app_name == "FaceSign-service" {
+        component = "express"
+      } else if pm2_app_name == "FaceTec_Custom_Server" {
+        component = "java"
+      } else if pm2_app_name == "node-exporter" {
+        component = "node"
+      } else if pm2_app_name == "Caddy" {
+        component = "caddy"
+      } else if pm2_app_name == "ULS" {
+        component = "uls"
+      }
+
+      .application = "facesign"
+      .environment = get_env_var("OTEL_ENVIRONMENT") ?? "unknown"
+      .component = component
+
+      parsed, err = parse_json(.message)
+      if err == null && is_object(parsed) {
+        . = merge!(., parsed)
+        .application = "facesign"
+        .environment = get_env_var("OTEL_ENVIRONMENT") ?? "unknown"
+        .component = component
+        del(.message)
+      } else if .component == "java" {
+        # FaceTec Server Webservice Debug:  Thu Jun 04 10:16:48 UTC 2026 - GET - /status - <uuid> - Request started.
+        ft, ft_err = parse_regex(.message, r'^FaceTec Server Webservice (?P<level>[A-Za-z]+):\s+(?P<timestamp>[A-Za-z]{3} [A-Za-z]{3} \d{2} \d{2}:\d{2}:\d{2} [A-Z]+ \d{4}) - (?P<http_method>[A-Z]+) - (?P<http_path>[^ ]+) - (?P<request_id>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}) - (?P<detail>.*)$')
+        if ft_err == null {
+          .log_kind = "facetec_webservice"
+          .log_level = downcase(ft.level) ?? ft.level
+          .http_method = ft.http_method
+          .http_path = ft.http_path
+          .request_id = ft.request_id
+          .detail = ft.detail
+
+          ts, ts_err = parse_timestamp(ft.timestamp, format: "%a %b %d %H:%M:%S %Z %Y", timezone: "UTC")
+          if ts_err == null {
+            .timestamp = ts
+          } else {
+            .timestamp_raw = ft.timestamp
+          }
+
+          tt, tt_err = parse_regex(ft.detail, r'^Total Time: (?P<total_time_ms>\d+)$')
+          if tt_err == null {
+            .total_time_ms = to_int(tt.total_time_ms) ?? tt.total_time_ms
+            .detail = "request_completed"
+          } else if ft.detail == "Request started." {
+            .detail = "request_started"
+          }
+
+          del(.message)
+        }
+      } else if err != null {
+        .parse_error = "Failed to parse PM2 message as JSON"
+        .original_message = .message
+      }
+
+      if !exists(.component) {
+        .component = "unknown"
+      }
+
+  express_metric_labels:
+    type: remap
+    inputs:
+      - express_metrics
+    source: |
+      .tags.component = "express"
+
+  caddy_metric_labels:
+    type: remap
+    inputs:
+      - caddy_metrics
+    source: |
+      .tags.component = "caddy"
+
+  node_metric_labels:
+    type: remap
+    inputs:
+      - node_metrics
+    source: |
+      .tags.component = "node"
+
+  java_metric_labels:
+    type: remap
+    inputs:
+      - java_metrics
+    source: |
+      .tags.component = "java"
+
+  global_labels:
+    type: remap
+    inputs:
+      - express_metric_labels
+      - caddy_metric_labels
+      - node_metric_labels
+      - java_metric_labels
+    source: |
+      .tags.application = "facesign"
+      .tags.environment = get_env_var("OTEL_ENVIRONMENT") ?? "unknown"
+      .tags.job = "facesign-vector-push"
+
+  metrics_cardinality:
+    type: tag_cardinality_limit
+    inputs:
+      - global_labels
+    mode: exact
+
+sinks:
+  prometheus:
+    # Read this why we are using tag_cardinality_limits
+    # https://vector.dev/docs/reference/configuration/sinks/prometheus_remote_write/
+    type: prometheus_remote_write
+    inputs:
+      - metrics_cardinality
+    endpoint: "${OTEL_BASE_URL}/api/v1/write"
+    healthcheck:
+      # Our Victoria Metrics now did not expose health endpoint
+      enabled: false
+    auth:
+      strategy: basic
+      user: "${OTEL_USER}"
+      password: "${OTEL_PASSWORD}"
+
+  loki:
+    type: loki
+    inputs:
+      - logs
+    endpoint: "${OTEL_BASE_URL}"
+    healthcheck:
+      # Our loki now did not expose health endpoint
+      enabled: false
+    auth:
+      strategy: basic
+      user: "${OTEL_USER}"
+      password: "${OTEL_PASSWORD}"
+    encoding:
+      codec: json
+    labels:
+      application: "{{ application }}"
+      component: "{{ component }}"
+      environment: "{{ environment }}"
+
+  console:
+    type: console
+    inputs:
+      - logs
+    target: stdout
+    encoding:
+      codec: json

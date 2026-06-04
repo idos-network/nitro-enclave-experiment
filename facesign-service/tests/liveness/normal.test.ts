@@ -3,9 +3,9 @@
 import { ObjectId } from "mongodb";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
-import agent from "../../providers/agent.ts";
 import * as db from "../../providers/db.ts";
 import app from "../../server.ts";
+import * as logs from "../../utils/logger-context.ts";
 import { relayAuthorizationHeader } from "../utils/helper.ts";
 import {
   processRequestErrorHandler,
@@ -67,7 +67,7 @@ describe("Liveness API", () => {
       insertedId: new ObjectId(),
     });
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+    const writeLogSpy = vi.spyOn(logs, "writeLog").mockImplementation(() => {});
 
     const response = await request(app)
       .post("/relay/liveness")
@@ -90,7 +90,7 @@ describe("Liveness API", () => {
     // New user audit trail image ID should be the same as userId
     expect(response.body.selfieImageId).toBe(response.body.userId);
 
-    expect(agentSpy).toHaveBeenCalledWith("liveness-request", {
+    expect(writeLogSpy).toHaveBeenCalledWith("liveness_request", {
       userId: response.body.userId,
       faceVector: true,
       onboardFaceSign: false,
@@ -119,7 +119,7 @@ describe("Liveness API", () => {
       }),
     );
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+    const writeLogSpy = vi.spyOn(logs, "writeLog").mockImplementation(() => {});
 
     const response = await request(app)
       .post("/relay/liveness")
@@ -137,7 +137,7 @@ describe("Liveness API", () => {
       result: { livenessProven: false },
     });
 
-    expect(agentSpy).toHaveBeenCalledWith("enrollment3d-recoverable-error", {
+    expect(writeLogSpy).toHaveBeenCalledWith("enrollment3d_recoverable_error", {
       success: false,
       launchId: expect.any(String),
       error: "Liveness check or enrollment 3D failed and was not processed.",

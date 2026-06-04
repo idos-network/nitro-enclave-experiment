@@ -53,6 +53,8 @@ if [ ! -f "./$JWT_TOKEN_PUBLIC_FILE" ]; then
   exit 1
 fi
 
+mkdir -p /tmp/vector
+
 echo "Running service with pm2-runtime"
 export HOME=/app
-pm2-runtime ecosystem.config.cjs
+exec vector --config /etc/vector/vector.yaml

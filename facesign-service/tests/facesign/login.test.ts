@@ -2,9 +2,9 @@
 import jwt from "jsonwebtoken";
 import { ObjectId } from "mongodb";
 import request from "supertest";
-import agent from "../../providers/agent.ts";
 import * as db from "../../providers/db.ts";
 import app from "../../server.ts";
+import * as logs from "../../utils/logger-context.ts";
 import { GROUP_NAME, publicKey } from "../utils/helper.ts";
 import {
   processRequestErrorHandler,
@@ -63,7 +63,7 @@ describe("FaceSign/Login API", () => {
       insertedId: new ObjectId(),
     });
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+    const writeLogSpy = vi.spyOn(logs, "writeLog").mockImplementation(() => {});
 
     const response = await request(app).post("/facesign").send({
       requestBlob: "test-face-scan",
@@ -86,11 +86,11 @@ describe("FaceSign/Login API", () => {
     });
     expect(decoded.sub).toBe(response.body.userId);
 
-    expect(agentSpy).toHaveBeenCalledWith("facesign-login", {
+    expect(writeLogSpy).toHaveBeenCalledWith("facesign_login", {
       userId: response.body.userId,
     });
 
-    expect(agentSpy).toHaveBeenCalledWith("facesign-user-pending-confirmation", {
+    expect(writeLogSpy).toHaveBeenCalledWith("facesign_user_pending_confirmation", {
       userId: response.body.userId,
       launchId,
     });
@@ -124,7 +124,7 @@ describe("FaceSign/Login API", () => {
       }),
     );
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+    const writeLogSpy = vi.spyOn(logs, "writeLog").mockImplementation(() => {});
 
     const response = await request(app).post("/facesign").send({
       requestBlob: "test-face-scan",
@@ -139,11 +139,11 @@ describe("FaceSign/Login API", () => {
       result: { livenessProven: false },
     });
 
-    expect(agentSpy).toHaveBeenCalledWith("facesign-login", {
+    expect(writeLogSpy).toHaveBeenCalledWith("facesign_login", {
       userId: expect.any(String),
     });
 
-    expect(agentSpy).toHaveBeenCalledWith("enrollment3d-recoverable-error", {
+    expect(writeLogSpy).toHaveBeenCalledWith("enrollment3d_recoverable_error", {
       success: false,
       launchId: expect.any(String),
       error: "Liveness check or enrollment 3D failed and was not processed.",
@@ -167,7 +167,7 @@ describe("FaceSign/Login API", () => {
       searchHandler([{ identifier: resultId, matchLevel: 15 }]),
     );
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+    const writeLogSpy = vi.spyOn(logs, "writeLog").mockImplementation(() => {});
     const oldestSpy = vi.spyOn(db, "getOldestFaceSignUserId").mockResolvedValue(resultId);
 
     const response = await request(app).post("/facesign").send({
@@ -193,7 +193,7 @@ describe("FaceSign/Login API", () => {
 
     expect(oldestSpy).not.toHaveBeenCalledWith([resultId]);
 
-    expect(agentSpy).toHaveBeenCalledWith("group-resolution-existing-user", {
+    expect(writeLogSpy).toHaveBeenCalledWith("group_resolution_existing_user", {
       count: 1,
       groupName: "pinocchio-users",
       process: "facesign",
@@ -231,7 +231,7 @@ describe("FaceSign/Login API", () => {
       insertedId: new ObjectId(),
     });
 
-    const agentSpy = vi.spyOn(agent, "writeLog").mockImplementation(() => {});
+    const writeLogSpy = vi.spyOn(logs, "writeLog").mockImplementation(() => {});
 
     const oldestSpy = vi.spyOn(db, "getOldestFaceSignUserId").mockResolvedValue(resultId3);
 
@@ -258,7 +258,7 @@ describe("FaceSign/Login API", () => {
 
     expect(db.insertMember).not.toHaveBeenCalled();
 
-    expect(agentSpy).toHaveBeenCalledWith("group-resolution-ffr-resolved", {
+    expect(writeLogSpy).toHaveBeenCalledWith("group_resolution_ffr_resolved", {
       count: 3,
       groupName: "pinocchio-users",
       process: "facesign",

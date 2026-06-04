@@ -1,21 +1,26 @@
 module.exports = {
 	apps: [
 		{
-			name: "Entropy-service",
+			name: "entropy",
 			cwd: "/app",
 			script: "npm",
 			args: "start",
 			env: {
 				NODE_ENV: "production",
 			},
+			log_type: "json",
+			merge_logs: true,
+			autorestart: true,
 		},
 		{
 			name: "Caddy",
 			cwd: "/app",
 			script: "caddy",
 			args: "run --config /app/Caddyfile --adapter caddyfile",
-			wait_ready: true,
 			autorestart: true,
+			wait_ready: true,
+			merge_logs: true,
+			log_type: "json",
 		},
 		{
 			name: "node-exporter",
@@ -23,6 +28,8 @@ module.exports = {
 			script: "node_exporter",
 			args: "--no-collector.kernel_hung",
 			autorestart: true,
+			merge_logs: true,
+			log_type: "json",
 		},
 	],
 };
