@@ -2,7 +2,7 @@
 FROM timberio/vector@sha256:32fd554fdd6dc3c17b5ec8e983e9889f37b0c87fa3c8cc28aa318d69cf34d392 AS vector
 
 # ---------- Build stage ----------
-FROM ubuntu:24.04@sha256:786a8b558f7be160c6c8c4a54f9a57274f3b4fb1491cf65146521ae77ff1dc54 AS builder
+FROM debian:trixie-slim AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -56,7 +56,7 @@ WORKDIR /home/FaceTec_Custom_Server/deploy
 RUN mvn -f /home/FaceTec_Custom_Server/pom.xml clean package -Plinux
 
 # ---------- Final stage ----------
-FROM ubuntu:24.04@sha256:786a8b558f7be160c6c8c4a54f9a57274f3b4fb1491cf65146521ae77ff1dc54
+FROM debian:trixie-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -94,9 +94,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends --no-install-su
 
 # Install Caddy
 RUN apt-get update && apt-get install -y --no-install-recommends --no-install-suggests \
-    apt-transport-https \
-    debian-archive-keyring \
-    debian-keyring \
     gnupg \
     && curl -1sLf "https://dl.cloudsmith.io/public/caddy/stable/gpg.key" | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg \
     && curl -1sLf "https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt" -o /etc/apt/sources.list.d/caddy-stable.list \
@@ -105,9 +102,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends --no-install-su
     && apt-get update \
     && apt-get install -y --no-install-recommends --no-install-suggests caddy \
     && apt-get purge -y --auto-remove \
-       apt-transport-https \
-       debian-archive-keyring \
-       debian-keyring \
        gnupg \
     && apt-get clean \
     && rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
@@ -168,7 +162,7 @@ RUN sed -i 's#search3D2DKioskPOSDatabaseRootDirectory: .*#search3D2DKioskPOSData
 RUN sed -i 's#search2D2DIDScanPhotoDatabaseRootDirectory: .*#search2D2DIDScanPhotoDatabaseRootDirectory: /mnt/encrypted/facetec/search-2d-2d-id-scan#' ./config.yaml
 RUN sed -i 's#search2D2DProfilePicDatabaseRootDirectory: .*#search2D2DProfilePicDatabaseRootDirectory: /mnt/encrypted/facetec/search-2d-2d-profile-pic#' ./config.yaml
 RUN sed -i 's#search2D2DFacePortraitDatabaseRootDirectory: .*#search2D2DFacePortraitDatabaseRootDirectory: /mnt/encrypted/facetec/search-2d-2d-face-portrait#' ./config.yaml
-RUN sed -i 's#usageLogServerUri: .*#usageLogServerUri: http://localhost:3000/#' ./config.yaml
+RUN sed -i 's#usageLogServerUri: .*#usageLogServerUri: http://localhost:3000#' ./config.yaml
 RUN printf "#!/bin/bash\njava -cp $HOME_FACETEC_SERVER_CORE/libs/FaceTecSDK-Server-Core-$FACETEC_SDK_VERSION.jar:FaceTec-Server-Webservice.jar com.facetec.facetecserver.app.App" > ./run.ash
 
 RUN echo "" >> ./config.yaml
