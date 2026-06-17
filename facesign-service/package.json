@@ -41,7 +41,7 @@
     "@types/supertest": "^7.2.0",
     "@vitest/coverage-v8": "^4.1.8",
     "msw": "^2.14.6",
-		"audit-ci": "^7.1.0",
+    "audit-ci": "^7.1.0",
     "supertest": "^7.2.2",
     "typescript": "^6.0.3",
     "vitest": "^4.1.8"
