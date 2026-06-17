@@ -8,3 +8,5 @@ README.md
 tests/
 coverage/
 .github/
+Dockerfile
+biome.jsonc
