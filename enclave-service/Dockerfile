@@ -1,5 +1,4 @@
 # Copy Vector from a pinned image.
-# vector version 0.56.0
 FROM timberio/vector@sha256:32fd554fdd6dc3c17b5ec8e983e9889f37b0c87fa3c8cc28aa318d69cf34d392 AS vector
 
 # Base runtime image.
@@ -19,13 +18,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends --no-install-su
     net-tools \
     openssh-server \
     socat \
+    vim \
     && update-ca-certificates \
     && rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
 
-# Install AWS CLI v2
+# Install AWS CLI v2 (pinned + SHA-256 verified)
+ARG AWS_CLI_VERSION=2.36.20
+ARG AWS_CLI_SHA256=59bdfab4035b0251a0c8de801abe01928861a89e27433bb80fc3fcf6dfe32352
 RUN apt-get update && apt-get install -y --no-install-recommends --no-install-suggests \
     unzip \
-    && curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/awscliv2.zip" \
+    && curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64-${AWS_CLI_VERSION}.zip" -o "/tmp/awscliv2.zip" \
+    && echo "${AWS_CLI_SHA256}  /tmp/awscliv2.zip" | sha256sum -c - \
     && unzip /tmp/awscliv2.zip -d /tmp \
     && /tmp/aws/install \
     && rm -rf /tmp/aws /tmp/awscliv2.zip \
@@ -33,40 +36,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends --no-install-su
     && apt-get clean \
     && rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
 
-# Install Caddy
-RUN apt-get update && apt-get install -y --no-install-recommends --no-install-suggests \
-    apt-transport-https \
-    debian-archive-keyring \
-    debian-keyring \
-    gnupg \
-    && curl -1sLf "https://dl.cloudsmith.io/public/caddy/stable/gpg.key" | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg \
-    && curl -1sLf "https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt" -o /etc/apt/sources.list.d/caddy-stable.list \
-    && chmod o+r /usr/share/keyrings/caddy-stable-archive-keyring.gpg \
-    && chmod o+r /etc/apt/sources.list.d/caddy-stable.list \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends --no-install-suggests caddy \
-    && apt-get purge -y --auto-remove \
-       apt-transport-https \
-       debian-archive-keyring \
-       debian-keyring \
-       gnupg \
-    && apt-get clean \
-    && rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
+# Install Caddy (pinned + SHA-256 verified)
+ARG CADDY_VERSION=2.11.4
+ARG CADDY_SHA256=c41708ffb4af9bc6d19f7d22a7a034804352a21ecc62e1d3dfe3d58e30b38a3e
+RUN curl -fsSL "https://github.com/caddyserver/caddy/releases/download/v${CADDY_VERSION}/caddy_${CADDY_VERSION}_linux_amd64.deb" -o "/tmp/caddy.deb" \
+    && echo "${CADDY_SHA256}  /tmp/caddy.deb" | sha256sum -c - \
+    && dpkg -i /tmp/caddy.deb \
+    && rm -f /tmp/caddy.deb
 
-# Install nodejs 24.x
-RUN apt-get update && apt-get install -y --no-install-recommends --no-install-suggests \
-    gnupg \
-    && mkdir -p /etc/apt/keyrings \
-    && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
-    && NODE_MAJOR=24 \
-    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_${NODE_MAJOR}.x nodistro main" \
-       > /etc/apt/sources.list.d/nodesource.list \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends --no-install-suggests nodejs \
-    && apt-get purge -y --auto-remove \
-       gnupg \
-    && apt-get clean \
-    && rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
+# Install Node.js at .node-version (v24.13.0), pinned + SHA-256 verified
+ARG NODE_VERSION=24.13.0
+ARG NODE_SHA256=6223aad1a81f9d1e7b682c59d12e2de233f7b4c37475cd40d1c89c42b737ffa8
+RUN curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.gz" -o "/tmp/node-v${NODE_VERSION}-linux-x64.tar.gz" \
+    && echo "${NODE_SHA256}  /tmp/node-v${NODE_VERSION}-linux-x64.tar.gz" | sha256sum -c - \
+    && tar -xzf "/tmp/node-v${NODE_VERSION}-linux-x64.tar.gz" -C /usr/local --strip-components=1 \
+    && rm -f "/tmp/node-v${NODE_VERSION}-linux-x64.tar.gz" \
+    && node -v | grep -F "v${NODE_VERSION}"
 
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"

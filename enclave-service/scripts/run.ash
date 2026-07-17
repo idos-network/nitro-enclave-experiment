@@ -1,0 +1,52 @@
+#!/bin/ash
+# shellcheck shell=dash
+set -ueo pipefail
+
+# Go to app dir
+cd /app
+
+# Script dir for sourcing shared scripts
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+source "$SCRIPT_DIR/shared/basic.ash"
+configure_basic_networking "$S3_SECRETS_BUCKET"
+
+# Get vsock.json for enclave networking
+aws s3 cp "s3://$S3_SECRETS_BUCKET/enclave/vsock.json" ./vsock.json --region eu-west-1
+source "$SCRIPT_DIR/shared/vsock.ash"
+setup_vsock_networking "./vsock.json"
+
+# Get config.env and source it
+aws s3 cp "s3://$S3_SECRETS_BUCKET/enclave/config.env" ./config.env --region eu-west-1
+
+# Load env vars from config.env to global space
+set -a
+source ./config.env
+set +a
+
+if true; then #SSH#
+  source "$SCRIPT_DIR/shared/ssh.ash"
+  setup_ssh "$SSH_PUBLIC_KEY"
+fi
+
+# Add mongo host to /etc/hosts
+# TODO: Solve this in configuration
+echo "127.0.0.1 $(echo "$MONGO_HOST" | sed 's#-cluster.cluster-#-cluster.#')" | tee -a /etc/hosts
+
+# NBD
+source "$SCRIPT_DIR/shared/nbd.ash"
+setup_nbd "enclave"
+
+echo "Fetching Caddyfile from S3"
+CADDYFILE=Caddyfile
+aws s3 cp "s3://$S3_SECRETS_BUCKET/enclave/$CADDYFILE" "./$CADDYFILE" --region eu-west-1
+if [ ! -f "./$CADDYFILE" ]; then
+  echo "Couldn't download $CADDYFILE from S3, exiting"
+  exit 1
+fi
+
+mkdir -p /tmp/vector
+
+echo "Running service with pm2-runtime"
+export HOME=/app
+exec vector --config /etc/vector/vector.yaml
