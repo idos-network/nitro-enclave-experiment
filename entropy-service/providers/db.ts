@@ -12,7 +12,6 @@ import {
 } from "../env.ts";
 
 let db: Db;
-let cacheClientEncryption: ClientEncryption | null = null;
 
 // FLE configuration
 const KEY_DB = "encryption";
@@ -43,12 +42,10 @@ async function ensureKmsProviders() {
 async function getClientEncryption() {
   const kmsProviders = await ensureKmsProviders();
 
-  cacheClientEncryption = new ClientEncryption(client, {
+  return new ClientEncryption(client, {
     keyVaultNamespace,
     kmsProviders,
   });
-
-  return cacheClientEncryption;
 }
 
 /**

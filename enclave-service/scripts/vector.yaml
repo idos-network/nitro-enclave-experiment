@@ -1,0 +1,140 @@
+data_dir: /tmp/vector
+
+sources:
+  pm2_app:
+    type: exec
+    command: ["pm2-runtime", "ecosystem.config.cjs"]
+    mode: streaming
+    decoding: 
+      codec: json
+    
+  express_metrics:
+    type: prometheus_scrape
+    endpoints:
+      - http://127.0.0.1:7000/metrics
+    scrape_interval_secs: 15
+
+  caddy_metrics:
+    type: prometheus_scrape
+    endpoints:
+      - https://127.0.0.1:9000/metrics
+    scrape_interval_secs: 15
+
+  node_metrics:
+    type: prometheus_scrape
+    endpoints:
+      - http://127.0.0.1:9100/metrics
+    scrape_interval_secs: 15
+
+transforms:
+  logs:
+    type: remap
+    inputs:
+      - pm2_app
+    source: |
+      pm2_app_name = .app_name
+
+      parsed, err = parse_json(.message)
+      if err != null {
+        .parse_error = "Failed to parse PM2 message as JSON"
+        .original_message = .message
+      } else {
+        . = parsed
+      }
+
+      .application = "enclave"
+      .environment = get_env_var("OTEL_ENVIRONMENT") ?? "unknown"
+      .component = to_string(pm2_app_name) ?? "unknown"
+
+      if .component == "" {
+        .component = "unknown"
+      }
+
+      .application = "enclave"
+      .environment = get_env_var("OTEL_ENVIRONMENT") ?? "unknown"
+      .component = to_string(pm2_app_name) ?? "unknown"
+
+      if .component == "" {
+        .component = "unknown"
+      }
+
+  express_metric_labels:
+    type: remap
+    inputs:
+      - express_metrics
+    source: |
+      .tags.component = "express"
+
+  caddy_metric_labels:
+    type: remap
+    inputs:
+      - caddy_metrics
+    source: |
+      .tags.component = "caddy"
+
+  node_metric_labels:
+    type: remap
+    inputs:
+      - node_metrics
+    source: |
+      .tags.component = "node"
+
+  global_labels:
+    type: remap
+    inputs:
+      - express_metric_labels
+      - caddy_metric_labels
+      - node_metric_labels
+    source: |
+      .tags.application = "enclave"
+      .tags.environment = get_env_var("OTEL_ENVIRONMENT") ?? "unknown"
+      .tags.job = "enclave-vector-push"
+
+  metrics_cardinality:
+    type: tag_cardinality_limit
+    inputs:
+      - global_labels
+    mode: exact
+
+sinks:
+  prometheus:
+    # Read this why we are using tag_cardinality_limits
+    # https://vector.dev/docs/reference/configuration/sinks/prometheus_remote_write/
+    type: prometheus_remote_write
+    inputs:
+      - metrics_cardinality
+    endpoint: "${OTEL_BASE_URL}/api/v1/write"
+    healthcheck:
+      # Our Victoria Metrics now did not expose health endpoint
+      enabled: false
+    auth:
+      strategy: basic
+      user: "${OTEL_USER}"
+      password: "${OTEL_PASSWORD}"
+
+  loki:
+    type: loki
+    inputs:
+      - logs
+    endpoint: "${OTEL_BASE_URL}"
+    healthcheck:
+      # Our loki now did not expose health endpoint
+      enabled: false
+    auth:
+      strategy: basic
+      user: "${OTEL_USER}"
+      password: "${OTEL_PASSWORD}"
+    encoding:
+      codec: json
+    labels:
+      application: "{{ application }}"
+      component: "{{ component }}"
+      environment: "{{ environment }}"
+
+  console:
+    type: console
+    inputs:
+      - logs
+    target: stdout
+    encoding:
+      codec: json
