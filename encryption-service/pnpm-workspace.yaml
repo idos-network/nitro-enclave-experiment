@@ -1,0 +1,5 @@
+allowBuilds:
+  mongodb-client-encryption: true
+
+overrides:
+  form-data: ">= 4.0.6"

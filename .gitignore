@@ -2,4 +2,4 @@ facetec-sdk/FaceTec-Server-Webservice/
 facetec-sdk/FaceTec-Usage-Log-Server/
 facesign-service/node_modules/
 entropy-service/node_modules/
-agent/node_modules/
+encryption-service/node_modules/
