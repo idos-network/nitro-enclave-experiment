@@ -4,32 +4,60 @@ import { storeSession } from "./db.ts";
 import { sign } from "./kms.ts";
 
 export async function createSession() {
-	const encryptionKeyPair = tweetnacl.box.keyPair();
-	const timestamp = Date.now().toString();
-	const nonce = Buffer.from(tweetnacl.randomBytes(16)).toString("base64");
-	const sessionId = crypto.randomUUID();
+    // TODO: we also need to remember the caller's pub key. But, that's orthogonal
 
-	const encryptionPublicKey = Buffer.from(encryptionKeyPair.publicKey).toString(
-		"base64",
-	);
+    // 1. Generate unique Session ID
+    const sessionId = crypto.randomUUID();
+    
+    // 2. Generate Ephemeral X25519 Encryption Keys
+    const encryptionKeyPair = tweetnacl.box.keyPair();
+    const encryptionPublicKey = {
+        "kty": "OKP",
+        "crv": "X25519",
+        "x": Buffer.from(encryptionKeyPair.publicKey).toString("base64url"),
+    };
 
-	const algorithm = "curve25519xsalsa20poly1305";
+    // 3. Define and Strict-Encode the JWS Protected Header
+    const protectedDecoded = {
+        kid: SIGNING_KEY_KMS_KEY_ID,
+        // TODO: I'd also maybe add jku here
+        alg: "EdDSA",
+        b64: false,
+        crit: ["b64"] // Standard JWS requires declaring "b64" in "crit" when false
+    };
+    
+    // Convert header to its Base64Url representation
+    const protectedBase64Url = Buffer.from(JSON.stringify(protectedDecoded)).toString("base64url");
 
-	const payload = encryptionPublicKey + algorithm + timestamp + nonce;
+    // 4. Construct the Payload (Your structural nonce acts perfectly as a cryptographic salt here)
+    const payload = {
+        "publicKeyX": encryptionPublicKey.x,
+        "nonce": crypto.randomUUID(), // Successfully prevents deterministic sign fingerprinting
+    };
+    const payloadJson = JSON.stringify(payload);
 
-	const signature = await sign(Buffer.from(payload));
+    // 5. Construct Signing Input exactly to RFC 7797 specifications:
+    // Format: Base64Url(Protected) + "." + Raw_Payload
+    const signingInputString = `${protectedBase64Url}.${payloadJson}`;
+    const signingInputBuffer = Buffer.from(signingInputString, "utf-8");
 
-	await storeSession(sessionId, encryptionKeyPair.secretKey);
+    // 6. Execute libnacl / KMS signature calculation
+    const rawSignature = await sign(signingInputBuffer);
+    const signatureBase64Url = Buffer.from(rawSignature).toString("base64url");
 
-	return {
-		payload: {
-			encryptionPublicKey,
-			algorithm,
-			timestamp,
-			nonce,
-		},
-		signature,
-		sessionId,
-		kid: SIGNING_KEY_KMS_KEY_ID,
-	};
+    // 7. Output compliant Flattened JSON Serialization
+    const encryptionPublicKeySignature = {
+        protected: protectedBase64Url, // Stored as the encoded string
+        payload: payload,              // Left unencoded as a clean JSON object inside the envelope
+        signature: signatureBase64Url,
+    };
+
+    // 8. Save ephemeral private state securely
+    await storeSession(sessionId, encryptionKeyPair.secretKey);
+
+    return {
+        sessionId,
+        encryptionPublicKey,
+        encryptionPublicKeySignature,
+    };
 }
