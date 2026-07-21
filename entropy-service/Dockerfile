@@ -1,4 +1,5 @@
 # Copy Vector from a pinned image.
+# vector version 0.56.0
 FROM timberio/vector@sha256:32fd554fdd6dc3c17b5ec8e983e9889f37b0c87fa3c8cc28aa318d69cf34d392 AS vector
 
 # Base runtime image.

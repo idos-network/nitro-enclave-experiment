@@ -66,10 +66,10 @@ app.post("/session/encrypt", sessionKeyMiddleware, async (req, res) => {
 	writeLog("encrypt_request", { sessionId: req.sessionRequest.sessionId });
 
 	const data = await encrypt(
-    req.keyPair,
-    req.sessionRequest.publicKey,
-    req.sessionRequest.data,
-  );
+		req.keyPair,
+		req.sessionRequest.publicKey,
+		req.sessionRequest.data,
+	);
 
 	return res.json({ data });
 });
@@ -78,10 +78,10 @@ app.post("/session/decrypt", sessionKeyMiddleware, async (req, res) => {
 	writeLog("decrypt_request", { sessionId: req.sessionRequest.sessionId });
 
 	const data = await decrypt(
-    req.keyPair,
-    req.sessionRequest.publicKey,
-    req.sessionRequest.data,
-  );
+		req.keyPair,
+		req.sessionRequest.publicKey,
+		req.sessionRequest.data,
+	);
 
 	return res.json({ data });
 });
