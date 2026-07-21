@@ -10,20 +10,22 @@ describe("POST /session/decrypt", () => {
 
 	it("decrypts a sender ciphertext", async () => {
 		const session = await createSession();
-		const sender = nacl.box.keyPair();
-		const recipient = nacl.box.keyPair();
+		const userKeyPair = nacl.box.keyPair();
+		const recipientKeyPair = nacl.box.keyPair();
 		const plaintext = b64(Buffer.from("decrypt me"));
-		const ciphertext = encrypt(sender, b64(recipient.publicKey), plaintext);
+		const ciphertext = encrypt(
+			userKeyPair,
+			b64(recipientKeyPair.publicKey),
+			plaintext,
+		);
 
 		const res = await request(app)
 			.post("/session/decrypt")
 			.send(
-				sessionBody(
-					session.sessionId,
-					session.payload.encryptionPublicKey,
-					recipient,
-					{ data: ciphertext, publicKey: b64(sender.publicKey) },
-				),
+				sessionBody(session, userKeyPair.secretKey, {
+					data: ciphertext,
+					publicKey: b64(recipientKeyPair.publicKey),
+				}),
 			)
 			.expect(200);
 
@@ -44,14 +46,16 @@ describe("POST /session/decrypt", () => {
 		const recipient = nacl.box.keyPair();
 		const missingSessionId = crypto.randomUUID();
 
+		const session = await createSession();
+		session.id = missingSessionId;
+
 		const res = await request(app)
 			.post("/session/decrypt")
 			.send(
-				sessionBody(
-					missingSessionId,
-					b64(nacl.box.keyPair().publicKey),
-					recipient,
-				),
+				sessionBody(session, recipient.secretKey, {
+					data: b64(Buffer.from("unused")),
+					publicKey: b64(recipient.publicKey),
+				}),
 			)
 			.expect(404);
 

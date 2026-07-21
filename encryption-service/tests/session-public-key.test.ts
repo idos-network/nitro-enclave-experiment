@@ -9,23 +9,19 @@ describe("POST /session/public-key", () => {
 
 	it("returns the unwrapped user public key", async () => {
 		const session = await createSession();
-		const user = nacl.box.keyPair();
+
+		const userKeyPair = nacl.box.keyPair();
 
 		const res = await request(app)
 			.post("/session/public-key")
-			.send(
-				sessionBody(
-					session.sessionId,
-					session.payload.encryptionPublicKey,
-					user,
-				),
-			)
+			.send(sessionBody(session, userKeyPair.secretKey))
 			.expect(200);
 
-		expect(getSession()).toHaveBeenCalledWith(session.sessionId);
+		expect(getSession()).toHaveBeenCalledWith(session.id);
+
 		expect(res.body).toEqual({
-			sessionId: session.sessionId,
-			publicKey: b64(user.publicKey),
+			sessionId: session.id,
+			publicKey: b64(userKeyPair.publicKey),
 		});
 	});
 
@@ -40,14 +36,15 @@ describe("POST /session/public-key", () => {
 	});
 
 	it("returns 404 when session is missing", async () => {
-		const user = nacl.box.keyPair();
 		const missingSessionId = crypto.randomUUID();
+		const session = await createSession();
+		session.id = missingSessionId;
+
+		const userKeyPair = nacl.box.keyPair();
 
 		const res = await request(app)
 			.post("/session/public-key")
-			.send(
-				sessionBody(missingSessionId, b64(nacl.box.keyPair().publicKey), user),
-			)
+			.send(sessionBody(session, userKeyPair.secretKey))
 			.expect(404);
 
 		expect(res.body).toEqual({ error: "Session not found" });
@@ -56,12 +53,9 @@ describe("POST /session/public-key", () => {
 
 	it("returns 404 when wrappedUserKey cannot be unwrapped", async () => {
 		const session = await createSession();
-		const user = nacl.box.keyPair();
-		const body = sessionBody(
-			session.sessionId,
-			b64(nacl.box.keyPair().publicKey),
-			user,
-		);
+		session.serverPublicKey = nacl.box.keyPair().publicKey;
+
+		const body = sessionBody(session, nacl.randomBytes(32));
 
 		const res = await request(app)
 			.post("/session/public-key")

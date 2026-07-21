@@ -2,9 +2,9 @@ openapi: 3.1.0
 info:
   title: Encryption Service
   description: |
-    Session-based encryption service. Clients create a session, then use the
-    session key material (via a wrapped user key) to encrypt/decrypt data or
-    fetch the session public key.
+    Session-based encryption service. Clients create a session with their
+    public key, then use a wrapped encryption key to encrypt/decrypt data or
+    fetch the unwrapped user public key.
   version: 1.0.0
 
 servers:
@@ -56,10 +56,10 @@ paths:
   /.well-known/jwks.json:
     get:
       tags: [Keys]
-      summary: JWKS for session payload verification
+      summary: JWKS for session signature verification
       description: |
         Returns the KMS signing public key as a JWK set. Used to verify
-        signatures on session creation responses (EdDSA / Ed25519).
+        `encryptionPublicKeySignature` on session creation responses (EdDSA / Ed25519).
       operationId: getJwks
       responses:
         "200":
@@ -74,9 +74,16 @@ paths:
       tags: [Session]
       summary: Create a session
       description: |
-        Creates a new encryption session and returns a signed payload containing
-        the session encryption public key (curve25519xsalsa20poly1305).
+        Creates a new encryption session bound to the caller's `publicKey`.
+        Returns the session encryption public key (X25519 JWK) and a flattened
+        JWS signature over that key (RFC 7797, `b64: false`).
       operationId: createSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSessionRequest"
       responses:
         "200":
           description: Session created
@@ -87,14 +94,17 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CreateSessionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
 
   /session/public-key:
     post:
       tags: [Session]
-      summary: Get session public key
+      summary: Get unwrapped user public key
       description: |
-        Unwraps the session key using `wrappedUserKey` and returns the session
-        curve25519xsalsa20poly1305 public key (base64).
+        Unwraps `wrappedEncryptionKey` using the session ephemeral key and the
+        client public key stored at session creation, then returns the derived
+        Curve25519 public key (base64).
       operationId: getSessionPublicKey
       parameters:
         - $ref: "#/components/parameters/XRequestId"
@@ -106,7 +116,7 @@ paths:
               $ref: "#/components/schemas/SessionRequest"
       responses:
         "200":
-          description: Session public key
+          description: Unwrapped user public key
           headers:
             x-request-id:
               $ref: "#/components/headers/XRequestId"
@@ -125,7 +135,7 @@ paths:
       summary: Encrypt data for a recipient
       description: |
         Encrypts `data` (base64 plaintext bytes) to `publicKey` (recipient
-        curve25519xsalsa20poly1305 public key, base64) using the session secret key.
+        Curve25519 public key, base64) using the unwrapped encryption secret key.
         Returns NaCl box ciphertext as base64 (`nonce || ciphertext`).
       operationId: encrypt
       parameters:
@@ -157,7 +167,7 @@ paths:
       summary: Decrypt data from a sender
       description: |
         Decrypts `data` (base64 `nonce || ciphertext`) using `publicKey`
-        (sender curve25519xsalsa20poly1305 public key, base64) and the session secret key.
+        (sender Curve25519 public key, base64) and the unwrapped encryption secret key.
         Returns plaintext bytes as base64.
       operationId: decrypt
       parameters:
@@ -216,31 +226,41 @@ components:
             $ref: "#/components/schemas/Error"
 
   schemas:
-    WrappedUserKey:
+    CreateSessionRequest:
       type: object
-      required: [encryptedKey, nonce, publicKey]
+      required: [publicKey]
+      description: Body for `POST /session` (`CreateSessionRequestSchema`)
       properties:
-        encryptedKey:
-          type: string
-          description: Base64-encoded encrypted session key material
-        nonce:
-          type: string
-          description: Base64-encoded nonce used to wrap the key
         publicKey:
           type: string
-          description: Base64-encoded client public key used for unwrapping
+          description: |
+            Base64-encoded client Curve25519 public key. Stored with the session
+            and used later to unwrap `wrappedEncryptionKey`.
 
-    SessionRequest:
+    WrappedEncryptionKey:
       type: object
-      required: [sessionId, wrappedUserKey, data, publicKey]
-      description: Body for session-authenticated endpoints (`RequestSchema`)
+      required: [sessionId, encryptedKey, nonce]
       properties:
         sessionId:
           type: string
           format: uuid
           description: Session UUID from `POST /session`
-        wrappedUserKey:
-          $ref: "#/components/schemas/WrappedUserKey"
+        encryptedKey:
+          type: string
+          description: |
+            Base64-encoded NaCl box of the user encryption secret key, sealed to
+            the session encryption public key with the client session secret key
+        nonce:
+          type: string
+          description: Base64-encoded nonce used to wrap the key
+
+    SessionRequest:
+      type: object
+      required: [wrappedEncryptionKey, data, publicKey]
+      description: Body for session-authenticated endpoints (`RequestSchema`)
+      properties:
+        wrappedEncryptionKey:
+          $ref: "#/components/schemas/WrappedEncryptionKey"
         data:
           type: string
           description: |
@@ -252,35 +272,59 @@ components:
             Base64 Curve25519 public key. For encrypt: recipient (decryptor).
             For decrypt: sender (encryptor).
 
+    EncryptionPublicKey:
+      type: object
+      description: X25519 public key as a JWK
+      required: [kty, crv, x]
+      properties:
+        kty:
+          type: string
+          const: OKP
+        crv:
+          type: string
+          const: X25519
+        x:
+          type: string
+          description: Base64url-encoded X25519 public key
+
+    EncryptionPublicKeySignature:
+      type: object
+      description: |
+        Flattened JWS (RFC 7515 §7.2.2) with unencoded payload (RFC 7797,
+        `b64: false`). Signing input is `protected + "." + JSON.stringify(payload)`.
+      required: [protected, payload, signature]
+      properties:
+        protected:
+          type: string
+          description: |
+            Base64url-encoded JWS protected header
+            (`{ kid, alg: "EdDSA", b64: false, crit: ["b64"] }`)
+        payload:
+          type: object
+          required: [publicKeyX, nonce]
+          properties:
+            publicKeyX:
+              type: string
+              description: Same value as `encryptionPublicKey.x`
+            nonce:
+              type: string
+              format: uuid
+              description: Random nonce to prevent deterministic sign fingerprinting
+        signature:
+          type: string
+          description: Base64url-encoded Ed25519 signature
+
     CreateSessionResponse:
       type: object
-      required: [payload, signature, sessionId, kid]
+      required: [sessionId, encryptionPublicKey, encryptionPublicKeySignature]
       properties:
         sessionId:
           type: string
           format: uuid
-        kid:
-          type: string
-          description: KMS key id used for the signature
-        signature:
-          type: string
-          description: Base64 Ed25519 signature over the concatenated payload fields
-        payload:
-          type: object
-          required: [encryptionPublicKey, algorithm, timestamp, nonce]
-          properties:
-            encryptionPublicKey:
-              type: string
-              description: Base64 Curve25519 session public key
-            algorithm:
-              type: string
-              const: curve25519xsalsa20poly1305
-            timestamp:
-              type: string
-              description: Unix epoch milliseconds as string
-            nonce:
-              type: string
-              description: Base64 random nonce
+        encryptionPublicKey:
+          $ref: "#/components/schemas/EncryptionPublicKey"
+        encryptionPublicKeySignature:
+          $ref: "#/components/schemas/EncryptionPublicKeySignature"
 
     PublicKeyResponse:
       type: object
@@ -291,7 +335,7 @@ components:
           format: uuid
         publicKey:
           type: string
-          description: Base64 Curve25519 session public key
+          description: Base64 Curve25519 public key derived from the unwrapped encryption secret
 
     DataResponse:
       type: object

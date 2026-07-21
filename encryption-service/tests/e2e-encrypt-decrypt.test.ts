@@ -8,19 +8,21 @@ describe("e2e: session → encrypt → decrypt", () => {
 	beforeEach(resetMocks);
 
 	it("round-trips plaintext through HTTP encrypt then decrypt", async () => {
-		const session = await createSession();
-		const sessionPub = session.payload.encryptionPublicKey;
+		const sessionUser = await createSession();
+		const sessionRecipient = await createSession();
 
-		const sender = nacl.box.keyPair();
-		const recipient = nacl.box.keyPair();
+		const userKeyPair = nacl.box.keyPair();
+		const recipientKeyPair = nacl.box.keyPair();
+
 		const plaintext = b64(Buffer.from("e2e roundtrip payload"));
 
 		const encrypted = await request(app)
 			.post("/session/encrypt")
 			.send(
-				sessionBody(session.sessionId, sessionPub, sender, {
+				sessionBody(sessionUser, userKeyPair.secretKey, {
 					data: plaintext,
-					publicKey: b64(recipient.publicKey),
+					// Encrypt for the recipient
+					publicKey: b64(recipientKeyPair.publicKey),
 				}),
 			)
 			.expect(200);
@@ -31,9 +33,10 @@ describe("e2e: session → encrypt → decrypt", () => {
 		const decrypted = await request(app)
 			.post("/session/decrypt")
 			.send(
-				sessionBody(session.sessionId, sessionPub, recipient, {
+				sessionBody(sessionRecipient, recipientKeyPair.secretKey, {
 					data: encrypted.body.data,
-					publicKey: b64(sender.publicKey),
+					// Recipient can decrypt
+					publicKey: b64(userKeyPair.publicKey),
 				}),
 			)
 			.expect(200);

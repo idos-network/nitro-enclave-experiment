@@ -7,6 +7,7 @@ import { decrypt, encrypt } from "./providers/encryption.ts";
 import { getPublicKeyJWK } from "./providers/kms.ts";
 import loggerMiddleware from "./providers/logger.ts";
 import { createSession } from "./providers/session.ts";
+import { CreateSessionRequestSchema } from "./utils/dto.ts";
 import { writeLog } from "./utils/logger-context.ts";
 import { runWithRequestContext } from "./utils/request-context.ts";
 
@@ -47,23 +48,36 @@ app.get("/.well-known/jwks.json", async (_req, res) => {
 	res.status(200).json({ keys: [key] });
 });
 
-app.post("/session", async (_req, res) => {
-	const session = await createSession();
+app.post("/session", async (req, res) => {
+	const createSessionRequest = CreateSessionRequestSchema.safeParse(req.body);
+
+	if (!createSessionRequest.success) {
+		return res.status(400).json({
+			error: "Invalid request body",
+			details: createSessionRequest.error,
+		});
+	}
+
+	const session = await createSession(createSessionRequest.data.publicKey);
 	writeLog("session_created", { sessionId: session.sessionId });
 	res.status(200).json(session);
 });
 
 app.post("/session/public-key", sessionKeyMiddleware, async (req, res) => {
-	writeLog("public_key_request", { sessionId: req.sessionRequest.sessionId });
+	writeLog("public_key_request", {
+		sessionId: req.sessionRequest.wrappedEncryptionKey.sessionId,
+	});
 
 	return res.json({
-		sessionId: req.sessionRequest.sessionId,
+		sessionId: req.sessionRequest.wrappedEncryptionKey.sessionId,
 		publicKey: Buffer.from(req.keyPair.publicKey).toString("base64"),
 	});
 });
 
 app.post("/session/encrypt", sessionKeyMiddleware, async (req, res) => {
-	writeLog("encrypt_request", { sessionId: req.sessionRequest.sessionId });
+	writeLog("encrypt_request", {
+		sessionId: req.sessionRequest.wrappedEncryptionKey.sessionId,
+	});
 
 	const data = await encrypt(
 		req.keyPair,
@@ -75,7 +89,9 @@ app.post("/session/encrypt", sessionKeyMiddleware, async (req, res) => {
 });
 
 app.post("/session/decrypt", sessionKeyMiddleware, async (req, res) => {
-	writeLog("decrypt_request", { sessionId: req.sessionRequest.sessionId });
+	writeLog("decrypt_request", {
+		sessionId: req.sessionRequest.wrappedEncryptionKey.sessionId,
+	});
 
 	const data = await decrypt(
 		req.keyPair,

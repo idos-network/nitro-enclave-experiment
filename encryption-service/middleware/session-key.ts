@@ -27,7 +27,9 @@ export const sessionKeyMiddleware: RequestHandler = async (req, res, next) => {
 	const keyPair = await getKeyPair(parsed.data);
 
 	if (!keyPair) {
-		writeLog("session_key_unavailable", { sessionId: parsed.data.sessionId });
+		writeLog("session_key_unavailable", {
+			sessionId: parsed.data.wrappedEncryptionKey.sessionId,
+		});
 		return res.status(404).json({ error: "Session not found" });
 	}
 
