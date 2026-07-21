@@ -1,0 +1,357 @@
+openapi: 3.1.0
+info:
+  title: Encryption Service
+  description: |
+    Session-based encryption service. Clients create a session, then use the
+    session key material (via a wrapped user key) to encrypt/decrypt data or
+    fetch the session public key.
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:7000
+    description: Local development
+
+tags:
+  - name: Health
+  - name: Keys
+  - name: Session
+
+paths:
+  /:
+    get:
+      tags: [Health]
+      summary: Service info
+      operationId: getRoot
+      responses:
+        "200":
+          description: Service is running
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: string
+                    example: Encryption Service is running
+
+  /health:
+    get:
+      tags: [Health]
+      summary: Health check
+      operationId: getHealth
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /.well-known/jwks.json:
+    get:
+      tags: [Keys]
+      summary: JWKS for session payload verification
+      description: |
+        Returns the KMS signing public key as a JWK set. Used to verify
+        signatures on session creation responses (EdDSA / Ed25519).
+      operationId: getJwks
+      responses:
+        "200":
+          description: JSON Web Key Set
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Jwks"
+
+  /session:
+    post:
+      tags: [Session]
+      summary: Create a session
+      description: |
+        Creates a new encryption session and returns a signed payload containing
+        the session encryption public key (curve25519xsalsa20poly1305).
+      operationId: createSession
+      responses:
+        "200":
+          description: Session created
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateSessionResponse"
+
+  /session/public-key:
+    post:
+      tags: [Session]
+      summary: Get session public key
+      description: |
+        Unwraps the session key using `wrappedUserKey` and returns the session
+        curve25519xsalsa20poly1305 public key (base64).
+      operationId: getSessionPublicKey
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionRequest"
+      responses:
+        "200":
+          description: Session public key
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicKeyResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/SessionNotFound"
+
+  /session/encrypt:
+    post:
+      tags: [Session]
+      summary: Encrypt data for a recipient
+      description: |
+        Encrypts `data` (base64 plaintext bytes) to `publicKey` (recipient
+        curve25519xsalsa20poly1305 public key, base64) using the session secret key.
+        Returns NaCl box ciphertext as base64 (`nonce || ciphertext`).
+      operationId: encrypt
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionRequest"
+      responses:
+        "200":
+          description: Encrypted payload
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DataResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/SessionNotFound"
+
+  /session/decrypt:
+    post:
+      tags: [Session]
+      summary: Decrypt data from a sender
+      description: |
+        Decrypts `data` (base64 `nonce || ciphertext`) using `publicKey`
+        (sender curve25519xsalsa20poly1305 public key, base64) and the session secret key.
+        Returns plaintext bytes as base64.
+      operationId: decrypt
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionRequest"
+      responses:
+        "200":
+          description: Decrypted payload
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DataResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/SessionNotFound"
+
+components:
+  parameters:
+    XRequestId:
+      name: x-request-id
+      in: header
+      required: false
+      description: Optional request correlation id; echoed on the response.
+      schema:
+        type: string
+        format: uuid
+
+  headers:
+    XRequestId:
+      description: Request correlation id (from request or generated).
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    BadRequest:
+      description: Request body failed Zod validation
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ValidationError"
+    SessionNotFound:
+      description: Session key pair unavailable
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+  schemas:
+    WrappedUserKey:
+      type: object
+      required: [encryptedKey, nonce, publicKey]
+      properties:
+        encryptedKey:
+          type: string
+          description: Base64-encoded encrypted session key material
+        nonce:
+          type: string
+          description: Base64-encoded nonce used to wrap the key
+        publicKey:
+          type: string
+          description: Base64-encoded client public key used for unwrapping
+
+    SessionRequest:
+      type: object
+      required: [sessionId, wrappedUserKey, data, publicKey]
+      description: Body for session-authenticated endpoints (`RequestSchema`)
+      properties:
+        sessionId:
+          type: string
+          format: uuid
+          description: Session UUID from `POST /session`
+        wrappedUserKey:
+          $ref: "#/components/schemas/WrappedUserKey"
+        data:
+          type: string
+          description: |
+            Base64-encoded payload. For encrypt: plaintext bytes.
+            For decrypt: `nonce || ciphertext`. May be unused for public-key.
+        publicKey:
+          type: string
+          description: |
+            Base64 Curve25519 public key. For encrypt: recipient (decryptor).
+            For decrypt: sender (encryptor).
+
+    CreateSessionResponse:
+      type: object
+      required: [payload, signature, sessionId, kid]
+      properties:
+        sessionId:
+          type: string
+          format: uuid
+        kid:
+          type: string
+          description: KMS key id used for the signature
+        signature:
+          type: string
+          description: Base64 Ed25519 signature over the concatenated payload fields
+        payload:
+          type: object
+          required: [encryptionPublicKey, algorithm, timestamp, nonce]
+          properties:
+            encryptionPublicKey:
+              type: string
+              description: Base64 Curve25519 session public key
+            algorithm:
+              type: string
+              const: curve25519xsalsa20poly1305
+            timestamp:
+              type: string
+              description: Unix epoch milliseconds as string
+            nonce:
+              type: string
+              description: Base64 random nonce
+
+    PublicKeyResponse:
+      type: object
+      required: [sessionId, publicKey]
+      properties:
+        sessionId:
+          type: string
+          format: uuid
+        publicKey:
+          type: string
+          description: Base64 Curve25519 session public key
+
+    DataResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: string
+          description: Base64-encoded result (ciphertext or plaintext bytes)
+
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          example: Session not found
+
+    ValidationError:
+      type: object
+      required: [error, details]
+      properties:
+        error:
+          type: string
+          example: Invalid request body
+        details:
+          description: Zod validation error object
+          type: object
+          additionalProperties: true
+
+    Jwk:
+      type: object
+      description: JSON Web Key (EdDSA signing key from KMS)
+      required: [kid, use, alg]
+      properties:
+        kty:
+          type: string
+          example: OKP
+        crv:
+          type: string
+          example: Ed25519
+        x:
+          type: string
+          description: Base64url-encoded public key
+        kid:
+          type: string
+        use:
+          type: string
+          const: sig
+        alg:
+          type: string
+          const: EdDSA
+      additionalProperties: true
+
+    Jwks:
+      type: object
+      required: [keys]
+      properties:
+        keys:
+          type: array
+          items:
+            $ref: "#/components/schemas/Jwk"
+          minItems: 1
+          maxItems: 1

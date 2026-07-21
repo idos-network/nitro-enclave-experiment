@@ -1,35 +1,35 @@
-import sodium from "libsodium-wrappers";
+import tweetnacl from "tweetnacl";
+import { SIGNING_KEY_KMS_KEY_ID } from "../env.ts";
 import { storeSession } from "./db.ts";
 import { sign } from "./kms.ts";
 
 export async function createSession() {
-	// TODO: Implement session creation
-
-	await sodium.ready;
-
-	const encryptionKeyPair = sodium.crypto_kx_keypair();
-
+	const encryptionKeyPair = tweetnacl.box.keyPair();
 	const timestamp = Date.now().toString();
-	const nonce = sodium.randombytes_buf(16);
+	const nonce = Buffer.from(tweetnacl.randomBytes(16)).toString("base64");
+	const sessionId = crypto.randomUUID();
 
-	// TODO: Store the encryption key pair in the database
+	const encryptionPublicKey = Buffer.from(encryptionKeyPair.publicKey).toString(
+		"base64",
+	);
 
-	const payload =
-		sodium.to_string(encryptionKeyPair.publicKey) +
-		timestamp +
-		sodium.to_base64(nonce);
+	const algorithm = "curve25519xsalsa20poly1305";
+
+	const payload = encryptionPublicKey + algorithm + timestamp + nonce;
 
 	const signature = await sign(Buffer.from(payload));
 
-	const sessionId = crypto.randomUUID();
-
-	await storeSession(sessionId, sodium.to_string(encryptionKeyPair.privateKey));
+	await storeSession(sessionId, encryptionKeyPair.secretKey);
 
 	return {
-		id: sessionId,
-		encryptionPublicKey: sodium.to_base64(encryptionKeyPair.publicKey),
-		timestamp,
-		nonce: sodium.to_base64(nonce),
-		signature: signature,
+		payload: {
+			encryptionPublicKey,
+			algorithm,
+			timestamp,
+			nonce,
+		},
+		signature,
+		sessionId,
+		kid: SIGNING_KEY_KMS_KEY_ID,
 	};
 }

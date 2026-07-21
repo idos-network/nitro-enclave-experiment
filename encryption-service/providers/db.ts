@@ -15,7 +15,7 @@ import {
 	MONGO_URI,
 } from "../env.ts";
 
-let db: Db;
+let db: Db | null = null;
 let cacheClientEncryption: ClientEncryption | null = null;
 
 // FLE configuration
@@ -125,21 +125,36 @@ export async function connectDB() {
 
 export async function storeSession(
 	sessionId: string,
-	encryptionPrivateKey: string,
+	encryptionPrivateKey: Uint8Array,
 ) {
 	const { db, encrypt } = await connectDB();
 
-	// try to find existing encrypted record
-	const existing = await db
+	await db.collection(FACE_SIGN_ENCRYPTION_COLLECTION).insertOne({
+		sessionId,
+		encryptionPrivateKey: await encrypt(
+			Buffer.from(encryptionPrivateKey).toString("base64"),
+		),
+	});
+}
+
+export async function getSession(sessionId: string) {
+	const { db, decrypt } = await connectDB();
+
+	const session = await db
 		.collection(FACE_SIGN_ENCRYPTION_COLLECTION)
 		.findOne({ sessionId });
 
-	if (existing) {
-		throw new Error("Session already exists");
+	if (!session) {
+		return null;
 	}
 
-	await db.collection(FACE_SIGN_ENCRYPTION_COLLECTION).insertOne({
-		sessionId,
-		encryptionPrivateKey: await encrypt(encryptionPrivateKey),
-	});
+  // TODO: TTL!
+
+	return {
+		...session,
+		encryptionPrivateKey: Buffer.from(
+			await decrypt(session.encryptionPrivateKey),
+			"base64",
+		),
+	};
 }

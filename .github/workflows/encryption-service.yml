@@ -1,0 +1,53 @@
+name: Encryption service
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - "encryption-service/**"
+      - ".github/workflows/encryption-service.yml"
+  pull_request:
+    paths:
+      - "encryption-service/**"
+      - ".github/workflows/encryption-service.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          package_json_file: encryption-service/package.json
+          cache_dependency_path: encryption-service/pnpm-lock.yaml
+          cache: true
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: encryption-service/.node-version
+          cache: pnpm
+          cache-dependency-path: encryption-service/pnpm-lock.yaml
+
+      - name: Install packages
+        working-directory: encryption-service
+        run: pnpm install --frozen-lockfile
+
+      - name: Run type check
+        working-directory: encryption-service
+        run: pnpm run types
+
+      - name: Run lint
+        working-directory: encryption-service
+        run: pnpm run format:ci
+
+      - name: Run tests
+        working-directory: encryption-service
+        run: pnpm run test
+
+      - name: Run audit
+        working-directory: encryption-service
+        run: pnpm exec audit-ci --package-manager pnpm --high --critical

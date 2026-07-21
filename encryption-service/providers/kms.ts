@@ -1,25 +1,14 @@
+import { createPublicKey } from "node:crypto";
 import {
 	GetPublicKeyCommand,
 	KMSClient,
 	SignCommand,
 } from "@aws-sdk/client-kms";
-import { defaultProvider } from "@aws-sdk/credential-provider-node";
 import { AWS_REGION, SIGNING_KEY_KMS_KEY_ID } from "../env.ts";
 
-export async function getPublicKey() {
-	const credentialsProvider = defaultProvider();
-	const credentials = await credentialsProvider();
-
+export async function getPublicKeyJWK() {
 	const kms = new KMSClient({
 		region: AWS_REGION,
-		credentials: {
-			accessKeyId: credentials.accessKeyId,
-			secretAccessKey: credentials.secretAccessKey,
-			// For some reason the types say sessionToken is string, but it can be undefined
-			// and it's trying to set never to string... it's weird
-			// biome-ignore lint/suspicious/noExplicitAny: invalid types
-			sessionToken: credentials.sessionToken as any,
-		},
 	});
 
 	const response = await kms.send(
@@ -32,23 +21,24 @@ export async function getPublicKey() {
 		throw new Error("No public key returned");
 	}
 
-	return Buffer.from(response.PublicKey).toString("hex");
+	// KMS returns SubjectPublicKeyInfo DER; Node exports that as JWK.
+	const jwk = createPublicKey({
+		key: Buffer.from(response.PublicKey),
+		format: "der",
+		type: "spki",
+	}).export({ format: "jwk" });
+
+	return {
+		...jwk,
+		kid: SIGNING_KEY_KMS_KEY_ID,
+		use: "sig",
+		alg: "EdDSA",
+	};
 }
 
 export async function sign(payload: Uint8Array<ArrayBufferLike>) {
-	const credentialsProvider = defaultProvider();
-	const credentials = await credentialsProvider();
-
 	const kms = new KMSClient({
 		region: AWS_REGION,
-		credentials: {
-			accessKeyId: credentials.accessKeyId,
-			secretAccessKey: credentials.secretAccessKey,
-			// For some reason the types say sessionToken is string, but it can be undefined
-			// and it's trying to set never to string... it's weird
-			// biome-ignore lint/suspicious/noExplicitAny: invalid types
-			sessionToken: credentials.sessionToken as any,
-		},
 	});
 
 	const response = await kms.send(
