@@ -8,6 +8,10 @@ info:
   version: 1.0.0
 
 servers:
+  - url: https://encryption.staging.sandbox.fractal.id/
+    description: Staging environment
+  - url: https://encryption.idos.network/
+    description: Production
   - url: http://localhost:7000
     description: Local development
 
