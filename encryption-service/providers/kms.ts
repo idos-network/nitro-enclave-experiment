@@ -54,5 +54,5 @@ export async function sign(payload: Uint8Array<ArrayBufferLike>) {
 		throw new Error("No signature returned");
 	}
 
-	return Buffer.from(response.Signature).toString("base64");
+	return Buffer.from(response.Signature);
 }

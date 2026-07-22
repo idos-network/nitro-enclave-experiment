@@ -1,6 +1,6 @@
 import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
-import { app, getPublicKeyJWK, resetMocks, SIGNING_KID } from "./app.ts";
+import { app, getPublicKeyJWK, resetMocks, signingPublicJwk } from "./app.ts";
 
 describe("health + JWKS", () => {
 	beforeEach(resetMocks);
@@ -19,16 +19,7 @@ describe("health + JWKS", () => {
 
 		expect(getPublicKeyJWK()).toHaveBeenCalledOnce();
 		expect(res.body).toEqual({
-			keys: [
-				{
-					kty: "OKP",
-					crv: "Ed25519",
-					x: "test-public-key",
-					kid: SIGNING_KID,
-					use: "sig",
-					alg: "EdDSA",
-				},
-			],
+			keys: [signingPublicJwk],
 		});
 	});
 });

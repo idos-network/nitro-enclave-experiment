@@ -1,10 +1,24 @@
+import { generateKeyPairSync, sign as cryptoSign } from "node:crypto";
 import type { NextFunction, Request, Response } from "express";
 import request from "supertest";
 import nacl from "tweetnacl";
+import type { Mock } from "vitest";
 import { vi } from "vitest";
 
 export const SIGNING_KID =
 	"arn:aws:kms:eu-central-1:000000000000:key/signing-test";
+
+const { publicKey: signingPublicKey, privateKey: signingPrivateKey } =
+	generateKeyPairSync("ed25519");
+
+export const signingPublicJwk = {
+	...signingPublicKey.export({ format: "jwk" }),
+	kid: SIGNING_KID,
+	use: "sig",
+	alg: "EdDSA",
+} as const;
+
+export { signingPublicKey };
 
 const mocks = vi.hoisted(() => {
 	const sessions = new Map<
@@ -28,17 +42,15 @@ const mocks = vi.hoisted(() => {
 			if (!encryptionPrivateKey || !publicKey) return null;
 			return { sessionId, encryptionPrivateKey, publicKey };
 		}),
-		sign: vi.fn(async (_payload: Uint8Array) => "mock-kms-signature"),
-		getPublicKeyJWK: vi.fn(async () => ({
-			kty: "OKP",
-			crv: "Ed25519",
-			x: "test-public-key",
-			kid: "arn:aws:kms:eu-central-1:000000000000:key/signing-test",
-			use: "sig",
-			alg: "EdDSA",
-		})),
+		sign: vi.fn(),
+		getPublicKeyJWK: vi.fn(),
 	};
 });
+
+mocks.sign.mockImplementation(async (payload: Uint8Array) =>
+	cryptoSign(null, Buffer.from(payload), signingPrivateKey),
+);
+mocks.getPublicKeyJWK.mockImplementation(async () => ({ ...signingPublicJwk }));
 
 vi.mock("../providers/db.ts", () => ({
 	storeSession: mocks.storeSession,
@@ -115,5 +127,7 @@ export function resetMocks() {
 export const storeSession = () => mocks.storeSession;
 export const getSession = () => mocks.getSession;
 export const sessions = () => mocks.sessions;
-export const sign = () => mocks.sign;
-export const getPublicKeyJWK = () => mocks.getPublicKeyJWK;
+export const sign = (): Mock<(payload: Uint8Array) => Promise<Buffer>> =>
+	mocks.sign;
+export const getPublicKeyJWK = (): Mock<() => Promise<typeof signingPublicJwk>> =>
+	mocks.getPublicKeyJWK;

@@ -3,7 +3,7 @@
 set -u
 set -o pipefail
 
-TARGET_DOCKER_IMAGE=idos-entropy
+TARGET_DOCKER_IMAGE=idos-encryption
 
 # Set allocation for enclave operation
 sudo sed -i 's/^memory_mib:.*/memory_mib: 8192/' /etc/nitro_enclaves/allocator.yaml

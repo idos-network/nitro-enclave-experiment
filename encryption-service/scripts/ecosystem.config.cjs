@@ -1,7 +1,7 @@
 module.exports = {
 	apps: [
 		{
-			name: "entropy",
+			name: "encryption",
 			cwd: "/app",
 			script: "npm",
 			args: "start",

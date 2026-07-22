@@ -3,7 +3,7 @@
 set -u
 set -o pipefail
 
-TARGET_DOCKER_IMAGE=idos-entropy
+TARGET_DOCKER_IMAGE=idos-encryption
 
 # Cleanup. This is ok to fail and proceed.
 sudo nitro-cli terminate-enclave --all
@@ -18,13 +18,13 @@ if [[ "${S3_SECRETS_BUCKET:-null}" == "null" ]]; then
   exit 1
 fi
 
-sed -i "s/INSERT_S3_SECRETS_BUCKET_HERE/$S3_SECRETS_BUCKET/g" ~ec2-user/entropy-service/Dockerfile
+sed -i "s/INSERT_S3_SECRETS_BUCKET_HERE/$S3_SECRETS_BUCKET/g" ~ec2-user/encryption-service/Dockerfile
 
 # Build origin Docker image
 docker build \
     -t "$TARGET_DOCKER_IMAGE" \
-    -f ~ec2-user/entropy-service/Dockerfile \
-    ~ec2-user/entropy-service/ \
+    -f ~ec2-user/encryption-service/Dockerfile \
+    ~ec2-user/encryption-service/ \
 ;
 
 # Free up memory for build-enclave

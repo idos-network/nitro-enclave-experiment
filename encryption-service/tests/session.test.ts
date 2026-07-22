@@ -1,3 +1,4 @@
+import { verify } from "node:crypto";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
 	createSession,
@@ -5,6 +6,7 @@ import {
 	SIGNING_KID,
 	sessions,
 	sign,
+	signingPublicKey,
 	storeSession,
 } from "./app.ts";
 
@@ -56,9 +58,18 @@ describe("POST /session", () => {
 		expect(signed).toBeInstanceOf(Uint8Array);
 		expect(Buffer.from(signed!).toString("utf8")).toBe(expectedSigningInput);
 
-		expect(encryptionPublicKeySignature.signature).toBe(
-			Buffer.from("mock-kms-signature").toString("base64url"),
+		const signature = Buffer.from(
+			encryptionPublicKeySignature.signature,
+			"base64url",
 		);
+		expect(
+			verify(
+				null,
+				Buffer.from(expectedSigningInput, "utf8"),
+				signingPublicKey,
+				signature,
+			),
+		).toBe(true);
 	});
 
 	it("returns a unique session each call", async () => {
