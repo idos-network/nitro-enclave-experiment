@@ -9,6 +9,7 @@ cryptsetup
 Dartifact
 davelosert
 dearmor
+decryptor
 Dfile
 Dgroup
 DNAT
@@ -17,6 +18,7 @@ Dpackaging
 dport
 Dversion
 ecparam
+encryptor
 facesign
 facetec
 facetecserver
@@ -28,15 +30,19 @@ healthcheck
 idos
 idphoto
 keygen
+keypair
 keyrings
 letsencrypt
 libavcodec
 libavutil
 libgomp
 libmongocrypt
+libnacl
 libnbd
+libsodium
 luks
 Multibase
+nacl
 nbdkit
 nocrypt
 nodesource

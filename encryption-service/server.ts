@@ -1,7 +1,11 @@
+import fs from "node:fs";
 import cors from "cors";
 import express, { type Express } from "express";
 import promBundle from "express-prom-bundle";
 import helmet from "helmet";
+import swaggerUi from "swagger-ui-express";
+import YAML from "yaml";
+
 import { sessionKeyMiddleware } from "./middleware/session-key.ts";
 import { decrypt, encrypt } from "./providers/encryption.ts";
 import { getPublicKeyJWK } from "./providers/kms.ts";
@@ -41,6 +45,18 @@ app.get("/", (_req, res) => {
 
 app.get("/health", async (_req, res) => {
 	res.status(200).json({ status: "ok" });
+});
+
+const file = fs.readFileSync("./openapi.yaml", "utf8");
+const swaggerDocument = YAML.parse(file);
+
+app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+app.get("/openapi.json", (_req, res) => {
+	res.json(swaggerDocument);
+});
+app.get("/openapi.yaml", (_req, res) => {
+	res.type("text/yaml");
+	res.send(file);
 });
 
 app.get("/.well-known/jwks.json", async (_req, res) => {

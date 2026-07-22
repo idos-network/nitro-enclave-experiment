@@ -1,4 +1,4 @@
-import { generateKeyPairSync, sign as cryptoSign } from "node:crypto";
+import { sign as cryptoSign, generateKeyPairSync } from "node:crypto";
 import type { NextFunction, Request, Response } from "express";
 import request from "supertest";
 import nacl from "tweetnacl";
@@ -129,5 +129,6 @@ export const getSession = () => mocks.getSession;
 export const sessions = () => mocks.sessions;
 export const sign = (): Mock<(payload: Uint8Array) => Promise<Buffer>> =>
 	mocks.sign;
-export const getPublicKeyJWK = (): Mock<() => Promise<typeof signingPublicJwk>> =>
-	mocks.getPublicKeyJWK;
+export const getPublicKeyJWK = (): Mock<
+	() => Promise<typeof signingPublicJwk>
+> => mocks.getPublicKeyJWK;
