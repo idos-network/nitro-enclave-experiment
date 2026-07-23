@@ -110,6 +110,7 @@ paths:
         Unwraps `session.wrappedEncryptionKey` using the session ephemeral key
         and the client public key stored at session creation, then returns the
         derived Curve25519 public key (base64).
+        Uses `CommonRequestSchema` (`session` + `audience` only).
       operationId: getSessionPublicKey
       parameters:
         - $ref: "#/components/parameters/XRequestId"
@@ -118,7 +119,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/SessionRequest"
+              $ref: "#/components/schemas/CommonRequest"
       responses:
         "200":
           description: Unwrapped user public key
@@ -143,6 +144,7 @@ paths:
         `arguments.publicKey` (recipient Curve25519 public key, base64) using
         the unwrapped encryption secret key.
         Returns NaCl box ciphertext as base64 (`nonce || ciphertext`).
+        Uses `DataRequestSchema` (`session` + `audience` + `arguments`).
       operationId: encrypt
       parameters:
         - $ref: "#/components/parameters/XRequestId"
@@ -151,7 +153,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/SessionRequest"
+              $ref: "#/components/schemas/DataRequest"
       responses:
         "200":
           description: Encrypted payload
@@ -172,10 +174,12 @@ paths:
       tags: [Session]
       summary: Decrypt data from a sender
       description: |
-        Decrypts `arguments.payload` (base64 `nonce || ciphertext`) using
-        `arguments.publicKey` (sender Curve25519 public key, base64) and the
-        unwrapped encryption secret key.
+        Decrypts using `arguments.publicKey` (sender Curve25519 public key,
+        base64) and the unwrapped encryption secret key.
+        If `arguments.nonce` is set, `arguments.payload` is ciphertext only;
+        otherwise `arguments.payload` is base64 `nonce || ciphertext`.
         Returns plaintext bytes as base64.
+        Uses `DataRequestSchema` (`session` + `audience` + `arguments`).
       operationId: decrypt
       parameters:
         - $ref: "#/components/parameters/XRequestId"
@@ -184,7 +188,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/SessionRequest"
+              $ref: "#/components/schemas/DataRequest"
       responses:
         "200":
           description: Decrypted payload
@@ -275,16 +279,19 @@ components:
 
     SessionArguments:
       type: object
-      required: [payload, nonce, publicKey]
+      required: [payload, publicKey]
       properties:
         payload:
           type: string
           description: |
             Base64-encoded payload. For encrypt: plaintext bytes.
-            For decrypt: `nonce || ciphertext`. May be unused for public-key.
+            For decrypt: ciphertext only when `nonce` is set, otherwise
+            `nonce || ciphertext`.
         nonce:
           type: string
-          description: Base64-encoded nonce
+          description: |
+            Optional base64-encoded nonce for decrypt. When omitted, the nonce
+            is taken from the first 24 bytes of `payload`.
         publicKey:
           type: string
           description: |
@@ -302,17 +309,25 @@ components:
           type: string
           description: Audience identifier
 
-    SessionRequest:
+    CommonRequest:
       type: object
-      required: [session, arguments, audience]
-      description: Body for session-authenticated endpoints (`RequestSchema`)
+      required: [session, audience]
+      description: Body for `POST /session/public-key` (`CommonRequestSchema`)
       properties:
         session:
           $ref: "#/components/schemas/SessionContext"
-        arguments:
-          $ref: "#/components/schemas/SessionArguments"
         audience:
           $ref: "#/components/schemas/Audience"
+
+    DataRequest:
+      allOf:
+        - $ref: "#/components/schemas/CommonRequest"
+        - type: object
+          required: [arguments]
+          description: Body for encrypt/decrypt (`DataRequestSchema`)
+          properties:
+            arguments:
+              $ref: "#/components/schemas/SessionArguments"
 
     EncryptionPublicKey:
       type: object
@@ -353,9 +368,9 @@ components:
 
     CreateSessionResponse:
       type: object
-      required: [id, encryptionPublicKey, encryptionPublicKeySignature]
+      required: [sessionId, encryptionPublicKey, encryptionPublicKeySignature]
       properties:
-        id:
+        sessionId:
           type: string
           format: uuid
         encryptionPublicKey:
@@ -365,10 +380,9 @@ components:
 
     PublicKeyResponse:
       type: object
-      required: [id, publicKey]
+      required: [sessionId, publicKey]
       properties:
-        id:
-          description: Session ID
+        sessionId:
           type: string
           format: uuid
         publicKey:
