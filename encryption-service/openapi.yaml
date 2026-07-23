@@ -253,29 +253,22 @@ components:
             type: string
           description: Audience roots permitted for this session
 
-    WrappedEncryptionKey:
-      type: object
-      required: [nonce, payload]
-      properties:
-        nonce:
-          type: string
-          description: Base64-encoded nonce used to wrap the key
-        payload:
-          type: string
-          description: |
-            Base64-encoded NaCl box of the user encryption secret key, sealed to
-            the session encryption public key with the client session secret key
-
     SessionContext:
       type: object
-      required: [id, wrappedEncryptionKey]
+      required: [id, encryptedKey, nonce]
       properties:
         id:
           type: string
           format: uuid
           description: Session UUID from `POST /session`
-        wrappedEncryptionKey:
-          $ref: "#/components/schemas/WrappedEncryptionKey"
+        nonce:
+          type: string
+          description: Base64-encoded nonce used to wrap the key
+        encryptedKey:
+          type: string
+          description: |
+            Base64-encoded NaCl box of the content encryption secret key, sealed to
+            the session encryption public key with the client session secret key
 
     SessionArguments:
       type: object
@@ -368,9 +361,9 @@ components:
 
     CreateSessionResponse:
       type: object
-      required: [sessionId, encryptionPublicKey, encryptionPublicKeySignature]
+      required: [id, encryptionPublicKey, encryptionPublicKeySignature]
       properties:
-        sessionId:
+        id:
           type: string
           format: uuid
         encryptionPublicKey:
@@ -382,9 +375,6 @@ components:
       type: object
       required: [sessionId, publicKey]
       properties:
-        sessionId:
-          type: string
-          format: uuid
         publicKey:
           type: string
           description: Base64 Curve25519 public key derived from the unwrapped encryption secret

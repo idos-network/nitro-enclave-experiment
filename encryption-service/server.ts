@@ -79,7 +79,7 @@ app.post("/session", async (req, res) => {
 	}
 
 	const session = await createSession(createSessionRequest.data);
-	writeLog("session_created", { sessionId: session.sessionId });
+	writeLog("session_created", { sessionId: session.id });
 	res.status(200).json(session);
 });
 

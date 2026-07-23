@@ -18,8 +18,8 @@ export async function getKeyPair(
 	const userPublicKey = Buffer.from(session.publicKey, "base64");
 
 	const secretKey = tweetnacl.box.open(
-		Buffer.from(request.session.wrappedEncryptionKey.payload, "base64"),
-		Buffer.from(request.session.wrappedEncryptionKey.nonce, "base64"),
+		Buffer.from(request.session.encryptedKey, "base64"),
+		Buffer.from(request.session.nonce, "base64"),
 		userPublicKey,
 		ephemeralKey.secretKey,
 	);

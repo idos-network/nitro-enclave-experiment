@@ -29,10 +29,8 @@ export function sessionBody(
 	> = {
 		session: {
 			id: session.id,
-			wrappedEncryptionKey: {
-				nonce: b64(nonce),
-				payload: b64(wrappedUserKey),
-			},
+			encryptedKey: b64(wrappedUserKey),
+			nonce: b64(nonce),
 		},
 		audience: {
 			root: "https://example.com",

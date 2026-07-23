@@ -112,7 +112,7 @@ export async function createSession(): Promise<CreateSessionResponse> {
 
 	return {
 		response: res.body as SessionResponse,
-		id: res.body.sessionId,
+		id: res.body.id,
 		serverPublicKey: Buffer.from(res.body.encryptionPublicKey.x, "base64"),
 		sessionClientKeyPair,
 	};

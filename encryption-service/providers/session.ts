@@ -58,7 +58,7 @@ export async function createSession(data: CreateSessionRequest) {
 	);
 
 	return {
-		sessionId,
+		id: sessionId,
 		encryptionPublicKey,
 		encryptionPublicKeySignature,
 	};

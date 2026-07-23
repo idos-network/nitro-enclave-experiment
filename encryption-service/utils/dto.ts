@@ -3,10 +3,8 @@ import { z } from "zod";
 export const CommonRequestSchema = z.object({
 	session: z.object({
 		id: z.uuid(), // UUID v4
-		wrappedEncryptionKey: z.object({
-			nonce: z.string(), // base64 encoded string
-			payload: z.string(), // base64 encoded string of encrypted private key
-		}),
+		encryptedKey: z.string(), // base64 encoded string of encrypted private key
+		nonce: z.string(), // base64 encoded string
 	}),
 	audience: z.object({
 		root: z.string(), // audience root
