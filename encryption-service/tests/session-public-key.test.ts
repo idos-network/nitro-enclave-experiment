@@ -53,7 +53,7 @@ describe("POST /session/public-key", () => {
 
 	it("returns 404 when wrappedUserKey cannot be unwrapped", async () => {
 		const session = await createSession();
-		session.serverPublicKey = nacl.box.keyPair().publicKey;
+		session.sessionServerPublicKey = nacl.box.keyPair().publicKey;
 
 		const body = sessionBody(session, nacl.randomBytes(32));
 

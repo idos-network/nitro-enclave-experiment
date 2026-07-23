@@ -23,7 +23,7 @@ export { signingPublicKey };
 const mocks = vi.hoisted(() => {
 	const sessions = new Map<
 		string,
-		{ encryptionPrivateKey: Uint8Array; publicKey: string }
+		{ sessionServerPrivateKey: Uint8Array; sessionClientPublicKey: string }
 	>();
 
 	return {
@@ -31,16 +31,16 @@ const mocks = vi.hoisted(() => {
 		storeSession: vi.fn(
 			async (
 				sessionId: string,
-				encryptionPrivateKey: Uint8Array,
-				publicKey: string,
+				sessionServerPrivateKey: Uint8Array,
+				sessionClientPublicKey: string,
 			) => {
-				sessions.set(sessionId, { encryptionPrivateKey, publicKey });
+				sessions.set(sessionId, { sessionServerPrivateKey, sessionClientPublicKey });
 			},
 		),
 		getSession: vi.fn(async (sessionId: string) => {
-			const { encryptionPrivateKey, publicKey } = sessions.get(sessionId) ?? {};
-			if (!encryptionPrivateKey || !publicKey) return null;
-			return { sessionId, encryptionPrivateKey, publicKey };
+			const { sessionServerPrivateKey, sessionClientPublicKey } = sessions.get(sessionId) ?? {};
+			if (!sessionServerPrivateKey || !sessionClientPublicKey) return null;
+			return { sessionId, sessionServerPrivateKey, sessionClientPublicKey };
 		}),
 		sign: vi.fn(),
 		getPublicKeyJWK: vi.fn(),
@@ -77,13 +77,13 @@ app.use((err: Error, _req: Request, res: Response, next: NextFunction) => {
 export { app };
 
 export type SessionResponse = {
-	sessionId: string;
-	encryptionPublicKey: {
+	id: string;
+	sessionServerPublicKey: {
 		kty: string;
 		crv: string;
 		x: string;
 	};
-	encryptionPublicKeySignature: {
+	sessionServerPublicKeySignature: {
 		protected: string;
 		payload: string;
 		signature: string;
@@ -91,9 +91,9 @@ export type SessionResponse = {
 };
 
 export interface CreateSessionResponse {
-	response: SessionResponse;
 	id: string;
-	serverPublicKey: Uint8Array;
+	response: SessionResponse;
+	sessionServerPublicKey: Uint8Array;
 	sessionClientKeyPair: nacl.BoxKeyPair;
 }
 
@@ -113,7 +113,7 @@ export async function createSession(): Promise<CreateSessionResponse> {
 	return {
 		response: res.body as SessionResponse,
 		id: res.body.id,
-		serverPublicKey: Buffer.from(res.body.encryptionPublicKey.x, "base64"),
+		sessionServerPublicKey: Buffer.from(res.body.sessionServerPublicKey.x, "base64"),
 		sessionClientKeyPair,
 	};
 }

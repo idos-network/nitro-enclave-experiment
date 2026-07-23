@@ -4,8 +4,8 @@ info:
   description: |
     Session-based encryption service. Clients create a session with their
     client public key and allowed audience roots, then authenticate later
-    requests with a wrapped encryption key to encrypt/decrypt data or fetch
-    the unwrapped user public key.
+    requests with a wrapped content encryption key to encrypt/decrypt data or
+    fetch the unwrapped user public key.
   version: 1.0.0
 
 servers:
@@ -64,7 +64,8 @@ paths:
       summary: JWKS for session signature verification
       description: |
         Returns the KMS signing public key as a JWK set. Used to verify
-        `encryptionPublicKeySignature` on session creation responses (EdDSA / Ed25519).
+        `sessionServerPublicKeySignature` on session creation responses
+        (EdDSA / Ed25519).
       operationId: getJwks
       responses:
         "200":
@@ -80,7 +81,7 @@ paths:
       summary: Create a session
       description: |
         Creates a new encryption session bound to `sessionClientPublicKey` and
-        `allowedAudienceRoots`. Returns the session encryption public key
+        `allowedAudienceRoots`. Returns the session server public key
         (X25519 JWK) and a flattened JWS signature over that key (RFC 7515).
       operationId: createSession
       requestBody:
@@ -107,9 +108,9 @@ paths:
       tags: [Session]
       summary: Get unwrapped user public key
       description: |
-        Unwraps `session.wrappedEncryptionKey` using the session ephemeral key
-        and the client public key stored at session creation, then returns the
-        derived Curve25519 public key (base64).
+        Unwraps `session.encryptedKey` using the session server key and the
+        client public key stored at session creation, then returns the derived
+        Curve25519 public key (base64).
         Uses `CommonRequestSchema` (`session` + `audience` only).
       operationId: getSessionPublicKey
       parameters:
@@ -142,7 +143,7 @@ paths:
       description: |
         Encrypts `arguments.payload` (base64 plaintext bytes) to
         `arguments.publicKey` (recipient Curve25519 public key, base64) using
-        the unwrapped encryption secret key.
+        the unwrapped content encryption secret key.
         Returns NaCl box ciphertext as base64 (`nonce || ciphertext`).
         Uses `DataRequestSchema` (`session` + `audience` + `arguments`).
       operationId: encrypt
@@ -175,7 +176,7 @@ paths:
       summary: Decrypt data from a sender
       description: |
         Decrypts using `arguments.publicKey` (sender Curve25519 public key,
-        base64) and the unwrapped encryption secret key.
+        base64) and the unwrapped content encryption secret key.
         If `arguments.nonce` is set, `arguments.payload` is ciphertext only;
         otherwise `arguments.payload` is base64 `nonce || ciphertext`.
         Returns plaintext bytes as base64.
@@ -246,7 +247,7 @@ components:
           type: string
           description: |
             Base64-encoded client Curve25519 public key. Stored with the session
-            and used later to unwrap `session.wrappedEncryptionKey`.
+            and used later to unwrap `session.encryptedKey`.
         allowedAudienceRoots:
           type: array
           items:
@@ -263,12 +264,12 @@ components:
           description: Session UUID from `POST /session`
         nonce:
           type: string
-          description: Base64-encoded nonce used to wrap the key
+          description: Base64-encoded nonce used to wrap the content encryption key
         encryptedKey:
           type: string
           description: |
-            Base64-encoded NaCl box of the content encryption secret key, sealed to
-            the session encryption public key with the client session secret key
+            Base64-encoded NaCl box of the content encryption secret key, sealed
+            to the session server public key with the client session secret key
 
     SessionArguments:
       type: object
@@ -322,9 +323,9 @@ components:
             arguments:
               $ref: "#/components/schemas/SessionArguments"
 
-    EncryptionPublicKey:
+    SessionServerPublicKey:
       type: object
-      description: X25519 public key as a JWK
+      description: X25519 session server public key as a JWK
       required: [kty, crv, x]
       properties:
         kty:
@@ -337,7 +338,7 @@ components:
           type: string
           description: Base64url-encoded X25519 public key
 
-    EncryptionPublicKeySignature:
+    SessionServerPublicKeySignature:
       type: object
       description: |
         Flattened JWS (RFC 7515 §7.2.2). Signing input is
@@ -354,30 +355,33 @@ components:
           type: string
           description: |
             Base64url-encoded JWS payload. Decodes to
-            `{ publicKeyX: encryptionPublicKey.x, nonce: <uuid> }`.
+            `{ publicKeyX: sessionServerPublicKey.x, nonce: <uuid> }`.
         signature:
           type: string
           description: Base64url-encoded Ed25519 signature
 
     CreateSessionResponse:
       type: object
-      required: [id, encryptionPublicKey, encryptionPublicKeySignature]
+      required: [id, sessionServerPublicKey, sessionServerPublicKeySignature]
       properties:
         id:
           type: string
           format: uuid
-        encryptionPublicKey:
-          $ref: "#/components/schemas/EncryptionPublicKey"
-        encryptionPublicKeySignature:
-          $ref: "#/components/schemas/EncryptionPublicKeySignature"
+        sessionServerPublicKey:
+          $ref: "#/components/schemas/SessionServerPublicKey"
+        sessionServerPublicKeySignature:
+          $ref: "#/components/schemas/SessionServerPublicKeySignature"
 
     PublicKeyResponse:
       type: object
       required: [sessionId, publicKey]
       properties:
+        sessionId:
+          type: string
+          format: uuid
         publicKey:
           type: string
-          description: Base64 Curve25519 public key derived from the unwrapped encryption secret
+          description: Base64 Curve25519 public key derived from the unwrapped content encryption secret
 
     DataResponse:
       type: object

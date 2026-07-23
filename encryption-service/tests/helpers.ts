@@ -16,7 +16,7 @@ export function sessionBody(
 	const wrappedUserKey = nacl.box(
 		userRandomBytes,
 		nonce,
-		session.serverPublicKey,
+		session.sessionServerPublicKey,
 		session.sessionClientKeyPair.secretKey,
 	);
 

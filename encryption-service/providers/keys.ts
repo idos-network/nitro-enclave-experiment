@@ -11,17 +11,17 @@ export async function getKeyPair(
 		return null;
 	}
 
-	const ephemeralKey = tweetnacl.box.keyPair.fromSecretKey(
-		session.encryptionPrivateKey,
+	const sessionServerKeyPair = tweetnacl.box.keyPair.fromSecretKey(
+		session.sessionServerPrivateKey,
 	);
 
-	const userPublicKey = Buffer.from(session.publicKey, "base64");
+	const sessionClientPublicKey = Buffer.from(session.sessionClientPublicKey, "base64");
 
 	const secretKey = tweetnacl.box.open(
 		Buffer.from(request.session.encryptedKey, "base64"),
 		Buffer.from(request.session.nonce, "base64"),
-		userPublicKey,
-		ephemeralKey.secretKey,
+		sessionClientPublicKey,
+		sessionServerKeyPair.secretKey,
 	);
 
 	if (!secretKey) {

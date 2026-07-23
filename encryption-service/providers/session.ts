@@ -9,11 +9,11 @@ export async function createSession(data: CreateSessionRequest) {
 	const sessionId = crypto.randomUUID();
 
 	// 2. Generate Ephemeral X25519 Encryption Keys
-	const encryptionKeyPair = tweetnacl.box.keyPair();
-	const encryptionPublicKey = {
+	const sessionServerKeyPair = tweetnacl.box.keyPair();
+	const sessionServerPublicKey = {
 		kty: "OKP",
 		crv: "X25519",
-		x: Buffer.from(encryptionKeyPair.publicKey).toString("base64url"),
+		x: Buffer.from(sessionServerKeyPair.publicKey).toString("base64url"),
 	};
 
 	// 3. JWS protected header (RFC 7515)
@@ -27,7 +27,7 @@ export async function createSession(data: CreateSessionRequest) {
 	// 4. Payload — nonce salts the signature so identical keys don't fingerprint
 	const payloadBase64Url = Buffer.from(
 		JSON.stringify({
-			publicKeyX: encryptionPublicKey.x,
+			publicKeyX: sessionServerPublicKey.x,
 			nonce: crypto.randomUUID(),
 		}),
 	).toString("base64url");
@@ -43,7 +43,7 @@ export async function createSession(data: CreateSessionRequest) {
 	const signatureBase64Url = Buffer.from(rawSignature).toString("base64url");
 
 	// 7. Flattened JWS JSON Serialization (RFC 7515 §7.2.2)
-	const encryptionPublicKeySignature = {
+	const sessionServerPublicKeySignature = {
 		protected: protectedBase64Url,
 		payload: payloadBase64Url,
 		signature: signatureBase64Url,
@@ -52,14 +52,14 @@ export async function createSession(data: CreateSessionRequest) {
 	// 8. Save ephemeral private state securely
 	await storeSession(
 		sessionId,
-		encryptionKeyPair.secretKey,
+		sessionServerKeyPair.secretKey,
 		data.sessionClientPublicKey,
 		data.allowedAudienceRoots,
 	);
 
 	return {
 		id: sessionId,
-		encryptionPublicKey,
-		encryptionPublicKeySignature,
+		sessionServerPublicKey,
+		sessionServerPublicKeySignature,
 	};
 }

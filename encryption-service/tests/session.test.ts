@@ -24,29 +24,29 @@ describe("POST /session", () => {
 		expect(storeSession()).toHaveBeenCalledOnce();
 		expect(storeSession().mock.calls[0]?.[0]).toBe(session.id);
 		expect(storeSession().mock.calls[0]?.[2]).toBe(publicKey);
-		expect(sessions().get(session.id)?.publicKey).toBe(publicKey);
+		expect(sessions().get(session.id)?.sessionClientPublicKey).toBe(publicKey);
 
-		const { encryptionPublicKey, encryptionPublicKeySignature } =
+		const { sessionServerPublicKey, sessionServerPublicKeySignature } =
 			session.response;
 
-		expect(encryptionPublicKey).toEqual({
+		expect(sessionServerPublicKey).toEqual({
 			kty: "OKP",
 			crv: "X25519",
 			x: expect.stringMatching(/^[A-Za-z0-9_-]+$/),
 		});
 
 		const payload = JSON.parse(
-			Buffer.from(encryptionPublicKeySignature.payload, "base64url").toString(
+			Buffer.from(sessionServerPublicKeySignature.payload, "base64url").toString(
 				"utf8",
 			),
 		);
 		expect(payload).toEqual({
-			publicKeyX: encryptionPublicKey.x,
+			publicKeyX: sessionServerPublicKey.x,
 			nonce: expect.any(String),
 		});
 
 		const protectedHeader = JSON.parse(
-			Buffer.from(encryptionPublicKeySignature.protected, "base64url").toString(
+			Buffer.from(sessionServerPublicKeySignature.protected, "base64url").toString(
 				"utf8",
 			),
 		);
@@ -56,13 +56,13 @@ describe("POST /session", () => {
 			alg: "EdDSA",
 		});
 
-		const expectedSigningInput = `${encryptionPublicKeySignature.protected}.${encryptionPublicKeySignature.payload}`;
+		const expectedSigningInput = `${sessionServerPublicKeySignature.protected}.${sessionServerPublicKeySignature.payload}`;
 		const signed = sign().mock.calls[0]?.[0];
 		expect(signed).toBeInstanceOf(Uint8Array);
 		expect(Buffer.from(signed!).toString("utf8")).toBe(expectedSigningInput);
 
 		const signature = Buffer.from(
-			encryptionPublicKeySignature.signature,
+			sessionServerPublicKeySignature.signature,
 			"base64url",
 		);
 		expect(
