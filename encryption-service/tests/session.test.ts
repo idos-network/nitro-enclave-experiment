@@ -35,7 +35,12 @@ describe("POST /session", () => {
 			x: expect.stringMatching(/^[A-Za-z0-9_-]+$/),
 		});
 
-		expect(encryptionPublicKeySignature.payload).toEqual({
+		const payload = JSON.parse(
+			Buffer.from(encryptionPublicKeySignature.payload, "base64url").toString(
+				"utf8",
+			),
+		);
+		expect(payload).toEqual({
 			publicKeyX: encryptionPublicKey.x,
 			nonce: expect.any(String),
 		});
@@ -49,11 +54,9 @@ describe("POST /session", () => {
 		expect(protectedHeader).toEqual({
 			kid: SIGNING_KID,
 			alg: "EdDSA",
-			b64: false,
-			crit: ["b64"],
 		});
 
-		const expectedSigningInput = `${encryptionPublicKeySignature.protected}.${JSON.stringify(encryptionPublicKeySignature.payload)}`;
+		const expectedSigningInput = `${encryptionPublicKeySignature.protected}.${encryptionPublicKeySignature.payload}`;
 		const signed = sign().mock.calls[0]?.[0];
 		expect(signed).toBeInstanceOf(Uint8Array);
 		expect(Buffer.from(signed!).toString("utf8")).toBe(expectedSigningInput);

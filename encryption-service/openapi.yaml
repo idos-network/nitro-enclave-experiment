@@ -3,8 +3,9 @@ info:
   title: Encryption Service
   description: |
     Session-based encryption service. Clients create a session with their
-    public key, then use a wrapped encryption key to encrypt/decrypt data or
-    fetch the unwrapped user public key.
+    client public key and allowed audience roots, then authenticate later
+    requests with a wrapped encryption key to encrypt/decrypt data or fetch
+    the unwrapped user public key.
   version: 1.0.0
 
 servers:
@@ -78,9 +79,9 @@ paths:
       tags: [Session]
       summary: Create a session
       description: |
-        Creates a new encryption session bound to the caller's `publicKey`.
-        Returns the session encryption public key (X25519 JWK) and a flattened
-        JWS signature over that key (RFC 7797, `b64: false`).
+        Creates a new encryption session bound to `sessionClientPublicKey` and
+        `allowedAudienceRoots`. Returns the session encryption public key
+        (X25519 JWK) and a flattened JWS signature over that key (RFC 7515).
       operationId: createSession
       requestBody:
         required: true
@@ -106,9 +107,9 @@ paths:
       tags: [Session]
       summary: Get unwrapped user public key
       description: |
-        Unwraps `wrappedEncryptionKey` using the session ephemeral key and the
-        client public key stored at session creation, then returns the derived
-        Curve25519 public key (base64).
+        Unwraps `session.wrappedEncryptionKey` using the session ephemeral key
+        and the client public key stored at session creation, then returns the
+        derived Curve25519 public key (base64).
       operationId: getSessionPublicKey
       parameters:
         - $ref: "#/components/parameters/XRequestId"
@@ -138,8 +139,9 @@ paths:
       tags: [Session]
       summary: Encrypt data for a recipient
       description: |
-        Encrypts `data` (base64 plaintext bytes) to `publicKey` (recipient
-        Curve25519 public key, base64) using the unwrapped encryption secret key.
+        Encrypts `arguments.payload` (base64 plaintext bytes) to
+        `arguments.publicKey` (recipient Curve25519 public key, base64) using
+        the unwrapped encryption secret key.
         Returns NaCl box ciphertext as base64 (`nonce || ciphertext`).
       operationId: encrypt
       parameters:
@@ -170,8 +172,9 @@ paths:
       tags: [Session]
       summary: Decrypt data from a sender
       description: |
-        Decrypts `data` (base64 `nonce || ciphertext`) using `publicKey`
-        (sender Curve25519 public key, base64) and the unwrapped encryption secret key.
+        Decrypts `arguments.payload` (base64 `nonce || ciphertext`) using
+        `arguments.publicKey` (sender Curve25519 public key, base64) and the
+        unwrapped encryption secret key.
         Returns plaintext bytes as base64.
       operationId: decrypt
       parameters:
@@ -232,49 +235,84 @@ components:
   schemas:
     CreateSessionRequest:
       type: object
-      required: [publicKey]
+      required: [sessionClientPublicKey, allowedAudienceRoots]
       description: Body for `POST /session` (`CreateSessionRequestSchema`)
       properties:
-        publicKey:
+        sessionClientPublicKey:
           type: string
           description: |
             Base64-encoded client Curve25519 public key. Stored with the session
-            and used later to unwrap `wrappedEncryptionKey`.
+            and used later to unwrap `session.wrappedEncryptionKey`.
+        allowedAudienceRoots:
+          type: array
+          items:
+            type: string
+          description: Audience roots permitted for this session
 
     WrappedEncryptionKey:
       type: object
-      required: [sessionId, encryptedKey, nonce]
+      required: [nonce, payload]
       properties:
-        sessionId:
+        nonce:
           type: string
-          format: uuid
-          description: Session UUID from `POST /session`
-        encryptedKey:
+          description: Base64-encoded nonce used to wrap the key
+        payload:
           type: string
           description: |
             Base64-encoded NaCl box of the user encryption secret key, sealed to
             the session encryption public key with the client session secret key
-        nonce:
-          type: string
-          description: Base64-encoded nonce used to wrap the key
 
-    SessionRequest:
+    SessionContext:
       type: object
-      required: [wrappedEncryptionKey, data, publicKey]
-      description: Body for session-authenticated endpoints (`RequestSchema`)
+      required: [id, wrappedEncryptionKey]
       properties:
+        id:
+          type: string
+          format: uuid
+          description: Session UUID from `POST /session`
         wrappedEncryptionKey:
           $ref: "#/components/schemas/WrappedEncryptionKey"
-        data:
+
+    SessionArguments:
+      type: object
+      required: [payload, nonce, publicKey]
+      properties:
+        payload:
           type: string
           description: |
             Base64-encoded payload. For encrypt: plaintext bytes.
             For decrypt: `nonce || ciphertext`. May be unused for public-key.
+        nonce:
+          type: string
+          description: Base64-encoded nonce
         publicKey:
           type: string
           description: |
             Base64 Curve25519 public key. For encrypt: recipient (decryptor).
             For decrypt: sender (encryptor).
+
+    Audience:
+      type: object
+      required: [root, identifier]
+      properties:
+        root:
+          type: string
+          description: Audience root
+        identifier:
+          type: string
+          description: Audience identifier
+
+    SessionRequest:
+      type: object
+      required: [session, arguments, audience]
+      description: Body for session-authenticated endpoints (`RequestSchema`)
+      properties:
+        session:
+          $ref: "#/components/schemas/SessionContext"
+        arguments:
+          $ref: "#/components/schemas/SessionArguments"
+        audience:
+          $ref: "#/components/schemas/Audience"
 
     EncryptionPublicKey:
       type: object
@@ -294,35 +332,30 @@ components:
     EncryptionPublicKeySignature:
       type: object
       description: |
-        Flattened JWS (RFC 7515 §7.2.2) with unencoded payload (RFC 7797,
-        `b64: false`). Signing input is `protected + "." + JSON.stringify(payload)`.
+        Flattened JWS (RFC 7515 §7.2.2). Signing input is
+        `protected + "." + payload` (both base64url).
+        Decoded payload JSON is `{ publicKeyX, nonce }`.
       required: [protected, payload, signature]
       properties:
         protected:
           type: string
           description: |
             Base64url-encoded JWS protected header
-            (`{ kid, alg: "EdDSA", b64: false, crit: ["b64"] }`)
+            (`{ kid, alg: "EdDSA" }`)
         payload:
-          type: object
-          required: [publicKeyX, nonce]
-          properties:
-            publicKeyX:
-              type: string
-              description: Same value as `encryptionPublicKey.x`
-            nonce:
-              type: string
-              format: uuid
-              description: Random nonce to prevent deterministic sign fingerprinting
+          type: string
+          description: |
+            Base64url-encoded JWS payload. Decodes to
+            `{ publicKeyX: encryptionPublicKey.x, nonce: <uuid> }`.
         signature:
           type: string
           description: Base64url-encoded Ed25519 signature
 
     CreateSessionResponse:
       type: object
-      required: [sessionId, encryptionPublicKey, encryptionPublicKeySignature]
+      required: [id, encryptionPublicKey, encryptionPublicKeySignature]
       properties:
-        sessionId:
+        id:
           type: string
           format: uuid
         encryptionPublicKey:
@@ -332,9 +365,10 @@ components:
 
     PublicKeyResponse:
       type: object
-      required: [sessionId, publicKey]
+      required: [id, publicKey]
       properties:
-        sessionId:
+        id:
+          description: Session ID
           type: string
           format: uuid
         publicKey:

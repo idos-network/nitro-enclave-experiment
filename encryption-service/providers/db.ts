@@ -127,6 +127,7 @@ export async function storeSession(
 	sessionId: string,
 	encryptionPrivateKey: Uint8Array,
 	publicKey: string,
+	allowedAudienceRoots: string[],
 ) {
 	const { db, encrypt } = await connectDB();
 
@@ -136,6 +137,9 @@ export async function storeSession(
 			Buffer.from(encryptionPrivateKey).toString("base64"),
 		),
 		publicKey,
+		allowedAudienceRoots: await encrypt(
+			Buffer.from(JSON.stringify(allowedAudienceRoots)).toString("base64"),
+		),
 	});
 }
 
@@ -143,9 +147,11 @@ export async function getSession(sessionId: string) {
 	const { db, decrypt } = await connectDB();
 
 	const session = await db
-		.collection<{ publicKey: string; encryptionPrivateKey: Binary }>(
-			FACE_SIGN_ENCRYPTION_COLLECTION,
-		)
+		.collection<{
+			publicKey: string;
+			encryptionPrivateKey: Binary;
+			allowedAudienceRoots: Binary;
+		}>(FACE_SIGN_ENCRYPTION_COLLECTION)
 		.findOne({ sessionId });
 
 	if (!session) {
@@ -156,6 +162,12 @@ export async function getSession(sessionId: string) {
 
 	return {
 		...session,
+		allowedAudienceRoots: JSON.parse(
+			Buffer.from(
+				await decrypt(session.allowedAudienceRoots),
+				"base64",
+			).toString("utf8"),
+		),
 		encryptionPrivateKey: Buffer.from(
 			await decrypt(session.encryptionPrivateKey),
 			"base64",

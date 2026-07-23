@@ -10,18 +10,18 @@ describe("POST /session/public-key", () => {
 	it("returns the unwrapped user public key", async () => {
 		const session = await createSession();
 
-		const userKeyPair = nacl.box.keyPair();
+		const contentEncryptionKeyPair = nacl.box.keyPair();
 
 		const res = await request(app)
 			.post("/session/public-key")
-			.send(sessionBody(session, userKeyPair.secretKey))
+			.send(sessionBody(session, contentEncryptionKeyPair.secretKey))
 			.expect(200);
 
 		expect(getSession()).toHaveBeenCalledWith(session.id);
 
 		expect(res.body).toEqual({
 			sessionId: session.id,
-			publicKey: b64(userKeyPair.publicKey),
+			publicKey: b64(contentEncryptionKeyPair.publicKey),
 		});
 	});
 
@@ -40,11 +40,11 @@ describe("POST /session/public-key", () => {
 		const session = await createSession();
 		session.id = missingSessionId;
 
-		const userKeyPair = nacl.box.keyPair();
+		const contentEncryptionKeyPair = nacl.box.keyPair();
 
 		const res = await request(app)
 			.post("/session/public-key")
-			.send(sessionBody(session, userKeyPair.secretKey))
+			.send(sessionBody(session, contentEncryptionKeyPair.secretKey))
 			.expect(404);
 
 		expect(res.body).toEqual({ error: "Session not found" });

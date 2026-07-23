@@ -1,9 +1,10 @@
 import tweetnacl from "tweetnacl";
 import { SIGNING_KEY_KMS_KEY_ID } from "../env.ts";
+import type { CreateSessionRequest } from "../utils/dto.ts";
 import { storeSession } from "./db.ts";
 import { sign } from "./kms.ts";
 
-export async function createSession(publicKey: string) {
+export async function createSession(data: CreateSessionRequest) {
 	// 1. Generate unique Session ID
 	const sessionId = crypto.randomUUID();
 
@@ -15,45 +16,46 @@ export async function createSession(publicKey: string) {
 		x: Buffer.from(encryptionKeyPair.publicKey).toString("base64url"),
 	};
 
-	// 3. Define and Strict-Encode the JWS Protected Header
-	const protectedDecoded = {
-		kid: SIGNING_KEY_KMS_KEY_ID,
-		// TODO: I'd also maybe add jku here
-		alg: "EdDSA",
-		b64: false,
-		crit: ["b64"], // Standard JWS requires declaring "b64" in "crit" when false
-	};
-
-	// Convert header to its Base64Url representation
+	// 3. JWS protected header (RFC 7515)
 	const protectedBase64Url = Buffer.from(
-		JSON.stringify(protectedDecoded),
+		JSON.stringify({
+			kid: SIGNING_KEY_KMS_KEY_ID,
+			alg: "EdDSA",
+		}),
 	).toString("base64url");
 
-	// 4. Construct the Payload (Your structural nonce acts perfectly as a cryptographic salt here)
-	const payload = {
-		publicKeyX: encryptionPublicKey.x,
-		nonce: crypto.randomUUID(), // Successfully prevents deterministic sign fingerprinting
-	};
-	const payloadJson = JSON.stringify(payload);
+	// 4. Payload — nonce salts the signature so identical keys don't fingerprint
+	const payloadBase64Url = Buffer.from(
+		JSON.stringify({
+			publicKeyX: encryptionPublicKey.x,
+			nonce: crypto.randomUUID(),
+		}),
+	).toString("base64url");
 
-	// 5. Construct Signing Input exactly to RFC 7797 specifications:
-	// Format: Base64Url(Protected) + "." + Raw_Payload
-	const signingInputString = `${protectedBase64Url}.${payloadJson}`;
-	const signingInputBuffer = Buffer.from(signingInputString, "utf-8");
+	// 5. Signing input: base64url(header) + "." + base64url(payload)
+	const signingInputBuffer = Buffer.from(
+		`${protectedBase64Url}.${payloadBase64Url}`,
+		"utf-8",
+	);
 
-	// 6. Execute libnacl / KMS signature calculation
+	// 6. Sign via KMS
 	const rawSignature = await sign(signingInputBuffer);
 	const signatureBase64Url = Buffer.from(rawSignature).toString("base64url");
 
-	// 7. Output compliant Flattened JSON Serialization
+	// 7. Flattened JWS JSON Serialization (RFC 7515 §7.2.2)
 	const encryptionPublicKeySignature = {
-		protected: protectedBase64Url, // Stored as the encoded string
-		payload: payload, // Left unencoded as a clean JSON object inside the envelope
+		protected: protectedBase64Url,
+		payload: payloadBase64Url,
 		signature: signatureBase64Url,
 	};
 
 	// 8. Save ephemeral private state securely
-	await storeSession(sessionId, encryptionKeyPair.secretKey, publicKey);
+	await storeSession(
+		sessionId,
+		encryptionKeyPair.secretKey,
+		data.sessionClientPublicKey,
+		data.allowedAudienceRoots,
+	);
 
 	return {
 		sessionId,

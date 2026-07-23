@@ -10,11 +10,11 @@ describe("POST /session/decrypt", () => {
 
 	it("decrypts a sender ciphertext", async () => {
 		const session = await createSession();
-		const userKeyPair = nacl.box.keyPair();
+		const contentEncryptionKeyPair = nacl.box.keyPair();
 		const recipientKeyPair = nacl.box.keyPair();
 		const plaintext = b64(Buffer.from("decrypt me"));
 		const ciphertext = encrypt(
-			userKeyPair,
+			contentEncryptionKeyPair,
 			b64(recipientKeyPair.publicKey),
 			plaintext,
 		);
@@ -22,8 +22,8 @@ describe("POST /session/decrypt", () => {
 		const res = await request(app)
 			.post("/session/decrypt")
 			.send(
-				sessionBody(session, userKeyPair.secretKey, {
-					data: ciphertext,
+				sessionBody(session, contentEncryptionKeyPair.secretKey, {
+					payload: ciphertext,
 					publicKey: b64(recipientKeyPair.publicKey),
 				}),
 			)
@@ -53,7 +53,7 @@ describe("POST /session/decrypt", () => {
 			.post("/session/decrypt")
 			.send(
 				sessionBody(session, recipient.secretKey, {
-					data: b64(Buffer.from("unused")),
+					payload: b64(Buffer.from("unused")),
 					publicKey: b64(recipient.publicKey),
 				}),
 			)

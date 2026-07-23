@@ -10,15 +10,15 @@ describe("POST /session/encrypt", () => {
 
 	it("encrypts for a recipient", async () => {
 		const session = await createSession();
-		const userKeyPair = nacl.box.keyPair();
+		const contentEncryptionKeyPair = nacl.box.keyPair();
 		const recipientKeyPair = nacl.box.keyPair();
 		const plaintext = b64(Buffer.from("encrypt me"));
 
 		const res = await request(app)
 			.post("/session/encrypt")
 			.send(
-				sessionBody(session, userKeyPair.secretKey, {
-					data: plaintext,
+				sessionBody(session, contentEncryptionKeyPair.secretKey, {
+					payload: plaintext,
 					publicKey: b64(recipientKeyPair.publicKey),
 				}),
 			)
@@ -26,9 +26,10 @@ describe("POST /session/encrypt", () => {
 
 		const recovered = decrypt(
 			recipientKeyPair,
-			b64(userKeyPair.publicKey),
+			b64(contentEncryptionKeyPair.publicKey),
 			res.body.data,
 		);
+
 		expect(recovered).toBe(plaintext);
 	});
 
@@ -43,7 +44,7 @@ describe("POST /session/encrypt", () => {
 	});
 
 	it("returns 404 when session is missing", async () => {
-		const userKeyPair = nacl.box.keyPair();
+		const contentEncryptionKeyPair = nacl.box.keyPair();
 		const missingSessionId = crypto.randomUUID();
 
 		const session = await createSession();
@@ -51,7 +52,12 @@ describe("POST /session/encrypt", () => {
 
 		const res = await request(app)
 			.post("/session/encrypt")
-			.send(sessionBody(session, userKeyPair.secretKey))
+			.send(
+				sessionBody(session, contentEncryptionKeyPair.secretKey, {
+					payload: b64(Buffer.from("encrypt me")),
+					publicKey: b64(contentEncryptionKeyPair.publicKey),
+				}),
+			)
 			.expect(404);
 
 		expect(res.body).toEqual({ error: "Session not found" });

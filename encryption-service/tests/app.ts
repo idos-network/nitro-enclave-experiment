@@ -85,10 +85,7 @@ export type SessionResponse = {
 	};
 	encryptionPublicKeySignature: {
 		protected: string;
-		payload: {
-			publicKeyX: string;
-			nonce: string;
-		};
+		payload: string;
 		signature: string;
 	};
 };
@@ -106,7 +103,10 @@ export async function createSession(): Promise<CreateSessionResponse> {
 	const res = await request(app)
 		.post("/session")
 		.send({
-			publicKey: Buffer.from(sessionClientKeyPair.publicKey).toString("base64"),
+			sessionClientPublicKey: Buffer.from(
+				sessionClientKeyPair.publicKey,
+			).toString("base64"),
+			allowedAudienceRoots: [],
 		})
 		.expect(200);
 

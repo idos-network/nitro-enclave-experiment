@@ -11,7 +11,11 @@ import { decrypt, encrypt } from "./providers/encryption.ts";
 import { getPublicKeyJWK } from "./providers/kms.ts";
 import loggerMiddleware from "./providers/logger.ts";
 import { createSession } from "./providers/session.ts";
-import { CreateSessionRequestSchema } from "./utils/dto.ts";
+import {
+	CommonRequestSchema,
+	CreateSessionRequestSchema,
+	DataRequestSchema,
+} from "./utils/dto.ts";
 import { writeLog } from "./utils/logger-context.ts";
 import { runWithRequestContext } from "./utils/request-context.ts";
 
@@ -74,48 +78,65 @@ app.post("/session", async (req, res) => {
 		});
 	}
 
-	const session = await createSession(createSessionRequest.data.publicKey);
+	const session = await createSession(createSessionRequest.data);
 	writeLog("session_created", { sessionId: session.sessionId });
 	res.status(200).json(session);
 });
 
-app.post("/session/public-key", sessionKeyMiddleware, async (req, res) => {
-	writeLog("public_key_request", {
-		sessionId: req.sessionRequest.wrappedEncryptionKey.sessionId,
-	});
+app.post(
+	"/session/public-key",
+	sessionKeyMiddleware(CommonRequestSchema),
+	async (req, res) => {
+		writeLog("public_key_request", {
+			sessionId: req.sessionRequest.session.id,
+		});
 
-	return res.json({
-		sessionId: req.sessionRequest.wrappedEncryptionKey.sessionId,
-		publicKey: Buffer.from(req.keyPair.publicKey).toString("base64"),
-	});
-});
+		return res.json({
+			sessionId: req.sessionRequest.session.id,
+			publicKey: Buffer.from(req.keyPair.publicKey).toString("base64"),
+		});
+	},
+);
 
-app.post("/session/encrypt", sessionKeyMiddleware, async (req, res) => {
-	writeLog("encrypt_request", {
-		sessionId: req.sessionRequest.wrappedEncryptionKey.sessionId,
-	});
+app.post(
+	"/session/encrypt",
+	sessionKeyMiddleware(DataRequestSchema),
+	async (req, res) => {
+		writeLog("encrypt_request", {
+			sessionId: req.sessionRequest.session.id,
+		});
 
-	const data = await encrypt(
-		req.keyPair,
-		req.sessionRequest.publicKey,
-		req.sessionRequest.data,
-	);
+		const data = await encrypt(
+			req.keyPair,
+			req.sessionRequest.arguments.publicKey,
+			req.sessionRequest.arguments.payload,
+		);
 
-	return res.json({ data });
-});
+		// TODO: Encrypt for the audience
 
-app.post("/session/decrypt", sessionKeyMiddleware, async (req, res) => {
-	writeLog("decrypt_request", {
-		sessionId: req.sessionRequest.wrappedEncryptionKey.sessionId,
-	});
+		return res.json({ data });
+	},
+);
 
-	const data = await decrypt(
-		req.keyPair,
-		req.sessionRequest.publicKey,
-		req.sessionRequest.data,
-	);
+app.post(
+	"/session/decrypt",
+	sessionKeyMiddleware(DataRequestSchema),
+	async (req, res) => {
+		writeLog("decrypt_request", {
+			sessionId: req.sessionRequest.session.id,
+		});
 
-	return res.json({ data });
-});
+		const data = await decrypt(
+			req.keyPair,
+			req.sessionRequest.arguments.publicKey,
+			req.sessionRequest.arguments.payload,
+			req.sessionRequest.arguments.nonce,
+		);
+
+		// TODO: Encrypt for the audience
+
+		return res.json({ data });
+	},
+);
 
 export default app;

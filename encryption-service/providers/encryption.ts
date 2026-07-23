@@ -38,11 +38,20 @@ export function encrypt(
 export function decrypt(
 	keyPair: BoxKeyPair,
 	senderEncryptionPublicKey: string,
-	message: string,
+	payload: string,
+	requestNonce: string | undefined = undefined,
 ): string {
-	const fullMessage = Buffer.from(message, "base64");
-	const nonce = fullMessage.subarray(0, nacl.box.nonceLength);
-	const encrypted = fullMessage.subarray(nacl.box.nonceLength);
+	let encrypted: Uint8Array;
+	let nonce: Uint8Array;
+
+	if (requestNonce) {
+		nonce = Buffer.from(requestNonce, "base64");
+		encrypted = Buffer.from(payload, "base64");
+	} else {
+		const fullMessage = Buffer.from(payload, "base64");
+		nonce = fullMessage.subarray(0, nacl.box.nonceLength);
+		encrypted = fullMessage.subarray(nacl.box.nonceLength);
+	}
 
 	const decrypted = nacl.box.open(
 		encrypted,
@@ -55,7 +64,7 @@ export function decrypt(
 		throw Error(
 			`Couldn't decrypt the provided message. ${JSON.stringify(
 				{
-					message,
+					message: encrypted,
 					nonce: Buffer.from(nonce).toString("base64"),
 					senderEncryptionPublicKey,
 				},

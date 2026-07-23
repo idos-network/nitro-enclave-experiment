@@ -11,7 +11,7 @@ describe("e2e: session → encrypt → decrypt", () => {
 		const sessionUser = await createSession();
 		const sessionRecipient = await createSession();
 
-		const userKeyPair = nacl.box.keyPair();
+		const contentEncryptionKeyPair = nacl.box.keyPair();
 		const recipientKeyPair = nacl.box.keyPair();
 
 		const plaintext = b64(Buffer.from("e2e roundtrip payload"));
@@ -19,8 +19,8 @@ describe("e2e: session → encrypt → decrypt", () => {
 		const encrypted = await request(app)
 			.post("/session/encrypt")
 			.send(
-				sessionBody(sessionUser, userKeyPair.secretKey, {
-					data: plaintext,
+				sessionBody(sessionUser, contentEncryptionKeyPair.secretKey, {
+					payload: plaintext,
 					// Encrypt for the recipient
 					publicKey: b64(recipientKeyPair.publicKey),
 				}),
@@ -34,9 +34,10 @@ describe("e2e: session → encrypt → decrypt", () => {
 			.post("/session/decrypt")
 			.send(
 				sessionBody(sessionRecipient, recipientKeyPair.secretKey, {
-					data: encrypted.body.data,
+					payload: encrypted.body.data,
+					// nonce: b64(encrypted.body.nonce),
 					// Recipient can decrypt
-					publicKey: b64(userKeyPair.publicKey),
+					publicKey: b64(contentEncryptionKeyPair.publicKey),
 				}),
 			)
 			.expect(200);

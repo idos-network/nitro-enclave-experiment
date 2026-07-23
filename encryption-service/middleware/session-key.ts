@@ -1,39 +1,47 @@
 import type { RequestHandler } from "express";
 import type nacl from "tweetnacl";
+import type { z } from "zod";
 import { getKeyPair } from "../providers/keys.ts";
-import { RequestSchema, type Request as SessionRequest } from "../utils/dto.ts";
+import type { DataRequest } from "../utils/dto.ts";
 import { writeLog } from "../utils/logger-context.ts";
 
 declare global {
 	namespace Express {
 		interface Request {
-			sessionRequest: SessionRequest;
+			sessionRequest: DataRequest;
 			keyPair: nacl.BoxKeyPair;
 		}
 	}
 }
 
 /** Parse RequestSchema and unwrap the session key pair. 400 on bad body, 404 if key pair unavailable. */
-export const sessionKeyMiddleware: RequestHandler = async (req, res, next) => {
-	const parsed = RequestSchema.safeParse(req.body);
-	if (!parsed.success) {
-		writeLog("session_request_invalid_body", { error: parsed.error });
+export function sessionKeyMiddleware<K extends z.ZodSchema<any>>(
+	schema: K,
+): RequestHandler {
+	return async (req, res, next) => {
+		const parsed = schema.safeParse(req.body);
 
-		return res
-			.status(400)
-			.json({ error: "Invalid request body", details: parsed.error });
-	}
+		if (!parsed.success) {
+			writeLog("session_request_invalid_body", { error: parsed.error });
 
-	const keyPair = await getKeyPair(parsed.data);
+			return res
+				.status(400)
+				.json({ error: "Invalid request body", details: parsed.error });
+		}
 
-	if (!keyPair) {
-		writeLog("session_key_unavailable", {
-			sessionId: parsed.data.wrappedEncryptionKey.sessionId,
-		});
-		return res.status(404).json({ error: "Session not found" });
-	}
+		const session = parsed.data.session;
 
-	req.sessionRequest = parsed.data;
-	req.keyPair = keyPair;
-	next();
-};
+		const keyPair = await getKeyPair(parsed.data);
+
+		if (!keyPair) {
+			writeLog("session_key_unavailable", {
+				sessionId: session.id,
+			});
+			return res.status(404).json({ error: "Session not found" });
+		}
+
+		req.sessionRequest = parsed.data;
+		req.keyPair = keyPair;
+		next();
+	};
+}
