@@ -143,7 +143,16 @@ export async function storeSession(
 	});
 }
 
-export async function getSession(sessionId: string) {
+export interface SessionRecord {
+	id: string;
+	allowedAudienceRoots: string[];
+	sessionClientPublicKey: Buffer;
+	sessionServerPrivateKey: Buffer;
+}
+
+export async function getSession(
+	sessionId: string,
+): Promise<SessionRecord | null> {
 	const { db, decrypt } = await connectDB();
 
 	const session = await db
@@ -161,12 +170,16 @@ export async function getSession(sessionId: string) {
 	// TODO: TTL!
 
 	return {
-		...session,
+		id: sessionId,
 		allowedAudienceRoots: JSON.parse(
 			Buffer.from(
 				await decrypt(session.allowedAudienceRoots),
 				"base64",
 			).toString("utf8"),
+		),
+		sessionClientPublicKey: Buffer.from(
+			session.sessionClientPublicKey,
+			"base64",
 		),
 		sessionServerPrivateKey: Buffer.from(
 			await decrypt(session.sessionServerPrivateKey),

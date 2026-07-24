@@ -1,14 +1,13 @@
-import { verify } from "node:crypto";
+import jws from "jws";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
 	createSession,
 	resetMocks,
-	SIGNING_KID,
 	sessions,
 	sign,
-	signingPublicKey,
 	storeSession,
 } from "./app.ts";
+import { SIGNING_KEY_PAIR, SIGNING_KID } from "./helpers.ts";
 
 describe("POST /session", () => {
 	beforeEach(resetMocks);
@@ -20,6 +19,7 @@ describe("POST /session", () => {
 			session.sessionClientKeyPair.publicKey,
 		).toString("base64");
 
+		// Check if mocked KMS signer was called
 		expect(sign()).toHaveBeenCalledOnce();
 		expect(storeSession()).toHaveBeenCalledOnce();
 		expect(storeSession().mock.calls[0]?.[0]).toBe(session.id);
@@ -36,9 +36,10 @@ describe("POST /session", () => {
 		});
 
 		const payload = JSON.parse(
-			Buffer.from(sessionServerPublicKeySignature.payload, "base64url").toString(
-				"utf8",
-			),
+			Buffer.from(
+				sessionServerPublicKeySignature.payload,
+				"base64url",
+			).toString("utf8"),
 		);
 		expect(payload).toEqual({
 			publicKeyX: sessionServerPublicKey.x,
@@ -46,31 +47,38 @@ describe("POST /session", () => {
 		});
 
 		const protectedHeader = JSON.parse(
-			Buffer.from(sessionServerPublicKeySignature.protected, "base64url").toString(
-				"utf8",
-			),
+			Buffer.from(
+				sessionServerPublicKeySignature.protected,
+				"base64url",
+			).toString("utf8"),
 		);
-
 		expect(protectedHeader).toEqual({
 			kid: SIGNING_KID,
-			alg: "EdDSA",
+			alg: "RS256",
 		});
 
 		const expectedSigningInput = `${sessionServerPublicKeySignature.protected}.${sessionServerPublicKeySignature.payload}`;
 		const signed = sign().mock.calls[0]?.[0];
 		expect(signed).toBeInstanceOf(Uint8Array);
-		expect(Buffer.from(signed!).toString("utf8")).toBe(expectedSigningInput);
+		if (!signed) {
+			throw new Error("Expected mocked KMS signer to be called");
+		}
+		expect(Buffer.from(signed).toString("utf8")).toBe(expectedSigningInput);
 
-		const signature = Buffer.from(
-			sessionServerPublicKeySignature.signature,
-			"base64url",
+		expect(sessionServerPublicKeySignature.jws).toBe(
+			`${expectedSigningInput}.${sessionServerPublicKeySignature.signature}`,
 		);
+
+		const signingPublicKeyPem = SIGNING_KEY_PAIR.publicKey.export({
+			format: "pem",
+			type: "spki",
+		});
+
 		expect(
-			verify(
-				null,
-				Buffer.from(expectedSigningInput, "utf8"),
-				signingPublicKey,
-				signature,
+			jws.verify(
+				sessionServerPublicKeySignature.jws,
+				"RS256",
+				signingPublicKeyPem,
 			),
 		).toBe(true);
 	});

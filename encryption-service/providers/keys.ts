@@ -1,25 +1,18 @@
 import tweetnacl, { type BoxKeyPair } from "tweetnacl";
 import type { DataRequest } from "../utils/dto.ts";
-import { getSession } from "./db.ts";
 
-export async function getKeyPair(
-	request: DataRequest,
+export async function getEncryptionKeyPair(
+	sessionClientPublicKey: Buffer,
+	sessionServerPrivateKey: Buffer,
+	request: DataRequest["session"],
 ): Promise<BoxKeyPair | null> {
-	const session = await getSession(request.session.id);
-
-	if (!session) {
-		return null;
-	}
-
 	const sessionServerKeyPair = tweetnacl.box.keyPair.fromSecretKey(
-		session.sessionServerPrivateKey,
+		sessionServerPrivateKey,
 	);
 
-	const sessionClientPublicKey = Buffer.from(session.sessionClientPublicKey, "base64");
-
 	const secretKey = tweetnacl.box.open(
-		Buffer.from(request.session.encryptedKey, "base64"),
-		Buffer.from(request.session.nonce, "base64"),
+		Buffer.from(request.encryptedKey, "base64"),
+		Buffer.from(request.nonce, "base64"),
 		sessionClientPublicKey,
 		sessionServerKeyPair.secretKey,
 	);

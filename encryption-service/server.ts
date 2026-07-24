@@ -14,6 +14,7 @@ import { createSession } from "./providers/session.ts";
 import {
 	CommonRequestSchema,
 	CreateSessionRequestSchema,
+	type DataRequest,
 	DataRequestSchema,
 } from "./utils/dto.ts";
 import { writeLog } from "./utils/logger-context.ts";
@@ -93,7 +94,9 @@ app.post(
 
 		return res.json({
 			sessionId: req.sessionRequest.session.id,
-			publicKey: Buffer.from(req.keyPair.publicKey).toString("base64"),
+			publicKey: Buffer.from(req.encryptionKeyPair.publicKey).toString(
+				"base64",
+			),
 		});
 	},
 );
@@ -106,10 +109,11 @@ app.post(
 			sessionId: req.sessionRequest.session.id,
 		});
 
+		const sessionRequest = req.sessionRequest as DataRequest;
 		const data = await encrypt(
-			req.keyPair,
-			req.sessionRequest.arguments.publicKey,
-			req.sessionRequest.arguments.payload,
+			req.encryptionKeyPair,
+			sessionRequest.arguments.publicKey,
+			sessionRequest.arguments.payload,
 		);
 
 		// TODO: Encrypt for the audience
@@ -126,11 +130,12 @@ app.post(
 			sessionId: req.sessionRequest.session.id,
 		});
 
+		const sessionRequest = req.sessionRequest as DataRequest;
 		const data = await decrypt(
-			req.keyPair,
-			req.sessionRequest.arguments.publicKey,
-			req.sessionRequest.arguments.payload,
-			req.sessionRequest.arguments.nonce,
+			req.encryptionKeyPair,
+			sessionRequest.arguments.publicKey,
+			sessionRequest.arguments.payload,
+			sessionRequest.arguments.nonce,
 		);
 
 		// TODO: Encrypt for the audience

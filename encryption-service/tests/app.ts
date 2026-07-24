@@ -1,29 +1,35 @@
-import { sign as cryptoSign, generateKeyPairSync } from "node:crypto";
+import { sign as cryptoSign } from "node:crypto";
 import type { NextFunction, Request, Response } from "express";
 import request from "supertest";
 import nacl from "tweetnacl";
 import type { Mock } from "vitest";
 import { vi } from "vitest";
+import { AUDIENCE_ROOT, AUDIENCE_SIGNING_PUBLIC_KEY_JWK, SIGNING_KEY_PAIR, SIGNING_PUBLIC_KEY_JWK } from "./helpers.ts";
 
-export const SIGNING_KID =
-	"arn:aws:kms:eu-central-1:000000000000:key/signing-test";
-
-const { publicKey: signingPublicKey, privateKey: signingPrivateKey } =
-	generateKeyPairSync("ed25519");
-
-export const signingPublicJwk = {
-	...signingPublicKey.export({ format: "jwk" }),
-	kid: SIGNING_KID,
-	use: "sig",
-	alg: "EdDSA",
-} as const;
-
-export { signingPublicKey };
+function mockAudienceJwks() {
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(async (input: Parameters<typeof fetch>[0]) => {
+			const url = String(input);
+			if (url === `https://${AUDIENCE_ROOT}/.well-known/jwks.json`) {
+				return new Response(JSON.stringify({ keys: [AUDIENCE_SIGNING_PUBLIC_KEY_JWK] }), {
+					status: 200,
+					headers: { "content-type": "application/json" },
+				});
+			}
+			throw new Error(`Unexpected fetch in test: ${url}`);
+		}),
+	);
+}
 
 const mocks = vi.hoisted(() => {
 	const sessions = new Map<
 		string,
-		{ sessionServerPrivateKey: Uint8Array; sessionClientPublicKey: string }
+		{
+			sessionServerPrivateKey: Uint8Array;
+			sessionClientPublicKey: string;
+			allowedAudienceRoots: string[];
+		}
 	>();
 
 	return {
@@ -33,14 +39,33 @@ const mocks = vi.hoisted(() => {
 				sessionId: string,
 				sessionServerPrivateKey: Uint8Array,
 				sessionClientPublicKey: string,
+				allowedAudienceRoots: string[],
 			) => {
-				sessions.set(sessionId, { sessionServerPrivateKey, sessionClientPublicKey });
+				sessions.set(sessionId, {
+					sessionServerPrivateKey,
+					sessionClientPublicKey,
+					allowedAudienceRoots,
+				});
 			},
 		),
 		getSession: vi.fn(async (sessionId: string) => {
-			const { sessionServerPrivateKey, sessionClientPublicKey } = sessions.get(sessionId) ?? {};
-			if (!sessionServerPrivateKey || !sessionClientPublicKey) return null;
-			return { sessionId, sessionServerPrivateKey, sessionClientPublicKey };
+			const {
+				sessionServerPrivateKey,
+				sessionClientPublicKey,
+				allowedAudienceRoots,
+			} = sessions.get(sessionId) ?? {};
+			if (
+				!sessionServerPrivateKey ||
+				!sessionClientPublicKey ||
+				!allowedAudienceRoots
+			)
+				return null;
+			return {
+				id: sessionId,
+				sessionServerPrivateKey,
+				sessionClientPublicKey: Buffer.from(sessionClientPublicKey, "base64"),
+				allowedAudienceRoots,
+			};
 		}),
 		sign: vi.fn(),
 		getPublicKeyJWK: vi.fn(),
@@ -48,9 +73,9 @@ const mocks = vi.hoisted(() => {
 });
 
 mocks.sign.mockImplementation(async (payload: Uint8Array) =>
-	cryptoSign(null, Buffer.from(payload), signingPrivateKey),
+	cryptoSign("RSA-SHA256", Buffer.from(payload), SIGNING_KEY_PAIR.privateKey),
 );
-mocks.getPublicKeyJWK.mockImplementation(async () => ({ ...signingPublicJwk }));
+mocks.getPublicKeyJWK.mockImplementation(async () => ({ ...SIGNING_PUBLIC_KEY_JWK }));
 
 vi.mock("../providers/db.ts", () => ({
 	storeSession: mocks.storeSession,
@@ -87,6 +112,7 @@ export type SessionResponse = {
 		protected: string;
 		payload: string;
 		signature: string;
+		jws: string;
 	};
 };
 
@@ -95,6 +121,7 @@ export interface CreateSessionResponse {
 	response: SessionResponse;
 	sessionServerPublicKey: Uint8Array;
 	sessionClientKeyPair: nacl.BoxKeyPair;
+	audienceRoot: string;
 }
 
 export async function createSession(): Promise<CreateSessionResponse> {
@@ -106,21 +133,27 @@ export async function createSession(): Promise<CreateSessionResponse> {
 			sessionClientPublicKey: Buffer.from(
 				sessionClientKeyPair.publicKey,
 			).toString("base64"),
-			allowedAudienceRoots: [],
+			allowedAudienceRoots: [AUDIENCE_ROOT],
 		})
 		.expect(200);
 
 	return {
 		response: res.body as SessionResponse,
 		id: res.body.id,
-		sessionServerPublicKey: Buffer.from(res.body.sessionServerPublicKey.x, "base64"),
+		sessionServerPublicKey: Buffer.from(
+			res.body.sessionServerPublicKey.x,
+			"base64",
+		),
 		sessionClientKeyPair,
+		audienceRoot: AUDIENCE_ROOT,
 	};
 }
 
 export function resetMocks() {
 	mocks.sessions.clear();
+	vi.unstubAllGlobals();
 	vi.clearAllMocks();
+	mockAudienceJwks();
 }
 
 /** Accessors — vitest forbids exporting `vi.hoisted` bindings directly. */
@@ -130,5 +163,5 @@ export const sessions = () => mocks.sessions;
 export const sign = (): Mock<(payload: Uint8Array) => Promise<Buffer>> =>
 	mocks.sign;
 export const getPublicKeyJWK = (): Mock<
-	() => Promise<typeof signingPublicJwk>
+	() => Promise<typeof SIGNING_PUBLIC_KEY_JWK>
 > => mocks.getPublicKeyJWK;

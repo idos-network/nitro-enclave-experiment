@@ -1,8 +1,12 @@
 import request from "supertest";
 import nacl from "tweetnacl";
 import { beforeEach, describe, expect, it } from "vitest";
-import { app, createSession, resetMocks } from "./app.ts";
-import { b64, sessionBody } from "./helpers.ts";
+import {
+	app,
+	createSession,
+	resetMocks,
+} from "./app.ts";
+import { b64, sessionBody, audience, decryptAudienceResponse } from "./helpers.ts";
 
 describe("e2e: session → encrypt → decrypt", () => {
 	beforeEach(resetMocks);
@@ -19,7 +23,7 @@ describe("e2e: session → encrypt → decrypt", () => {
 		const encrypted = await request(app)
 			.post("/session/encrypt")
 			.send(
-				sessionBody(sessionUser, contentEncryptionKeyPair.secretKey, {
+				sessionBody(sessionUser, contentEncryptionKeyPair.secretKey, audience, {
 					payload: plaintext,
 					// Encrypt for the recipient
 					publicKey: b64(recipientKeyPair.publicKey),
@@ -27,14 +31,25 @@ describe("e2e: session → encrypt → decrypt", () => {
 			)
 			.expect(200);
 
-		expect(encrypted.body.data).toBeTruthy();
-		expect(encrypted.body.data).not.toBe(plaintext);
+		expect(encrypted.body).toEqual({
+			audience: {
+				recipientPublicKey: audience.recipientPublicKey,
+				senderPublicKey: expect.any(String),
+			},
+			payload: expect.any(String),
+			nonce: expect.any(String),
+		});
+
+		const decryptedResponse = decryptAudienceResponse(encrypted.body);
+		expect(decryptedResponse).toEqual({
+			data: expect.any(String),
+		});
 
 		const decrypted = await request(app)
 			.post("/session/decrypt")
 			.send(
-				sessionBody(sessionRecipient, recipientKeyPair.secretKey, {
-					payload: encrypted.body.data,
+				sessionBody(sessionRecipient, recipientKeyPair.secretKey, audience, {
+					payload: decryptedResponse.data,
 					// nonce: b64(encrypted.body.nonce),
 					// Recipient can decrypt
 					publicKey: b64(contentEncryptionKeyPair.publicKey),
@@ -42,9 +57,7 @@ describe("e2e: session → encrypt → decrypt", () => {
 			)
 			.expect(200);
 
-		expect(decrypted.body.data).toBe(plaintext);
-		expect(Buffer.from(decrypted.body.data, "base64").toString()).toBe(
-			"e2e roundtrip payload",
-		);
+		const decryptedPayload = decryptAudienceResponse(decrypted.body);
+		expect(decryptedPayload.data).toBe(plaintext);
 	});
 });

@@ -3,7 +3,7 @@ import nacl from "tweetnacl";
 import { beforeEach, describe, expect, it } from "vitest";
 import { encrypt } from "../providers/encryption.ts";
 import { app, createSession, resetMocks } from "./app.ts";
-import { b64, sessionBody } from "./helpers.ts";
+import { audience, b64, decryptAudienceResponse, sessionBody } from "./helpers.ts";
 
 describe("POST /session/decrypt", () => {
 	beforeEach(resetMocks);
@@ -22,14 +22,16 @@ describe("POST /session/decrypt", () => {
 		const res = await request(app)
 			.post("/session/decrypt")
 			.send(
-				sessionBody(session, contentEncryptionKeyPair.secretKey, {
+				sessionBody(session, contentEncryptionKeyPair.secretKey, audience, {
 					payload: ciphertext,
 					publicKey: b64(recipientKeyPair.publicKey),
 				}),
 			)
 			.expect(200);
 
-		expect(res.body.data).toBe(plaintext);
+    const decryptedPayload = decryptAudienceResponse(res.body);
+
+		expect(decryptedPayload.data).toBe(plaintext);
 	});
 
 	it("returns 400 for invalid body", async () => {
@@ -52,7 +54,7 @@ describe("POST /session/decrypt", () => {
 		const res = await request(app)
 			.post("/session/decrypt")
 			.send(
-				sessionBody(session, recipient.secretKey, {
+				sessionBody(session, recipient.secretKey, audience, {
 					payload: b64(Buffer.from("unused")),
 					publicKey: b64(recipient.publicKey),
 				}),

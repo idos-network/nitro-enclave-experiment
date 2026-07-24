@@ -7,8 +7,8 @@ export const CommonRequestSchema = z.object({
 		nonce: z.string(), // base64 encoded string
 	}),
 	audience: z.object({
-		root: z.string(), // audience root
-		identifier: z.string(), // audience identifier
+		recipientPublicKey: z.string(), // recipient public key
+		chain: z.string(), // jws.sign(keyInWellKnown, {recipientPublicKeyX: recipientPublicKey.x})
 	}),
 });
 

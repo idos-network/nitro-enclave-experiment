@@ -20,7 +20,7 @@ export async function createSession(data: CreateSessionRequest) {
 	const protectedBase64Url = Buffer.from(
 		JSON.stringify({
 			kid: SIGNING_KEY_KMS_KEY_ID,
-			alg: "EdDSA",
+			alg: "RS256",
 		}),
 	).toString("base64url");
 
@@ -47,6 +47,7 @@ export async function createSession(data: CreateSessionRequest) {
 		protected: protectedBase64Url,
 		payload: payloadBase64Url,
 		signature: signatureBase64Url,
+		jws: `${protectedBase64Url}.${payloadBase64Url}.${signatureBase64Url}`,
 	};
 
 	// 8. Save ephemeral private state securely

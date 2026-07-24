@@ -1,3 +1,5 @@
+import { sign as cryptoSign, generateKeyPairSync } from "node:crypto";
+import jws from "jws";
 import nacl from "tweetnacl";
 import type { DataRequest } from "../utils/dto.ts";
 import type { CreateSessionResponse } from "./app.ts";
@@ -6,9 +8,80 @@ export function b64(bytes: Uint8Array): string {
 	return Buffer.from(bytes).toString("base64");
 }
 
+/*
+ * Signing helpers
+ */
+export const SIGNING_KID =
+	"arn:aws:kms:eu-central-1:000000000000:key/signing-test";
+export const SIGNING_KEY_PAIR = generateKeyPairSync("rsa", {
+	modulusLength: 2048,
+});
+export const SIGNING_PUBLIC_KEY_JWK = {
+	...SIGNING_KEY_PAIR.publicKey.export({ format: "jwk" }),
+	kid: SIGNING_KID,
+	use: "sig",
+	alg: "RS256",
+} as const;
+
+/*
+ * Audience helpers
+ */
+export const AUDIENCE_SIGNING_KEY_PAIR = generateKeyPairSync("rsa", {
+	modulusLength: 2048,
+});
+export const AUDIENCE_KID = crypto.randomUUID();
+export const AUDIENCE_ROOT = "test.root.com";
+export const AUDIENCE_SIGNING_PUBLIC_KEY_JWK = {
+	...AUDIENCE_SIGNING_KEY_PAIR.publicKey.export({ format: "jwk" }),
+	kid: AUDIENCE_KID,
+	use: "sig",
+	alg: "RS256",
+} as const;
+export const AUDIENCE_RECIPIENT_KEY_PAIR = nacl.box.keyPair();
+
+export function createAudience(
+	recipientPublicKey: Uint8Array,
+  audienceSigningKeyPair = AUDIENCE_SIGNING_KEY_PAIR,
+): DataRequest["audience"] {
+	const audiencePrivateKeyPem = audienceSigningKeyPair.privateKey.export({
+		format: "pem",
+		type: "pkcs8",
+	});
+
+	const recipientPublicKeyX =
+		Buffer.from(recipientPublicKey).toString("base64url");
+
+	return {
+		recipientPublicKey: Buffer.from(recipientPublicKey).toString("base64"),
+		chain: jws.sign({
+			header: { kid: AUDIENCE_KID, alg: "RS256" },
+			payload: { recipientPublicKeyX },
+			privateKey: audiencePrivateKeyPem,
+		}),
+	};
+}
+
+export const audience = createAudience(AUDIENCE_RECIPIENT_KEY_PAIR.publicKey);
+
+export function decryptAudienceResponse(response: any) {
+	const decrypted = nacl.box.open(
+		Buffer.from(response.payload, "base64"),
+		Buffer.from(response.nonce, "base64"),
+		Buffer.from(response.audience.senderPublicKey, "base64"),
+		AUDIENCE_RECIPIENT_KEY_PAIR.secretKey,
+	);
+
+	if (!decrypted) {
+		throw new Error("Failed to decrypt payload");
+	}
+
+	return JSON.parse(Buffer.from(decrypted).toString("utf8"));
+}
+
 export function sessionBody(
 	session: CreateSessionResponse,
 	userRandomBytes: Uint8Array,
+	audience: DataRequest["audience"],
 	body: DataRequest["arguments"] | undefined = undefined,
 ) {
 	const nonce = nacl.randomBytes(nacl.box.nonceLength);
@@ -32,10 +105,7 @@ export function sessionBody(
 			encryptedKey: b64(wrappedUserKey),
 			nonce: b64(nonce),
 		},
-		audience: {
-			root: "https://example.com",
-			identifier: "1234567890",
-		},
+		audience,
 	};
 
 	if (body) {
