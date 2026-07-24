@@ -64,7 +64,7 @@ paths:
       summary: JWKS for session signature verification
       description: |
         Returns the KMS signing public key as a JWK set. Used to verify
-        `jwtChain` on session creation responses (RS256 / RSA).
+        `jwtChain` on session creation responses (EdDSA / Ed25519).
       operationId: getJwks
       responses:
         "200":
@@ -216,22 +216,22 @@ components:
       description: Optional request correlation id; echoed on the response.
       schema:
         type: string
-        format: uuid
 
   headers:
     XRequestId:
       description: Request correlation id (from request or generated).
       schema:
         type: string
-        format: uuid
 
   responses:
     BadRequest:
-      description: Request body failed Zod validation
+      description: Request body failed validation or audience verification failed
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/ValidationError"
+            oneOf:
+              - $ref: "#/components/schemas/ValidationError"
+              - $ref: "#/components/schemas/Error"
     SessionNotFound:
       description: Session key pair unavailable
       content:
@@ -296,14 +296,15 @@ components:
 
     Audience:
       type: object
-      required: [recipientPublicKey, chain]
+      required: [recipientPublicKey, jwtChain]
       properties:
         recipientPublicKey:
-          $ref: "#/components/schemas/X25519EncryptionPublicKey"
+          $ref: "#/components/schemas/AudienceRecipientPublicKey"
         jwtChain:
           type: string
           description: |
-            Compact JWT signed by one of the allowed audience root JWKS keys.
+            Compact JWT signed with EdDSA by one of the allowed audience root
+            JWKS keys.
             The decoded payload contains `{ recipientPublicKeyX }`, where
             `recipientPublicKeyX` is the base64url audience public key.
 
@@ -363,6 +364,12 @@ components:
           type: string
           description: Optional key id
 
+    AudienceRecipientPublicKey:
+      allOf:
+        - $ref: "#/components/schemas/X25519EncryptionPublicKey"
+        - type: object
+          required: [kid]
+
     CreateSessionResponse:
       type: object
       required: [id, jwtChain, sessionServerPublicKey]
@@ -373,7 +380,7 @@ components:
         jwtChain:
           type: string
           description: |
-            Compact JWS (`protected.payload.signature`) signed with KMS RS256.
+            Compact JWS (`protected.payload.signature`) signed with KMS EdDSA.
             The decoded payload contains
             `{ sessionServerPublicKeyX: sessionServerPublicKey.x, nonce }`.
         sessionServerPublicKey:
@@ -443,18 +450,18 @@ components:
 
     Jwk:
       type: object
-      description: JSON Web Key (RSA signing key from KMS)
-      required: [kid, use, alg]
+      description: JSON Web Key (Ed25519 signing key from KMS)
+      required: [kty, crv, x, kid, use, alg]
       properties:
         kty:
           type: string
-          example: RSA
-        n:
+          const: OKP
+        crv:
           type: string
-          description: Base64url-encoded RSA modulus
-        e:
+          const: Ed25519
+        x:
           type: string
-          description: Base64url-encoded RSA public exponent
+          description: Base64url-encoded Ed25519 public key
         kid:
           type: string
         use:
@@ -462,7 +469,7 @@ components:
           const: sig
         alg:
           type: string
-          const: RS256
+          const: EdDSA
       additionalProperties: true
 
     Jwks:

@@ -1,5 +1,5 @@
 import { generateKeyPairSync } from "node:crypto";
-import jwt from "jsonwebtoken";
+import { SignJWT } from "jose";
 import nacl from "tweetnacl";
 import type { DataRequest } from "../utils/dto.ts";
 import type { CreateSessionResponse } from "./app.ts";
@@ -13,43 +13,43 @@ export function b64(bytes: Uint8Array): string {
  */
 export const SIGNING_KID =
 	"arn:aws:kms:eu-central-1:000000000000:key/signing-test";
-export const SIGNING_KEY_PAIR = generateKeyPairSync("rsa", {
-	modulusLength: 2048,
-});
+export const SIGNING_KEY_PAIR = generateKeyPairSync("ed25519");
 export const SIGNING_PUBLIC_KEY_JWK = {
 	...SIGNING_KEY_PAIR.publicKey.export({ format: "jwk" }),
 	kid: SIGNING_KID,
 	use: "sig",
-	alg: "RS256",
+	alg: "EdDSA",
 } as const;
 
 /*
  * Audience helpers
  */
-export const AUDIENCE_SIGNING_KEY_PAIR = generateKeyPairSync("rsa", {
-	modulusLength: 2048,
-});
+export const AUDIENCE_SIGNING_KEY_PAIR = generateKeyPairSync("ed25519");
 export const AUDIENCE_KID = crypto.randomUUID();
 export const AUDIENCE_ROOT = "test.root.com";
 export const AUDIENCE_SIGNING_PUBLIC_KEY_JWK = {
 	...AUDIENCE_SIGNING_KEY_PAIR.publicKey.export({ format: "jwk" }),
 	kid: AUDIENCE_KID,
 	use: "sig",
-	alg: "RS256",
+	alg: "EdDSA",
 } as const;
 export const AUDIENCE_RECIPIENT_KEY_PAIR = nacl.box.keyPair();
 
-export function createAudience(
+export async function createAudience(
 	recipientPublicKey: Uint8Array,
 	audienceSigningKeyPair = AUDIENCE_SIGNING_KEY_PAIR,
-): DataRequest["audience"] {
-	const audiencePrivateKeyPem = audienceSigningKeyPair.privateKey.export({
-		format: "pem",
-		type: "pkcs8",
+): Promise<DataRequest["audience"]> {
+	const audiencePrivateJwk = audienceSigningKeyPair.privateKey.export({
+		format: "jwk",
 	});
 
 	const recipientPublicKeyX =
 		Buffer.from(recipientPublicKey).toString("base64url");
+
+	const jwtChain = await new SignJWT({ recipientPublicKeyX })
+		.setProtectedHeader({ alg: "EdDSA", kid: AUDIENCE_KID })
+		.setIssuedAt()
+		.sign(audiencePrivateJwk);
 
 	return {
 		recipientPublicKey: {
@@ -59,14 +59,13 @@ export function createAudience(
 			use: "enc",
 			kid: AUDIENCE_KID,
 		},
-		jwtChain: jwt.sign({ recipientPublicKeyX }, audiencePrivateKeyPem, {
-			algorithm: "RS256",
-			keyid: AUDIENCE_KID,
-		}),
+		jwtChain,
 	};
 }
 
-export const audience = createAudience(AUDIENCE_RECIPIENT_KEY_PAIR.publicKey);
+export const audience = await createAudience(
+	AUDIENCE_RECIPIENT_KEY_PAIR.publicKey,
+);
 
 export function decryptAudienceResponse(response: any) {
 	const decrypted = nacl.box.open(

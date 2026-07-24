@@ -14,7 +14,7 @@ export const CommonRequestSchema = z.object({
 			use: z.literal("enc"),
 			kid: z.string(), // key id
 		}),
-		jwtChain: z.string(), // jwt.sign(keyInWellKnown, {recipientPublicKeyX: recipientPublicKey.x})
+		jwtChain: z.string(), // Compact JWS over { recipientPublicKeyX }
 	}),
 });
 

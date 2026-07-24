@@ -1,5 +1,6 @@
+import { base64url } from "jose";
 import tweetnacl from "tweetnacl";
-import { SIGNING_KEY_KMS_KEY_ID } from "../env.ts";
+import { BASE_URL, SIGNING_KEY_KMS_KEY_ID } from "../env.ts";
 import type { CreateSessionRequest } from "../utils/dto.ts";
 import { storeSession } from "./db.ts";
 import { sign } from "./kms.ts";
@@ -20,7 +21,8 @@ export async function createSession(data: CreateSessionRequest) {
 	const protectedBase64Url = Buffer.from(
 		JSON.stringify({
 			kid: SIGNING_KEY_KMS_KEY_ID,
-			alg: "RS256",
+			alg: "EdDSA",
+      iss: BASE_URL,
 		}),
 	).toString("base64url");
 

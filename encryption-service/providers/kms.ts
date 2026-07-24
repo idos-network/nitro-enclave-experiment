@@ -36,7 +36,7 @@ export async function getPublicKeyJWK() {
 		...jwk,
 		kid: SIGNING_KEY_KMS_KEY_ID,
 		use: "sig",
-		alg: "RS256",
+		alg: "EdDSA",
 	};
 }
 
@@ -49,7 +49,7 @@ export async function sign(payload: Uint8Array<ArrayBufferLike>) {
 		new SignCommand({
 			KeyId: SIGNING_KEY_KMS_KEY_ARN,
 			Message: payload,
-			SigningAlgorithm: "RSASSA_PKCS1_V1_5_SHA_256",
+			SigningAlgorithm: "ED25519_SHA_512",
 			MessageType: "RAW",
 		}),
 	);

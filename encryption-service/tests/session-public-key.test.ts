@@ -97,10 +97,9 @@ describe("POST /session/public-key", () => {
 	it("returns 400 when audience is signed by another key", async () => {
 		const session = await createSession();
 		const contentEncryptionKeyPair = nacl.box.keyPair();
-		const invalidAudienceSigningKeyPair = generateKeyPairSync("rsa", {
-			modulusLength: 2048,
-		});
-		const invalidAudience = createAudience(
+		const invalidAudienceSigningKeyPair = generateKeyPairSync("ed25519");
+
+		const invalidAudience = await createAudience(
 			nacl.box.keyPair().publicKey,
 			invalidAudienceSigningKeyPair,
 		);

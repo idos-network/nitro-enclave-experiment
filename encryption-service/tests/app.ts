@@ -81,7 +81,8 @@ const mocks = vi.hoisted(() => {
 });
 
 mocks.sign.mockImplementation(async (payload: Uint8Array) =>
-	cryptoSign("RSA-SHA256", Buffer.from(payload), SIGNING_KEY_PAIR.privateKey),
+	// Mirrors KMS ED25519_SHA_512 with MessageType RAW.
+	cryptoSign(null, Buffer.from(payload), SIGNING_KEY_PAIR.privateKey),
 );
 mocks.getPublicKeyJWK.mockImplementation(async () => ({
 	...SIGNING_PUBLIC_KEY_JWK,

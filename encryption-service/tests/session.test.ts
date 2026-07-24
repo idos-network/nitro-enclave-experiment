@@ -1,4 +1,4 @@
-import jwt from "jsonwebtoken";
+import { importJWK, jwtVerify } from "jose";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
 	createSession,
@@ -34,15 +34,12 @@ describe("POST /session", () => {
 			x: expect.stringMatching(/^[A-Za-z0-9_-]+$/),
 		});
 
-		const signingPublicKeyJWK = {
-			format: "jwk" as const,
-			key: SIGNING_KEY_PAIR.publicKey.export({
-				format: "jwk",
-			}),
-		};
-
-		const decoded = jwt.verify(jwtChain, signingPublicKeyJWK, {
-			complete: true,
+		const signingPublicKey = await importJWK(
+			SIGNING_KEY_PAIR.publicKey.export({ format: "jwk" }),
+			"EdDSA",
+		);
+		const decoded = await jwtVerify(jwtChain, signingPublicKey, {
+			algorithms: ["EdDSA"],
 		});
 
 		expect(decoded?.payload).toEqual({
@@ -50,9 +47,10 @@ describe("POST /session", () => {
 			nonce: expect.any(String),
 		});
 
-		expect(decoded?.header).toEqual({
+		expect(decoded?.protectedHeader).toEqual({
 			kid: SIGNING_KID.split("/")[1], // just the key ID, not the full ARN
-			alg: "RS256",
+			alg: "EdDSA",
+			iss: "https://test.root.com",
 		});
 	});
 
