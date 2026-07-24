@@ -1,4 +1,8 @@
-import { createPublicKey, type JsonWebKeyInput, type webcrypto } from "node:crypto";
+import {
+	createPublicKey,
+	type JsonWebKeyInput,
+	type webcrypto,
+} from "node:crypto";
 import jwt from "jsonwebtoken";
 import type { DataRequest } from "../utils/dto.ts";
 

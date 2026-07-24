@@ -51,7 +51,7 @@ describe("POST /session", () => {
 		});
 
 		expect(decoded?.header).toEqual({
-			kid: SIGNING_KID,
+			kid: SIGNING_KID.split("/")[1], // just the key ID, not the full ARN
 			alg: "RS256",
 		});
 	});

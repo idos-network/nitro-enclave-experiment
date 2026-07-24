@@ -5,7 +5,6 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { app, createSession, getSession, resetMocks } from "./app.ts";
 import {
 	audience,
-	b64,
 	createAudience,
 	decryptAudienceResponse,
 	sessionBody,

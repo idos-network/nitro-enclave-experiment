@@ -4,7 +4,11 @@ import {
 	KMSClient,
 	SignCommand,
 } from "@aws-sdk/client-kms";
-import { AWS_REGION, SIGNING_KEY_KMS_KEY_ID } from "../env.ts";
+import {
+	AWS_REGION,
+	SIGNING_KEY_KMS_KEY_ARN,
+	SIGNING_KEY_KMS_KEY_ID,
+} from "../env.ts";
 
 export async function getPublicKeyJWK() {
 	const kms = new KMSClient({
@@ -13,7 +17,7 @@ export async function getPublicKeyJWK() {
 
 	const response = await kms.send(
 		new GetPublicKeyCommand({
-			KeyId: SIGNING_KEY_KMS_KEY_ID,
+			KeyId: SIGNING_KEY_KMS_KEY_ARN,
 		}),
 	);
 
@@ -43,7 +47,7 @@ export async function sign(payload: Uint8Array<ArrayBufferLike>) {
 
 	const response = await kms.send(
 		new SignCommand({
-			KeyId: SIGNING_KEY_KMS_KEY_ID,
+			KeyId: SIGNING_KEY_KMS_KEY_ARN,
 			Message: payload,
 			SigningAlgorithm: "RSASSA_PKCS1_V1_5_SHA_256",
 			MessageType: "RAW",

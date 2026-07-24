@@ -1,4 +1,4 @@
-import { sign as cryptoSign, generateKeyPairSync } from "node:crypto";
+import { generateKeyPairSync } from "node:crypto";
 import jwt from "jsonwebtoken";
 import nacl from "tweetnacl";
 import type { DataRequest } from "../utils/dto.ts";
