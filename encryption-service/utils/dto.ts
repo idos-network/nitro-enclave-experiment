@@ -7,8 +7,14 @@ export const CommonRequestSchema = z.object({
 		nonce: z.string(), // base64 encoded string
 	}),
 	audience: z.object({
-		recipientPublicKey: z.string(), // recipient public key
-		chain: z.string(), // jws.sign(keyInWellKnown, {recipientPublicKeyX: recipientPublicKey.x})
+		recipientPublicKey: z.object({
+			kty: z.literal("OKP"),
+			crv: z.literal("X25519"),
+			x: z.string(), // recipient public key x coordinate of elliptic curve
+			use: z.literal("enc"),
+			kid: z.string(), // key id
+		}),
+		jwtChain: z.string(), // jwt.sign(keyInWellKnown, {recipientPublicKeyX: recipientPublicKey.x})
 	}),
 });
 

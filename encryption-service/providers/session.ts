@@ -27,7 +27,7 @@ export async function createSession(data: CreateSessionRequest) {
 	// 4. Payload — nonce salts the signature so identical keys don't fingerprint
 	const payloadBase64Url = Buffer.from(
 		JSON.stringify({
-			publicKeyX: sessionServerPublicKey.x,
+			sessionServerPublicKeyX: sessionServerPublicKey.x,
 			nonce: crypto.randomUUID(),
 		}),
 	).toString("base64url");
@@ -42,15 +42,7 @@ export async function createSession(data: CreateSessionRequest) {
 	const rawSignature = await sign(signingInputBuffer);
 	const signatureBase64Url = Buffer.from(rawSignature).toString("base64url");
 
-	// 7. Flattened JWS JSON Serialization (RFC 7515 §7.2.2)
-	const sessionServerPublicKeySignature = {
-		protected: protectedBase64Url,
-		payload: payloadBase64Url,
-		signature: signatureBase64Url,
-		jws: `${protectedBase64Url}.${payloadBase64Url}.${signatureBase64Url}`,
-	};
-
-	// 8. Save ephemeral private state securely
+	// 7. Save ephemeral private state securely
 	await storeSession(
 		sessionId,
 		sessionServerKeyPair.secretKey,
@@ -60,7 +52,7 @@ export async function createSession(data: CreateSessionRequest) {
 
 	return {
 		id: sessionId,
+		jwtChain: `${protectedBase64Url}.${payloadBase64Url}.${signatureBase64Url}`,
 		sessionServerPublicKey,
-		sessionServerPublicKeySignature,
 	};
 }

@@ -87,8 +87,18 @@ export function sessionKeyMiddleware(
 
 			return originalJson({
 				audience: {
-					recipientPublicKey: audiencePublicKey.toString("base64"),
-					senderPublicKey: Buffer.from(randomBox.publicKey).toString("base64"),
+					recipientPublicKey: {
+						kty: "OKP",
+						crv: "X25519",
+						x: audiencePublicKey.toString("base64url"),
+						use: "enc",
+					},
+					senderPublicKey: {
+						kty: "OKP",
+						crv: "X25519",
+						x: Buffer.from(randomBox.publicKey).toString("base64url"),
+						use: "enc",
+					},
 				},
 				payload: Buffer.from(payload).toString("base64"),
 				nonce: Buffer.from(nonce).toString("base64"),

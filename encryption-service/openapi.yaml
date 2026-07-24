@@ -64,8 +64,7 @@ paths:
       summary: JWKS for session signature verification
       description: |
         Returns the KMS signing public key as a JWK set. Used to verify
-        `sessionServerPublicKeySignature` on session creation responses
-        (EdDSA / Ed25519).
+        `jwtChain` on session creation responses (RS256 / RSA).
       operationId: getJwks
       responses:
         "200":
@@ -82,7 +81,7 @@ paths:
       description: |
         Creates a new encryption session bound to `sessionClientPublicKey` and
         `allowedAudienceRoots`. Returns the session server public key
-        (X25519 JWK) and a flattened JWS signature over that key (RFC 7515).
+        (X25519 JWK) and a compact JWS chain over that key (RFC 7515).
       operationId: createSession
       requestBody:
         required: true
@@ -123,14 +122,14 @@ paths:
               $ref: "#/components/schemas/CommonRequest"
       responses:
         "200":
-          description: Unwrapped user public key
+          description: Audience-encrypted response containing `PublicKeyResponse`
           headers:
             x-request-id:
               $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PublicKeyResponse"
+                $ref: "#/components/schemas/EncryptedResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
         "404":
@@ -144,7 +143,8 @@ paths:
         Encrypts `arguments.payload` (base64 plaintext bytes) to
         `arguments.publicKey` (recipient Curve25519 public key, base64) using
         the unwrapped content encryption secret key.
-        Returns NaCl box ciphertext as base64 (`nonce || ciphertext`).
+        The successful response is encrypted for the verified audience. After
+        decrypting the response envelope, the inner body contains `DataResponse`.
         Uses `DataRequestSchema` (`session` + `audience` + `arguments`).
       operationId: encrypt
       parameters:
@@ -157,14 +157,14 @@ paths:
               $ref: "#/components/schemas/DataRequest"
       responses:
         "200":
-          description: Encrypted payload
+          description: Audience-encrypted response containing `DataResponse`
           headers:
             x-request-id:
               $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DataResponse"
+                $ref: "#/components/schemas/EncryptedResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
         "404":
@@ -179,7 +179,9 @@ paths:
         base64) and the unwrapped content encryption secret key.
         If `arguments.nonce` is set, `arguments.payload` is ciphertext only;
         otherwise `arguments.payload` is base64 `nonce || ciphertext`.
-        Returns plaintext bytes as base64.
+        The successful response is encrypted for the verified audience. After
+        decrypting the response envelope, the inner body contains `DataResponse`
+        with plaintext bytes as base64.
         Uses `DataRequestSchema` (`session` + `audience` + `arguments`).
       operationId: decrypt
       parameters:
@@ -192,14 +194,14 @@ paths:
               $ref: "#/components/schemas/DataRequest"
       responses:
         "200":
-          description: Decrypted payload
+          description: Audience-encrypted response containing `DataResponse`
           headers:
             x-request-id:
               $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DataResponse"
+                $ref: "#/components/schemas/EncryptedResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
         "404":
@@ -294,14 +296,16 @@ components:
 
     Audience:
       type: object
-      required: [root, identifier]
+      required: [recipientPublicKey, chain]
       properties:
-        root:
+        recipientPublicKey:
+          $ref: "#/components/schemas/X25519EncryptionPublicKey"
+        jwtChain:
           type: string
-          description: Audience root
-        identifier:
-          type: string
-          description: Audience identifier
+          description: |
+            Compact JWT signed by one of the allowed audience root JWKS keys.
+            The decoded payload contains `{ recipientPublicKeyX }`, where
+            `recipientPublicKeyX` is the base64url audience public key.
 
     CommonRequest:
       type: object
@@ -338,43 +342,42 @@ components:
           type: string
           description: Base64url-encoded X25519 public key
 
-    SessionServerPublicKeySignature:
+    X25519EncryptionPublicKey:
       type: object
-      description: |
-        Flattened JWS (RFC 7515 §7.2.2) plus compact JWS. Signing input is
-        `protected + "." + payload` (both base64url), and `jws` is
-        `protected + "." + payload + "." + signature`.
-        Decoded payload JSON is `{ publicKeyX, nonce }`.
-      required: [protected, payload, signature, jws]
+      description: X25519 public key as a JWK for NaCl box encryption
+      required: [kty, crv, x, use]
       properties:
-        protected:
+        kty:
           type: string
-          description: |
-            Base64url-encoded JWS protected header
-            (`{ kid, alg: "RS256" }`)
-        payload:
+          const: OKP
+        crv:
           type: string
-          description: |
-            Base64url-encoded JWS payload. Decodes to
-            `{ publicKeyX: sessionServerPublicKey.x, nonce: <uuid> }`.
-        signature:
+          const: X25519
+        use:
           type: string
-          description: Base64url-encoded RSA SHA-256 signature
-        jws:
+          const: enc
+        x:
           type: string
-          description: Compact JWS string (`protected.payload.signature`)
+          description: Base64url-encoded X25519 public key
+        kid:
+          type: string
+          description: Optional key id
 
     CreateSessionResponse:
       type: object
-      required: [id, sessionServerPublicKey, sessionServerPublicKeySignature]
+      required: [id, jwtChain, sessionServerPublicKey]
       properties:
         id:
           type: string
           format: uuid
+        jwtChain:
+          type: string
+          description: |
+            Compact JWS (`protected.payload.signature`) signed with KMS RS256.
+            The decoded payload contains
+            `{ sessionServerPublicKeyX: sessionServerPublicKey.x, nonce }`.
         sessionServerPublicKey:
           $ref: "#/components/schemas/SessionServerPublicKey"
-        sessionServerPublicKeySignature:
-          $ref: "#/components/schemas/SessionServerPublicKeySignature"
 
     PublicKeyResponse:
       type: object
@@ -394,6 +397,29 @@ components:
         data:
           type: string
           description: Base64-encoded result (ciphertext or plaintext bytes)
+
+    EncryptedResponse:
+      type: object
+      description: |
+        Response body encrypted for the verified audience with NaCl box.
+        Decrypt `payload` using `nonce`, `audience.senderPublicKey`, and the
+        private key matching `audience.recipientPublicKey`.
+      required: [audience, nonce, payload]
+      properties:
+        audience:
+          type: object
+          required: [recipientPublicKey, senderPublicKey]
+          properties:
+            recipientPublicKey:
+              $ref: "#/components/schemas/X25519EncryptionPublicKey"
+            senderPublicKey:
+              $ref: "#/components/schemas/X25519EncryptionPublicKey"
+        nonce:
+          type: string
+          description: Base64-encoded NaCl box nonce
+        payload:
+          type: string
+          description: Base64-encoded encrypted JSON response body
 
     Error:
       type: object
@@ -417,18 +443,18 @@ components:
 
     Jwk:
       type: object
-      description: JSON Web Key (EdDSA signing key from KMS)
+      description: JSON Web Key (RSA signing key from KMS)
       required: [kid, use, alg]
       properties:
         kty:
           type: string
-          example: OKP
-        crv:
+          example: RSA
+        n:
           type: string
-          example: Ed25519
-        x:
+          description: Base64url-encoded RSA modulus
+        e:
           type: string
-          description: Base64url-encoded public key
+          description: Base64url-encoded RSA public exponent
         kid:
           type: string
         use:
@@ -436,7 +462,7 @@ components:
           const: sig
         alg:
           type: string
-          const: EdDSA
+          const: RS256
       additionalProperties: true
 
     Jwks:

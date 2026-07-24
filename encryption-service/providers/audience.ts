@@ -1,5 +1,5 @@
-import { createPublicKey, type webcrypto } from "node:crypto";
-import jws from "jws";
+import { createPublicKey, type JsonWebKeyInput, type webcrypto } from "node:crypto";
+import jwt from "jsonwebtoken";
 import type { DataRequest } from "../utils/dto.ts";
 
 type AudienceJwk = webcrypto.JsonWebKey & {
@@ -10,7 +10,7 @@ export async function verifyAudience(
 	allowedAudienceRoots: string[],
 	request: DataRequest["audience"],
 ): Promise<Buffer | null> {
-	const claim = readAudienceClaim(request.chain);
+	const claim = readAudienceClaim(request.jwtChain);
 
 	if (!claim) {
 		return null;
@@ -25,7 +25,7 @@ export async function verifyAudience(
 		for (const key of await fetchJwksKeys(root)) {
 			if (
 				(!claim.kid || key.kid === claim.kid) &&
-				verifyRsaJws(request.chain, key)
+				verifyRsaJwt(request.jwtChain, key)
 			) {
 				return recipientPublicKey;
 			}
@@ -37,7 +37,7 @@ export async function verifyAudience(
 
 function readAudienceClaim(chain: string) {
 	try {
-		const decoded = jws.decode(chain, { json: true });
+		const decoded = jwt.decode(chain, { complete: true });
 
 		if (!decoded || !isObject(decoded.header) || !isObject(decoded.payload)) {
 			return null;
@@ -101,18 +101,20 @@ function jwksUrl(root: string): string | null {
 	}
 }
 
-function verifyRsaJws(chain: string, key: AudienceJwk): boolean {
+function verifyRsaJwt(jwtChain: string, key: AudienceJwk): boolean {
 	if (key.kty !== "RSA" || (key.alg !== undefined && key.alg !== "RS256")) {
 		return false;
 	}
 
 	try {
-		const publicKey = createPublicKey({ key, format: "jwk" }).export({
-			format: "pem",
-			type: "spki",
-		});
+		const publicKey: JsonWebKeyInput = {
+			format: "jwk" as const,
+			key: createPublicKey({ key, format: "jwk" }).export({
+				format: "jwk" as const,
+			}),
+		};
 
-		return jws.verify(chain, "RS256", publicKey);
+		return !!jwt.verify(jwtChain, publicKey, { algorithms: ["RS256"] });
 	} catch {
 		return false;
 	}

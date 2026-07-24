@@ -3,7 +3,12 @@ import nacl from "tweetnacl";
 import { beforeEach, describe, expect, it } from "vitest";
 import { encrypt } from "../providers/encryption.ts";
 import { app, createSession, resetMocks } from "./app.ts";
-import { audience, b64, decryptAudienceResponse, sessionBody } from "./helpers.ts";
+import {
+	audience,
+	b64,
+	decryptAudienceResponse,
+	sessionBody,
+} from "./helpers.ts";
 
 describe("POST /session/decrypt", () => {
 	beforeEach(resetMocks);
@@ -29,7 +34,7 @@ describe("POST /session/decrypt", () => {
 			)
 			.expect(200);
 
-    const decryptedPayload = decryptAudienceResponse(res.body);
+		const decryptedPayload = decryptAudienceResponse(res.body);
 
 		expect(decryptedPayload.data).toBe(plaintext);
 	});

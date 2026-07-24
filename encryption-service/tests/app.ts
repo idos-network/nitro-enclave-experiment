@@ -4,7 +4,12 @@ import request from "supertest";
 import nacl from "tweetnacl";
 import type { Mock } from "vitest";
 import { vi } from "vitest";
-import { AUDIENCE_ROOT, AUDIENCE_SIGNING_PUBLIC_KEY_JWK, SIGNING_KEY_PAIR, SIGNING_PUBLIC_KEY_JWK } from "./helpers.ts";
+import {
+	AUDIENCE_ROOT,
+	AUDIENCE_SIGNING_PUBLIC_KEY_JWK,
+	SIGNING_KEY_PAIR,
+	SIGNING_PUBLIC_KEY_JWK,
+} from "./helpers.ts";
 
 function mockAudienceJwks() {
 	vi.stubGlobal(
@@ -12,10 +17,13 @@ function mockAudienceJwks() {
 		vi.fn(async (input: Parameters<typeof fetch>[0]) => {
 			const url = String(input);
 			if (url === `https://${AUDIENCE_ROOT}/.well-known/jwks.json`) {
-				return new Response(JSON.stringify({ keys: [AUDIENCE_SIGNING_PUBLIC_KEY_JWK] }), {
-					status: 200,
-					headers: { "content-type": "application/json" },
-				});
+				return new Response(
+					JSON.stringify({ keys: [AUDIENCE_SIGNING_PUBLIC_KEY_JWK] }),
+					{
+						status: 200,
+						headers: { "content-type": "application/json" },
+					},
+				);
 			}
 			throw new Error(`Unexpected fetch in test: ${url}`);
 		}),
@@ -75,7 +83,9 @@ const mocks = vi.hoisted(() => {
 mocks.sign.mockImplementation(async (payload: Uint8Array) =>
 	cryptoSign("RSA-SHA256", Buffer.from(payload), SIGNING_KEY_PAIR.privateKey),
 );
-mocks.getPublicKeyJWK.mockImplementation(async () => ({ ...SIGNING_PUBLIC_KEY_JWK }));
+mocks.getPublicKeyJWK.mockImplementation(async () => ({
+	...SIGNING_PUBLIC_KEY_JWK,
+}));
 
 vi.mock("../providers/db.ts", () => ({
 	storeSession: mocks.storeSession,
@@ -103,16 +113,11 @@ export { app };
 
 export type SessionResponse = {
 	id: string;
+	jwtChain: string;
 	sessionServerPublicKey: {
 		kty: string;
 		crv: string;
 		x: string;
-	};
-	sessionServerPublicKeySignature: {
-		protected: string;
-		payload: string;
-		signature: string;
-		jws: string;
 	};
 };
 

@@ -1,5 +1,5 @@
 import { sign as cryptoSign, generateKeyPairSync } from "node:crypto";
-import jws from "jws";
+import jwt from "jsonwebtoken";
 import nacl from "tweetnacl";
 import type { DataRequest } from "../utils/dto.ts";
 import type { CreateSessionResponse } from "./app.ts";
@@ -41,7 +41,7 @@ export const AUDIENCE_RECIPIENT_KEY_PAIR = nacl.box.keyPair();
 
 export function createAudience(
 	recipientPublicKey: Uint8Array,
-  audienceSigningKeyPair = AUDIENCE_SIGNING_KEY_PAIR,
+	audienceSigningKeyPair = AUDIENCE_SIGNING_KEY_PAIR,
 ): DataRequest["audience"] {
 	const audiencePrivateKeyPem = audienceSigningKeyPair.privateKey.export({
 		format: "pem",
@@ -52,11 +52,16 @@ export function createAudience(
 		Buffer.from(recipientPublicKey).toString("base64url");
 
 	return {
-		recipientPublicKey: Buffer.from(recipientPublicKey).toString("base64"),
-		chain: jws.sign({
-			header: { kid: AUDIENCE_KID, alg: "RS256" },
-			payload: { recipientPublicKeyX },
-			privateKey: audiencePrivateKeyPem,
+		recipientPublicKey: {
+			kty: "OKP",
+			crv: "X25519",
+			x: Buffer.from(recipientPublicKey).toString("base64url"),
+			use: "enc",
+			kid: AUDIENCE_KID,
+		},
+		jwtChain: jwt.sign({ recipientPublicKeyX }, audiencePrivateKeyPem, {
+			algorithm: "RS256",
+			keyid: AUDIENCE_KID,
 		}),
 	};
 }
@@ -67,7 +72,7 @@ export function decryptAudienceResponse(response: any) {
 	const decrypted = nacl.box.open(
 		Buffer.from(response.payload, "base64"),
 		Buffer.from(response.nonce, "base64"),
-		Buffer.from(response.audience.senderPublicKey, "base64"),
+		Buffer.from(response.audience.senderPublicKey.x, "base64"),
 		AUDIENCE_RECIPIENT_KEY_PAIR.secretKey,
 	);
 

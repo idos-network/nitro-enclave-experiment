@@ -3,7 +3,12 @@ import nacl from "tweetnacl";
 import { beforeEach, describe, expect, it } from "vitest";
 import { decrypt } from "../providers/encryption.ts";
 import { app, createSession, resetMocks } from "./app.ts";
-import { audience, b64, decryptAudienceResponse, sessionBody } from "./helpers.ts";
+import {
+	audience,
+	b64,
+	decryptAudienceResponse,
+	sessionBody,
+} from "./helpers.ts";
 
 describe("POST /session/encrypt", () => {
 	beforeEach(resetMocks);

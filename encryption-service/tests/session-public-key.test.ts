@@ -1,14 +1,15 @@
+import { generateKeyPairSync } from "node:crypto";
 import request from "supertest";
 import nacl from "tweetnacl";
 import { beforeEach, describe, expect, it } from "vitest";
+import { app, createSession, getSession, resetMocks } from "./app.ts";
 import {
-	app,
-	createSession,
-	getSession,
-	resetMocks,
-} from "./app.ts";
-import { audience, b64, createAudience, decryptAudienceResponse, sessionBody } from "./helpers.ts";
-import { generateKeyPairSync } from "node:crypto";
+	audience,
+	b64,
+	createAudience,
+	decryptAudienceResponse,
+	sessionBody,
+} from "./helpers.ts";
 
 describe("POST /session/public-key", () => {
 	beforeEach(resetMocks);
@@ -27,18 +28,30 @@ describe("POST /session/public-key", () => {
 
 		expect(res.body).toEqual({
 			audience: {
-				recipientPublicKey: audience.recipientPublicKey,
-				senderPublicKey: expect.any(String),
+				recipientPublicKey: {
+					x: audience.recipientPublicKey.x,
+					kty: "OKP",
+					crv: "X25519",
+					use: "enc",
+				},
+				senderPublicKey: {
+					x: expect.any(String),
+					kty: "OKP",
+					crv: "X25519",
+					use: "enc",
+				},
 			},
 			payload: expect.any(String),
 			nonce: expect.any(String),
 		});
 
-    const decryptedPayload = decryptAudienceResponse(res.body);
+		const decryptedPayload = decryptAudienceResponse(res.body);
 
 		expect(decryptedPayload).toEqual({
 			sessionId: session.id,
-			publicKey: Buffer.from(contentEncryptionKeyPair.publicKey).toString("base64"),
+			publicKey: Buffer.from(contentEncryptionKeyPair.publicKey).toString(
+				"base64",
+			),
 		});
 	});
 
@@ -85,10 +98,13 @@ describe("POST /session/public-key", () => {
 	it("returns 400 when audience is signed by another key", async () => {
 		const session = await createSession();
 		const contentEncryptionKeyPair = nacl.box.keyPair();
-    const invalidAudienceSigningKeyPair = generateKeyPairSync("rsa", {
-      modulusLength: 2048,
-    });
-		const invalidAudience = createAudience(nacl.box.keyPair().publicKey, invalidAudienceSigningKeyPair);
+		const invalidAudienceSigningKeyPair = generateKeyPairSync("rsa", {
+			modulusLength: 2048,
+		});
+		const invalidAudience = createAudience(
+			nacl.box.keyPair().publicKey,
+			invalidAudienceSigningKeyPair,
+		);
 
 		const res = await request(app)
 			.post("/session/public-key")

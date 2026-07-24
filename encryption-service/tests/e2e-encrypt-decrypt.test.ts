@@ -1,12 +1,13 @@
 import request from "supertest";
 import nacl from "tweetnacl";
 import { beforeEach, describe, expect, it } from "vitest";
+import { app, createSession, resetMocks } from "./app.ts";
 import {
-	app,
-	createSession,
-	resetMocks,
-} from "./app.ts";
-import { b64, sessionBody, audience, decryptAudienceResponse } from "./helpers.ts";
+	audience,
+	b64,
+	decryptAudienceResponse,
+	sessionBody,
+} from "./helpers.ts";
 
 describe("e2e: session → encrypt → decrypt", () => {
 	beforeEach(resetMocks);
@@ -33,8 +34,18 @@ describe("e2e: session → encrypt → decrypt", () => {
 
 		expect(encrypted.body).toEqual({
 			audience: {
-				recipientPublicKey: audience.recipientPublicKey,
-				senderPublicKey: expect.any(String),
+				recipientPublicKey: {
+					x: audience.recipientPublicKey.x,
+					kty: "OKP",
+					crv: "X25519",
+					use: "enc",
+				},
+				senderPublicKey: {
+					x: expect.any(String),
+					kty: "OKP",
+					crv: "X25519",
+					use: "enc",
+				},
 			},
 			payload: expect.any(String),
 			nonce: expect.any(String),
