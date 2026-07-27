@@ -28,7 +28,8 @@ export async function verifyAudience(
 			if (typeof recipientPublicKeyX === "string") {
 				return Buffer.from(recipientPublicKeyX, "base64url");
 			}
-		} catch {
+		} catch (error) {
+      console.log("error", error);
 			continue;
 		}
 	}
