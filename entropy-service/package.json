@@ -10,6 +10,7 @@
 		"start": "node index.ts",
 		"types": "tsc --noEmit",
 		"test": "vitest",
+		"test:coverage": "vitest run --coverage",
 		"format": "npx @biomejs/biome check --write",
 		"format:ci": "npx @biomejs/biome ci"
 	},
@@ -36,6 +37,7 @@
 		"@types/node": "^25.9.1",
 		"@types/os-utils": "^0.0.4",
 		"@types/supertest": "^7.2.0",
+		"@vitest/coverage-v8": "^4.1.8",
 		"audit-ci": "^7.1.0",
 		"supertest": "^7.2.2",
 		"typescript": "^6.0.3",
