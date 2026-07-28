@@ -54,14 +54,16 @@ jobs:
         working-directory: facesign-service
         run: pnpm run test:coverage
 
-      - name: "Report Coverage"
-        # Set if: always() to also generate the report if tests are failing
-        # Only works if you set `reportOnFailure: true` in your vite config as specified above
+      - name: Report coverage
+        # always() so the report is still posted when tests fail
+        # (requires reportOnFailure: true in vitest.config.js)
         if: always()
         uses: davelosert/vitest-coverage-report-action@v2
         with:
-          working-directory: "./facesign-service"
+          # unique name, otherwise this comment collides with the entropy one
+          name: FaceSign Service
+          working-directory: ./facesign-service
 
       - name: Run audit
-        working-directory: entropy-service
+        working-directory: facesign-service
         run: pnpm exec audit-ci --package-manager pnpm --high --critical

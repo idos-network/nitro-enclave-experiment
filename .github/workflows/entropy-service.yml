@@ -15,6 +15,12 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    permissions:
+      # Required to checkout the code
+      contents: read
+      # Required to put a comment into the pull-request
+      pull-requests: write
+
     steps:
       - uses: actions/checkout@v4
 
@@ -46,7 +52,16 @@ jobs:
 
       - name: Run tests
         working-directory: entropy-service
-        run: pnpm run test
+        run: pnpm run test:coverage
+
+      - name: Report coverage
+        # always() so the report is still posted when tests fail
+        # (requires reportOnFailure: true in vitest.config.js)
+        if: always()
+        uses: davelosert/vitest-coverage-report-action@v2
+        with:
+          name: Entropy Service
+          working-directory: ./entropy-service
 
       - name: Run audit
         working-directory: entropy-service
