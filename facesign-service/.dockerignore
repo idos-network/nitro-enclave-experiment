@@ -10,3 +10,4 @@ coverage/
 .github/
 Dockerfile
 biome.jsonc
+config.env

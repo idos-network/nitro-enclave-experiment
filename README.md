@@ -1,5 +1,13 @@
 # Nitro experiment
 
+## Git hooks
+
+```bash
+bash scripts/install-git-hooks.sh
+```
+
+Pre-commit runs `pnpm types`, `pnpm format`, and `pnpm test` in each `*-service`, then `npx cspell`.
+
 ## Setting up facesign service
 
 1. Follow up [FaceTec SDK](./facetec-sdk/README.md)

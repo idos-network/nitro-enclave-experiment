@@ -7,24 +7,21 @@ import type { ActionType } from "./actions.ts";
 export const loggerStorage = new AsyncLocalStorage<Logger>();
 
 export const getLogger = (): Logger => {
-	return loggerStorage.getStore() ?? fallbackLogger;
+  return loggerStorage.getStore() ?? fallbackLogger;
 };
 
 // Fallback logger for places outside of HTTP requests (e.g. startup, cron jobs)
 const fallbackLogger = pino({
-	formatters: { level: (label) => ({ level: label }) },
+  formatters: { level: (label) => ({ level: label }) },
 });
 
-export const writeLog = (
-	eventType: ActionType,
-	data: Record<string, unknown> = {},
-) => {
-	actions.inc({
-		[eventType]: 1,
-	});
+export const writeLog = (eventType: ActionType, data: Record<string, unknown> = {}) => {
+  actions.inc({
+    [eventType]: 1,
+  });
 
-	getLogger().info({
-		eventType,
-		...data,
-	});
+  getLogger().info({
+    eventType,
+    ...data,
+  });
 };

@@ -1,8 +1,6 @@
 openapi: 3.0.3
 info:
   title: FaceSign service
-  license:
-    name: ISC
   description: |
     HTTP API for FaceTec relay flows, FaceSign login/confirmation, and idOS issuer metadata.
 
@@ -21,8 +19,10 @@ info:
 security: []
 
 servers:
-  - url: /
-    description: Relative to deployed host (see `HOST` in deployment).
+  - url: https://facesign.fractal.id
+    description: Production
+  - url: https://facesign.staging.sandbox.fractal.id
+    description: Dev
 
 tags:
   - name: Health
