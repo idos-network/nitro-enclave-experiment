@@ -1,0 +1,140 @@
+openapi: 3.0.3
+info:
+  title: Entropy service
+  description: |
+    HTTP API that issues (or retrieves) FaceSign user entropy from a JWT attestment token.
+    On success, returns a BIP-39 mnemonic (256-bit entropy) — created once per user and stored encrypted.
+  version: 1.0.0
+
+security: []
+
+servers:
+  - url: https://entropy.fractal.id
+    description: Production
+  - url: https://entropy.staging.sandbox.fractal.id
+    description: Dev
+
+tags:
+  - name: Health
+    description: Root banner and readiness.
+  - name: Entropy
+    description: Entropy issuance and lookup.
+
+paths:
+  /:
+    get:
+      tags: [Health]
+      summary: Service banner
+      operationId: getRoot
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: string
+                    example: Entropy Service is running
+
+  /health:
+    get:
+      tags: [Health]
+      summary: Liveness
+      operationId: getHealth
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /facesign/entropy:
+    post:
+      tags: [Entropy]
+      summary: Fetch or create FaceSign entropy for a user
+      operationId: postFaceSignEntropy
+      description: |
+        Verifies the ES512 JWT in `token`, then fetches existing entropy for `sub` or creates a new
+        BIP-39 mnemonic (256-bit) and stores it encrypted.
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FaceSignEntropyRequest"
+      responses:
+        "200":
+          description: Entropy created or fetched for the FaceSign user.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FaceSignEntropyResponse"
+        "400":
+          description: |
+            Missing token, invalid/malformed JWT, missing `sub`/`iat`, or token older than 60 seconds.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+              examples:
+                missingToken:
+                  value:
+                    error: Token is required
+                invalidToken:
+                  value:
+                    error: Invalid token
+                expiredToken:
+                  value:
+                    error: Token already expired
+
+components:
+  parameters:
+    XRequestId:
+      name: x-request-id
+      in: header
+      required: false
+      schema:
+        type: string
+        format: uuid
+      description: Optional correlation id; server generates one if omitted and echoes it on the response.
+
+  schemas:
+    FaceSignEntropyRequest:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+          description: |
+            ES512 JWT (typically `userAttestmentToken` from FaceSign login/confirmation).
+            Claims must include `sub` (user id) and `iat`. Rejected if `iat` is more than 60 seconds ago.
+
+    FaceSignEntropyResponse:
+      type: object
+      required: [faceSignUserId, entropy]
+      properties:
+        faceSignUserId:
+          type: string
+          format: uuid
+          description: Value of the JWT `sub` claim.
+        entropy:
+          type: string
+          description: BIP-39 English mnemonic (256-bit entropy).
+
+    ErrorBody:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string

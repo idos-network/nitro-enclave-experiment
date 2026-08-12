@@ -13,6 +13,8 @@ import promBundle from "express-prom-bundle";
 import { rateLimit } from "express-rate-limit";
 import helmet from "helmet";
 import cron from "node-cron";
+import swaggerUi from "swagger-ui-express";
+import YAML from "yaml";
 
 // Configurations and providers
 import { HOST, KEY_1_MULTIBASE_PUBLIC_PATH } from "./env.ts";
@@ -80,6 +82,20 @@ app.get("/health", async (_req, res) => {
   const status = await getStatus();
   res.status(200).json({ status: "ok", version: status.serverInfo.facetecServerWebserviceVersion });
 });
+
+if (process.env.NODE_ENV !== "test") {
+  const file = readFileSync("./openapi.yaml", "utf8");
+  const swaggerDocument = YAML.parse(file);
+
+  app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+  app.get("/openapi.json", (_req, res) => {
+    res.json(swaggerDocument);
+  });
+  app.get("/openapi.yaml", (_req, res) => {
+    res.type("text/yaml");
+    res.send(file);
+  });
+}
 
 export const asyncHandler = (
   // biome-ignore lint/suspicious/noExplicitAny: any is needed here

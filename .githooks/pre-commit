@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Runs types/format/test in each *-service, then cspell at repo root.
+# Git already starts hooks with cwd at the repo root.
+set -euo pipefail
+
+for dir in *-service; do
+	[[ -f "$dir/package.json" ]] || continue
+	echo "==> $dir: types"
+	(cd "$dir" && pnpm types)
+	echo "==> $dir: format"
+	(cd "$dir" && pnpm format)
+	echo "==> $dir: test"
+	(cd "$dir" && pnpm test)
+done
+
+# format --write may touch files; don't commit stale staged content
+if ! git diff --quiet; then
+	echo "pre-commit: format changed files — stage them and commit again." >&2
+	git diff --name-only >&2
+	exit 1
+fi
+
+echo "==> cspell"
+npx --yes cspell lint --config cspell.config.yaml .
