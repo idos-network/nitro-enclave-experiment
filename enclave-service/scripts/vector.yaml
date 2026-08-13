@@ -33,28 +33,30 @@ transforms:
       - pm2_app
     source: |
       pm2_app_name = .app_name
+      component = pm2_app_name
+
+      if pm2_app_name == "enclave" {
+        component = "express"
+      } else if pm2_app_name == "node-exporter" {
+        component = "node"
+      } else if pm2_app_name == "Caddy" {
+        component = "caddy"
+      }
+
+      .application = "entropy"
+      .environment = get_env_var("OTEL_ENVIRONMENT") ?? "unknown"
+      .component = component
 
       parsed, err = parse_json(.message)
       if err != null {
         .parse_error = "Failed to parse PM2 message as JSON"
         .original_message = .message
-      } else {
-        . = parsed
+      } else if err != null {
+        .parse_error = "Failed to parse PM2 message as JSON"
+        .original_message = .message
       }
 
-      .application = "enclave"
-      .environment = get_env_var("OTEL_ENVIRONMENT") ?? "unknown"
-      .component = to_string(pm2_app_name) ?? "unknown"
-
-      if .component == "" {
-        .component = "unknown"
-      }
-
-      .application = "enclave"
-      .environment = get_env_var("OTEL_ENVIRONMENT") ?? "unknown"
-      .component = to_string(pm2_app_name) ?? "unknown"
-
-      if .component == "" {
+      if !exists(.component) {
         .component = "unknown"
       }
 

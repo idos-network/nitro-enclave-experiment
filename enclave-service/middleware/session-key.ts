@@ -6,21 +6,13 @@ import { getEncryptionKeyPair } from "../providers/keys.ts";
 import type { CommonRequest, DecryptRequest } from "../utils/dto.ts";
 import { writeLog } from "../utils/logger-context.ts";
 
-declare global {
-  namespace Express {
-    interface Request {
-      encryptionKeyPair: nacl.BoxKeyPair;
-    }
-  }
-}
-
 /**
  * Unwrap the session key pair. 404 if key pair unavailable.
  * also check audience against the chain and signature.
  */
 export function sessionKeyMiddleware(): RequestHandler {
-  return async (req, res, next) => {
-    const sessionRequest = req.sessionRequest as CommonRequest | DecryptRequest;
+  return async (_req, res, next) => {
+    const sessionRequest = res.locals.validatedBody as CommonRequest | DecryptRequest;
 
     if (!sessionRequest) {
       return res.status(400).json({ error: "Missing session request." });
@@ -55,7 +47,7 @@ export function sessionKeyMiddleware(): RequestHandler {
       });
     }
 
-    req.encryptionKeyPair = encryptionKeyPair;
+    res.locals.encryptionKeyPair = encryptionKeyPair;
 
     const originalJson = res.json.bind(res);
 

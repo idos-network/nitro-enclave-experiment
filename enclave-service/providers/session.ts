@@ -53,7 +53,7 @@ export async function createSession(data: CreateSessionRequest) {
 
   return {
     id: sessionId,
-    jwtChain: `${protectedBase64Url}.${payloadBase64Url}.${signatureBase64Url}`,
+    jwtChain,
     sessionServerPublicKey,
   };
 }
