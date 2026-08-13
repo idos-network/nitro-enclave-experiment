@@ -11,6 +11,8 @@ for dir in *-service; do
 	(cd "$dir" && pnpm format)
 	echo "==> $dir: test"
 	(cd "$dir" && pnpm test)
+	echo "==> $dir: audit-ci"
+	(cd "$dir" && pnpm exec audit-ci --package-manager pnpm --high --critical)
 done
 
 # format --write may touch files; don't commit stale staged content
