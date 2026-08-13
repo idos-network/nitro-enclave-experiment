@@ -15,7 +15,17 @@ import { runWithRequestContext } from "./utils/request-context.ts";
 
 const app: Express = express();
 
+app.use((req, res, next) => {
+  const requestId = req.header("x-request-id") || crypto.randomUUID();
+  res.setHeader("x-request-id", requestId);
+  runWithRequestContext({ requestId, ...(req.ip !== undefined ? { remoteIp: req.ip } : {}) }, next);
+});
 app.use(loggerMiddleware);
+app.set("trust proxy", "loopback");
+app.use(promBundle({ includeMethod: true }));
+app.use(helmet());
+app.use(cors());
+app.use(express.json({ limit: "5mb" }));
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minute
@@ -25,23 +35,6 @@ const limiter = rateLimit({
   ipv6Subnet: 56,
   skip: (req) => req.url.startsWith("/metrics") || req.url.startsWith("/health"),
 });
-
-app.set("trust proxy", "loopback");
-
-app.use(
-  promBundle({
-    includeMethod: true,
-  }),
-);
-
-app.use(helmet());
-app.use(cors());
-app.use((req, res, next) => {
-  const requestId = req.header("x-request-id") || crypto.randomUUID();
-  res.setHeader("x-request-id", requestId);
-  runWithRequestContext({ requestId, ...(req.ip !== undefined ? { remoteIp: req.ip } : {}) }, next);
-});
-app.use(express.json({ limit: "5mb" }));
 app.use(limiter);
 
 app.get("/", (_req, res) => {
