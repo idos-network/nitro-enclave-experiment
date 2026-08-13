@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import cors from "cors";
-import express, { type Express, type Response } from "express";
+import express, { type Express, type NextFunction, type Request, type Response } from "express";
 import promBundle from "express-prom-bundle";
 import helmet from "helmet";
 import swaggerUi from "swagger-ui-express";
@@ -29,23 +29,17 @@ import { runWithRequestContext } from "./utils/request-context.ts";
 
 const app: Express = express();
 
-app.use(loggerMiddleware);
-
-app.set("trust proxy", "loopback");
-
-app.use(
-  promBundle({
-    includeMethod: true,
-  }),
-);
-
-app.use(helmet());
-app.use(cors());
 app.use((req, res, next) => {
   const requestId = req.header("x-request-id") || crypto.randomUUID();
   res.setHeader("x-request-id", requestId);
   runWithRequestContext({ requestId, ...(req.ip !== undefined ? { remoteIp: req.ip } : {}) }, next);
 });
+
+app.use(loggerMiddleware);
+app.set("trust proxy", "loopback");
+app.use(promBundle({ includeMethod: true }));
+app.use(helmet());
+app.use(cors());
 app.use(express.json({ limit: "32mb" }));
 
 app.get("/", (_req, res) => {
@@ -150,5 +144,13 @@ app.post(
     return res.json({ data });
   },
 );
+
+app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+  if (err instanceof Error) {
+    writeLog("error", { error: err.message });
+    return res.status(500).json({ error: err.message });
+  }
+  return res.status(500).json({ error: "Internal server error" });
+});
 
 export default app;

@@ -9,6 +9,7 @@ export const ACTION_TYPES = [
   "decrypt_request",
   "decrypt_request_missing_required_fields",
   "audience_jwks_url_not_found",
+  "error",
 ] as const;
 
 export type ActionType = (typeof ACTION_TYPES)[number];
