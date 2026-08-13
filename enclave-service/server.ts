@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import cors from "cors";
-import express, { type Express } from "express";
+import express, { type Express, type Response } from "express";
 import promBundle from "express-prom-bundle";
 import helmet from "helmet";
 import swaggerUi from "swagger-ui-express";
@@ -56,80 +56,95 @@ app.get("/health", async (_req, res) => {
   res.status(200).json({ status: "ok" });
 });
 
-const file = fs.readFileSync("./openapi.yaml", "utf8");
-const swaggerDocument = YAML.parse(file);
+if (process.env.NODE_ENV !== "test") {
+  const file = fs.readFileSync("./openapi.yaml", "utf8");
+  const swaggerDocument = YAML.parse(file);
 
-app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
-app.get("/openapi.json", (_req, res) => {
-  res.json(swaggerDocument);
-});
-app.get("/openapi.yaml", (_req, res) => {
-  res.type("text/yaml");
-  res.send(file);
-});
+  app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+  app.get("/openapi.json", (_req, res) => {
+    res.json(swaggerDocument);
+  });
+  app.get("/openapi.yaml", (_req, res) => {
+    res.type("text/yaml");
+    res.send(file);
+  });
+}
 
 app.get("/.well-known/jwks.json", async (_req, res) => {
   const key = await getPublicKeyJWK();
   res.status(200).json({ keys: [key] });
 });
 
-app.post("/session", validatorMiddleware(CreateSessionRequestSchema), async (req, res) => {
-  const sessionRequest = req.sessionRequest as CreateSessionRequest;
-  const session = await createSession(sessionRequest);
-  writeLog("session_created", { sessionId: session.id });
-  res.status(200).json(session);
-});
+app.post(
+  "/session",
+  validatorMiddleware(CreateSessionRequestSchema),
+  async (_req, res: Response<any, { validatedBody: CreateSessionRequest }>) => {
+    const session = await createSession(res.locals.validatedBody);
+    writeLog("session_created", { sessionId: session.id });
+    res.status(200).json(session);
+  },
+);
 
 app.post(
   "/session/public-key",
   validatorMiddleware(CommonRequestSchema),
   sessionKeyMiddleware(),
-  async (req, res) => {
-    const sessionRequest = req.sessionRequest as CommonRequest;
+  async (
+    _req,
+    res: Response<any, { validatedBody: CommonRequest; encryptionKeyPair: nacl.BoxKeyPair }>,
+  ) => {
+    const { validatedBody, encryptionKeyPair } = res.locals;
 
     writeLog("public_key_request", {
-      sessionId: sessionRequest.session.id,
+      sessionId: validatedBody.session.id,
     });
 
     return res.json({
-      sessionId: sessionRequest.session.id,
-      publicKey: Buffer.from(req.encryptionKeyPair.publicKey).toString("base64url"),
+      sessionId: validatedBody.session.id,
+      publicKey: Buffer.from(encryptionKeyPair.publicKey).toString("base64url"),
     });
   },
 );
 
-app.post("/encrypt", validatorMiddleware(EncryptRequestSchema), async (req, res) => {
-  const sessionRequest = req.sessionRequest as EncryptRequest;
+app.post(
+  "/encrypt",
+  validatorMiddleware(EncryptRequestSchema),
+  async (_req, res: Response<any, { validatedBody: EncryptRequest }>) => {
+    const { validatedBody } = res.locals;
 
-  writeLog("encrypt_request");
+    writeLog("encrypt_request");
 
-  const data = await encrypt(sessionRequest.arguments.payload, sessionRequest.arguments.publicKey);
+    const data = await encrypt(validatedBody.arguments.payload, validatedBody.arguments.publicKey);
 
-  return res.json(data);
-});
+    return res.json(data);
+  },
+);
 
 app.post(
   "/session/decrypt",
   validatorMiddleware(DecryptRequestSchema),
   sessionKeyMiddleware(),
-  async (req, res) => {
-    const sessionRequest = req.sessionRequest as DecryptRequest;
+  async (
+    _req,
+    res: Response<any, { validatedBody: DecryptRequest; encryptionKeyPair: nacl.BoxKeyPair }>,
+  ) => {
+    const { validatedBody, encryptionKeyPair } = res.locals;
 
     writeLog("decrypt_request", {
-      sessionId: sessionRequest.session.id,
+      sessionId: validatedBody.session.id,
     });
 
     // Nonce is optional
     const [payload, nonce] = splitPayload(
-      sessionRequest.arguments.payload,
-      sessionRequest.arguments.nonce,
+      validatedBody.arguments.payload,
+      validatedBody.arguments.nonce,
     );
 
     const data = await decrypt(
       payload,
       nonce,
-      sessionRequest.arguments.publicKey,
-      req.encryptionKeyPair.secretKey,
+      validatedBody.arguments.publicKey,
+      encryptionKeyPair.secretKey,
     );
 
     return res.json({ data });

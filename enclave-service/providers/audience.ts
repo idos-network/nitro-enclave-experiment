@@ -1,7 +1,7 @@
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { writeLog } from "../utils/logger-context.ts";
 
-const jwksByUrl = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
+const keySetCache = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
 
 export async function verifyAudience(
   allowedAudienceRoots: string[],
@@ -33,13 +33,19 @@ export async function verifyAudience(
 }
 
 function remoteJwks(url: string) {
-  const cached = jwksByUrl.get(url);
+  const cached = keySetCache.get(url);
+
   if (cached) {
     return cached;
   }
 
-  const jwks = createRemoteJWKSet(new URL(url), { timeoutDuration: 3_000 });
-  jwksByUrl.set(url, jwks);
+  // Under the hood according the doc, this is automatically refreshed every 1 minute
+  // so we don't need to refresh it manually
+  const jwks = createRemoteJWKSet(new URL(url), {
+    timeoutDuration: 3_000,
+    cooldownDuration: 60_000,
+  });
+  keySetCache.set(url, jwks);
   return jwks;
 }
 

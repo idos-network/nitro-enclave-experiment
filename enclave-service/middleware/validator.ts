@@ -8,16 +8,7 @@ import type {
 } from "../utils/dto.ts";
 import { writeLog } from "../utils/logger-context.ts";
 
-declare global {
-  namespace Express {
-    interface Request {
-      sessionRequest: CreateSessionRequest | EncryptRequest | DecryptRequest | CommonRequest;
-    }
-  }
-}
-
 /**
- *
  * Parse RequestSchema and return 400 on bad body
  */
 export function validatorMiddleware(
@@ -36,7 +27,7 @@ export function validatorMiddleware(
       return res.status(400).json({ error: "Invalid request body", details: issues });
     }
 
-    req.sessionRequest = parsed.data;
+    res.locals.validatedBody = parsed.data;
     return next();
   };
 }
