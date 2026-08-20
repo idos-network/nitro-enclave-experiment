@@ -42,6 +42,44 @@ describe("POST /session/decrypt", () => {
     expect(decryptedPayload.data).toBe(plaintext);
   });
 
+  it("decrypts a sender ciphertext without a nonce", async () => {
+    const session = await createSession();
+    const contentEncryptionKeyPair = nacl.box.keyPair();
+    const recipientKeyPair = nacl.box.keyPair();
+    const plaintext = b64(Buffer.from("decrypt me"));
+
+    // We have to encrypt manually (because of ephemeral key pair)
+    const nonce = nacl.randomBytes(nacl.box.nonceLength);
+    const encrypted = nacl.box(
+      Buffer.from(plaintext, "base64url"),
+      nonce,
+      recipientKeyPair.publicKey,
+      contentEncryptionKeyPair.secretKey,
+    );
+
+    if (encrypted === null) {
+      throw new Error("Failed to encrypt");
+    }
+
+    const payload = new Uint8Array(nonce.length + encrypted.length);
+    payload.set(nonce, 0);
+    payload.set(encrypted, nonce.length);
+
+    const res = await request(app)
+      .post("/session/decrypt")
+      .send(
+        sessionBody(session, contentEncryptionKeyPair.secretKey, audience, {
+          payload: b64(payload),
+          publicKey: b64(recipientKeyPair.publicKey),
+        }),
+      )
+      .expect(200);
+
+    const decryptedPayload = decryptAudienceResponse(res.body);
+
+    expect(decryptedPayload.data).toBe(plaintext);
+  });
+
   it("returns 400 for invalid body", async () => {
     const res = await request(app)
       .post("/session/decrypt")

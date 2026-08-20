@@ -15,5 +15,5 @@ export function splitPayload(payloadBase64Url: string, nonceBase64Url?: string):
   const nonce = payload.subarray(0, nacl.box.nonceLength);
   const encrypted = payload.subarray(nacl.box.nonceLength);
 
-  return [Buffer.from(nonce).toString("base64url"), Buffer.from(encrypted).toString("base64url")];
+  return [Buffer.from(encrypted).toString("base64url"), Buffer.from(nonce).toString("base64url")];
 }

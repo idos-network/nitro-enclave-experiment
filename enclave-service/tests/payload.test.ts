@@ -14,8 +14,8 @@ describe("splitPayload", () => {
     const combined = Buffer.concat([nonce, encrypted]).toString("base64url");
 
     expect(splitPayload(combined)).toEqual([
-      nonce.toString("base64url"),
       encrypted.toString("base64url"),
+      nonce.toString("base64url"),
     ]);
   });
 });
