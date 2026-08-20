@@ -30,11 +30,15 @@ jobs:
             name: Entropy Service
           - dir: facesign-service
             name: FaceSign Service
+          - dir: enclave-service
+            name: Enclave Service
 
     name: ${{ matrix.service.name }}
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install pnpm
         uses: pnpm/action-setup@v6

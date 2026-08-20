@@ -1,0 +1,527 @@
+openapi: 3.1.0
+info:
+  title: Enclave Service
+  description: |
+    Enclave service. Clients create a session with their client public key
+    and allowed audience roots, then authenticate later requests with a
+    wrapped content enclave key to decrypt data or fetch the unwrapped user
+    public key. Plaintext encryption (`POST /encrypt`) is sessionless.
+  version: 1.0.0
+
+servers:
+  - url: https://enclave.staging.sandbox.fractal.id/
+    description: Staging environment
+  - url: https://enclave.idos.network/
+    description: Production
+  - url: http://localhost:7000
+    description: Local development
+
+tags:
+  - name: Health
+  - name: Keys
+  - name: Session
+  - name: Encryption
+
+paths:
+  /:
+    get:
+      tags: [Health]
+      summary: Service info
+      operationId: getRoot
+      responses:
+        "200":
+          description: Service is running
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: string
+                    example: enclave Service is running
+
+  /health:
+    get:
+      tags: [Health]
+      summary: Health check
+      operationId: getHealth
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /.well-known/jwks.json:
+    get:
+      tags: [Keys]
+      summary: JWKS for session signature verification
+      description: |
+        Returns the KMS signing public key as a JWK set. Used to verify
+        `jwtChain` on session creation responses (EdDSA / Ed25519).
+      operationId: getJwks
+      responses:
+        "200":
+          description: JSON Web Key Set
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Jwks"
+
+  /session:
+    post:
+      tags: [Session]
+      summary: Create a session
+      description: |
+        Creates a new enclave session bound to `sessionClientPublicKey` and
+        `allowedAudienceRoots`. Returns the session server public key
+        (X25519 JWK) and a compact JWS chain over that key (RFC 7515).
+      operationId: createSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSessionRequest"
+      responses:
+        "200":
+          description: Session created
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateSessionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /session/public-key:
+    post:
+      tags: [Session]
+      summary: Get unwrapped user public key
+      description: |
+        Unwraps `session.encryptedKey` using the session server key and the
+        client public key stored at session creation, then returns the derived
+        Curve25519 public key (base64url).
+        Uses `CommonRequestSchema` (`session` + `audience` only).
+      operationId: getSessionPublicKey
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommonRequest"
+      responses:
+        "200":
+          description: Audience-encrypted response containing `PublicKeyResponse`
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EncryptedResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/SessionNotFound"
+
+  /encrypt:
+    post:
+      tags: [Encryption]
+      summary: Encrypt data for a recipient
+      description: |
+        Sessionless. Encrypts `arguments.payload` (base64url plaintext bytes)
+        to `arguments.publicKey` (recipient Curve25519 public key, base64url)
+        with an ephemeral X25519 key pair.
+        Uses `EncryptRequestSchema` (`arguments` only).
+      operationId: encrypt
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EncryptRequest"
+      responses:
+        "200":
+          description: NaCl box ciphertext, nonce, and ephemeral public key
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EncryptResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /session/decrypt:
+    post:
+      tags: [Session]
+      summary: Decrypt data from a sender
+      description: |
+        Decrypts using `arguments.publicKey` (sender Curve25519 public key,
+        base64url) and the unwrapped content enclave secret key.
+        If `arguments.nonce` is set, `arguments.payload` is ciphertext only;
+        otherwise `arguments.payload` is base64url `nonce || ciphertext`.
+        The successful response is encrypted for the verified audience. After
+        decrypting the response envelope, the inner body contains `DataResponse`
+        with plaintext bytes as base64url.
+        Uses `DecryptRequestSchema` (`session` + `audience` + `arguments`).
+      operationId: decrypt
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DecryptRequest"
+      responses:
+        "200":
+          description: Audience-encrypted response containing `DataResponse`
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EncryptedResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/SessionNotFound"
+
+components:
+  parameters:
+    XRequestId:
+      name: x-request-id
+      in: header
+      required: false
+      description: Optional request correlation id; echoed on the response.
+      schema:
+        type: string
+
+  headers:
+    XRequestId:
+      description: Request correlation id (from request or generated).
+      schema:
+        type: string
+
+  responses:
+    BadRequest:
+      description: Request body failed validation or audience verification failed
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - $ref: "#/components/schemas/ValidationError"
+              - $ref: "#/components/schemas/Error"
+    SessionNotFound:
+      description: Session key pair unavailable
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+  schemas:
+    CreateSessionRequest:
+      type: object
+      required: [sessionClientPublicKey, allowedAudienceRoots]
+      description: Body for `POST /session` (`CreateSessionRequestSchema`)
+      properties:
+        sessionClientPublicKey:
+          type: string
+          pattern: '^[A-Za-z0-9_-]{43,44}$'
+          description: |
+            Base64url-encoded client Curve25519 public key (32 bytes). Stored
+            with the session and used later to unwrap `session.encryptedKey`.
+        allowedAudienceRoots:
+          type: array
+          maxItems: 10
+          items:
+            type: string
+          description: Audience roots permitted for this session
+
+    SessionContext:
+      type: object
+      required: [id, encryptedKey, nonce]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Session UUID from `POST /session`
+        nonce:
+          type: string
+          pattern: '^[A-Za-z0-9_-]{32}$'
+          description: |
+            Base64url-encoded 24-byte NaCl nonce used to wrap the content
+            enclave key (32 chars)
+        encryptedKey:
+          type: string
+          pattern: '^[A-Za-z0-9_-]{64}$'
+          description: |
+            Base64url-encoded NaCl box of the content enclave secret key (64
+            chars = 48 bytes), sealed to the session server public key with the
+            client session secret key
+
+    SessionArguments:
+      type: object
+      required: [payload, publicKey]
+      properties:
+        payload:
+          type: string
+          pattern: '^[A-Za-z0-9_-]+$'
+          description: |
+            Base64url-encoded payload. For encrypt: plaintext bytes.
+            For decrypt: ciphertext only when `nonce` is set, otherwise
+            `nonce || ciphertext`.
+        nonce:
+          type: string
+          pattern: '^[A-Za-z0-9_-]{32}$'
+          description: |
+            Optional base64url-encoded 24-byte NaCl nonce for decrypt. When
+            omitted, the nonce is taken from the first 24 bytes of `payload`.
+        publicKey:
+          type: string
+          pattern: '^[A-Za-z0-9_-]{43,44}$'
+          description: |
+            Base64url-encoded 32-byte Curve25519 public key. For encrypt:
+            recipient (decryptor). For decrypt: sender (encryptor).
+
+    Audience:
+      type: object
+      required: [recipient, jwtChain]
+      properties:
+        recipient:
+          $ref: "#/components/schemas/AudienceRecipientPublicKey"
+        jwtChain:
+          type: string
+          description: |
+            Compact JWT signed with EdDSA by one of the allowed audience root
+            JWKS keys.
+            The decoded payload contains `{ recipientPublicKeyX }`, where
+            `recipientPublicKeyX` is the base64url audience public key.
+
+    CommonRequest:
+      type: object
+      required: [session, audience]
+      description: Body for `POST /session/public-key` (`CommonRequestSchema`)
+      properties:
+        session:
+          $ref: "#/components/schemas/SessionContext"
+        audience:
+          $ref: "#/components/schemas/Audience"
+
+    EncryptRequest:
+      type: object
+      required: [arguments]
+      description: Body for `POST /encrypt` (`EncryptRequestSchema`)
+      properties:
+        arguments:
+          $ref: "#/components/schemas/SessionArguments"
+
+    DecryptRequest:
+      allOf:
+        - $ref: "#/components/schemas/CommonRequest"
+        - type: object
+          required: [arguments]
+          description: Body for `POST /session/decrypt` (`DecryptRequestSchema`)
+          properties:
+            arguments:
+              $ref: "#/components/schemas/SessionArguments"
+
+    EncryptResponse:
+      type: object
+      required: [nonce, encrypted, publicKey]
+      description: Plain response from `POST /encrypt`
+      properties:
+        nonce:
+          type: string
+          pattern: '^[A-Za-z0-9_-]{32}$'
+          description: Base64url-encoded 24-byte NaCl box nonce
+        encrypted:
+          type: string
+          pattern: '^[A-Za-z0-9_-]+$'
+          description: Base64url-encoded NaCl box ciphertext
+        publicKey:
+          type: string
+          pattern: '^[A-Za-z0-9_-]{43,44}$'
+          description: |
+            Base64url-encoded ephemeral Curve25519 public key (sender) used
+            for this box
+
+    SessionServerPublicKey:
+      type: object
+      description: X25519 session server public key as a JWK
+      required: [kty, crv, x]
+      properties:
+        kty:
+          type: string
+          const: OKP
+        crv:
+          type: string
+          const: X25519
+        x:
+          type: string
+          description: Base64url-encoded X25519 public key
+
+    X25519enclavePublicKey:
+      type: object
+      description: X25519 public key as a JWK for NaCl box enclave
+      required: [kty, crv, x, use]
+      properties:
+        kty:
+          type: string
+          const: OKP
+        crv:
+          type: string
+          const: X25519
+        use:
+          type: string
+          const: enc
+        x:
+          type: string
+          pattern: '^[A-Za-z0-9_-]+$'
+          description: Base64url-encoded X25519 public key
+        kid:
+          type: string
+          description: Optional key id
+
+    AudienceRecipientPublicKey:
+      allOf:
+        - $ref: "#/components/schemas/X25519enclavePublicKey"
+        - type: object
+          required: [kid]
+
+    CreateSessionResponse:
+      type: object
+      required: [id, jwtChain, sessionServerPublicKey]
+      properties:
+        id:
+          type: string
+          format: uuid
+        jwtChain:
+          type: string
+          description: |
+            Compact JWS (`protected.payload.signature`) signed with KMS EdDSA.
+            The decoded payload contains
+            `{ sessionServerPublicKeyX: sessionServerPublicKey.x, nonce }`.
+        sessionServerPublicKey:
+          $ref: "#/components/schemas/SessionServerPublicKey"
+
+    PublicKeyResponse:
+      type: object
+      required: [sessionId, publicKey]
+      properties:
+        sessionId:
+          type: string
+          format: uuid
+        publicKey:
+          type: string
+          pattern: '^[A-Za-z0-9_-]{43,44}$'
+          description: |
+            Base64url-encoded Curve25519 public key derived from the unwrapped
+            content enclave secret
+
+    DataResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: string
+          pattern: '^[A-Za-z0-9_-]+$'
+          description: Base64url-encoded result (ciphertext or plaintext bytes)
+
+    EncryptedResponse:
+      type: object
+      description: |
+        Response body encrypted for the verified audience with NaCl box.
+        Decrypt `payload` using `nonce`, `audience.sender`, and the private
+        key matching `audience.recipient`.
+      required: [audience, nonce, payload]
+      properties:
+        audience:
+          type: object
+          required: [recipient, sender, jwtChain]
+          properties:
+            recipient:
+              $ref: "#/components/schemas/X25519enclavePublicKey"
+            sender:
+              $ref: "#/components/schemas/X25519enclavePublicKey"
+            jwtChain:
+              type: string
+              description: Session server compact JWS chain
+        nonce:
+          type: string
+          description: Base64url-encoded NaCl box nonce
+        payload:
+          type: string
+          description: Base64url-encoded encrypted JSON response body
+
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          example: Session not found
+
+    ValidationError:
+      type: object
+      required: [error, details]
+      properties:
+        error:
+          type: string
+          example: Invalid request body
+        details:
+          description: Zod validation error object
+          type: object
+          additionalProperties: true
+
+    Jwk:
+      type: object
+      description: JSON Web Key (Ed25519 signing key from KMS)
+      required: [kty, crv, x, kid, use, alg]
+      properties:
+        kty:
+          type: string
+          const: OKP
+        crv:
+          type: string
+          const: Ed25519
+        x:
+          type: string
+          description: Base64url-encoded Ed25519 public key
+        kid:
+          type: string
+        use:
+          type: string
+          const: sig
+        alg:
+          type: string
+          const: EdDSA
+      additionalProperties: true
+
+    Jwks:
+      type: object
+      required: [keys]
+      properties:
+        keys:
+          type: array
+          items:
+            $ref: "#/components/schemas/Jwk"
+          minItems: 1
+          maxItems: 1

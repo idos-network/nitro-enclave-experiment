@@ -28,7 +28,6 @@ const client = new MongoClient(MONGO_URI, {
 
 let db: Db | null = null;
 let facetecDataDb: Db | null = null;
-let cacheClientEncryption: ClientEncryption | null = null;
 
 async function ensureKmsProviders() {
   const credentialsProvider = defaultProvider();
@@ -49,12 +48,10 @@ async function ensureKmsProviders() {
 async function getClientEncryption() {
   const kmsProviders = await ensureKmsProviders();
 
-  cacheClientEncryption = new ClientEncryption(client, {
+  return new ClientEncryption(client, {
     keyVaultNamespace,
     kmsProviders,
   });
-
-  return cacheClientEncryption;
 }
 
 /**
