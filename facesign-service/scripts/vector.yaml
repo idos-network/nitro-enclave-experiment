@@ -1,12 +1,87 @@
 data_dir: /tmp/vector
 
+# Vector supervises the processes directly instead of pm2-runtime.
+# pm2's `log_type: json` wrapped raw *pipe chunks* (not lines) into one JSON
+# envelope, so bursts of log lines collapsed into a single unparseable event and
+# lines >64KB were split mid-line. The exec source frames on newlines at the
+# pipe, so one log line is always one event.
 sources:
-  pm2_app:
+  facesign:
     type: exec
-    command: ["pm2-runtime", "ecosystem.config.cjs"]
     mode: streaming
+    command: ["npm", "start"]
+    working_directory: "${HOME_FACESIGN_SERVICE}"
+    streaming:
+      respawn_on_exit: true
+      respawn_interval_secs: 5
+    framing:
+      method: newline_delimited
+    # bytes, never json: a non-JSON line must be kept, not silently dropped
     decoding:
-      codec: json
+      codec: bytes
+    maximum_buffer_size_bytes: 4194304
+
+  uls:
+    type: exec
+    mode: streaming
+    command: ["node", "index.js", "start"]
+    working_directory: "${HOME_FACETEC_USAGE_LOGS}"
+    streaming:
+      # was pm2 `max_restarts: 0` - do not bring it back up on exit
+      respawn_on_exit: false
+    framing:
+      method: newline_delimited
+    decoding:
+      codec: bytes
+    maximum_buffer_size_bytes: 4194304
+
+  facetec:
+    type: exec
+    mode: streaming
+    # sleep 5 keeps the pm2 start-ordering delay this server relied on
+    command: ["bash", "-c", "sleep 5 && bash run.ash"]
+    working_directory: "${HOME_FACETEC_CUSTOM_SERVER}/deploy"
+    streaming:
+      respawn_on_exit: true
+      respawn_interval_secs: 5
+    framing:
+      method: newline_delimited
+    decoding:
+      codec: bytes
+    maximum_buffer_size_bytes: 4194304
+
+  caddy:
+    type: exec
+    mode: streaming
+    command: ["caddy", "run", "--config", "/home/deploy/Caddyfile", "--adapter", "caddyfile"]
+    working_directory: /home/deploy
+    streaming:
+      respawn_on_exit: true
+      respawn_interval_secs: 5
+    framing:
+      method: newline_delimited
+    decoding:
+      codec: bytes
+    maximum_buffer_size_bytes: 4194304
+
+  node_exporter:
+    type: exec
+    mode: streaming
+    command: ["node_exporter", "--no-collector.kernel_hung"]
+    working_directory: /usr/local/bin
+    streaming:
+      respawn_on_exit: true
+      respawn_interval_secs: 5
+    framing:
+      method: newline_delimited
+    decoding:
+      codec: bytes
+    maximum_buffer_size_bytes: 4194304
+
+  # Exposes component_discarded_events_total / component_errors_total so log
+  # loss is visible in Victoria Metrics instead of silent.
+  internal_metrics:
+    type: internal_metrics
 
   express_metrics:
     type: prometheus_scrape
@@ -33,38 +108,48 @@ sources:
     scrape_interval_secs: 15
 
 transforms:
+  tag_facesign:
+    type: remap
+    inputs: [facesign]
+    source: '.component = "express"'
+
+  tag_uls:
+    type: remap
+    inputs: [uls]
+    source: '.component = "uls"'
+
+  tag_facetec:
+    type: remap
+    inputs: [facetec]
+    source: '.component = "java"'
+
+  tag_caddy:
+    type: remap
+    inputs: [caddy]
+    source: '.component = "caddy"'
+
+  tag_node_exporter:
+    type: remap
+    inputs: [node_exporter]
+    source: '.component = "node"'
+
   logs:
     type: remap
     inputs:
-      - pm2_app
+      - tag_facesign
+      - tag_uls
+      - tag_facetec
+      - tag_caddy
+      - tag_node_exporter
     source: |
-      pm2_app_name = .app_name
-      component = pm2_app_name
-
-      if pm2_app_name == "FaceSign-service" {
-        component = "express"
-      } else if pm2_app_name == "FaceTec_Custom_Server" {
-        component = "java"
-      } else if pm2_app_name == "node-exporter" {
-        component = "node"
-      } else if pm2_app_name == "Caddy" {
-        component = "caddy"
-      } else if pm2_app_name == "ULS" {
-        component = "uls"
-      }
-
-      .application = "facesign"
-      .environment = get_env_var("OTEL_ENVIRONMENT") ?? "unknown"
-      .component = component
+      # merge!() lets the parsed payload win, so stash the label first
+      component = .component
 
       parsed, err = parse_json(.message)
       if err == null && is_object(parsed) {
-        . = merge!(., parsed)
-        .application = "facesign"
-        .environment = get_env_var("OTEL_ENVIRONMENT") ?? "unknown"
-        .component = component
+        . = merge!(., object!(parsed))
         del(.message)
-      } else if .component == "java" {
+      } else if component == "java" {
         # FaceTec Server Webservice Debug:  Thu Jun 04 10:16:48 UTC 2026 - GET - /status - <uuid> - Request started.
         ft, ft_err = parse_regex(.message, r'^FaceTec Server Webservice (?P<level>[A-Za-z]+):\s+(?P<timestamp>[A-Za-z]{3} [A-Za-z]{3} \d{2} \d{2}:\d{2}:\d{2} [A-Z]+ \d{4}) - (?P<http_method>[A-Z]+) - (?P<http_path>[^ ]+) - (?P<request_id>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}) - (?P<detail>.*)$')
         if ft_err == null {
@@ -92,14 +177,13 @@ transforms:
 
           del(.message)
         }
-      } else if err != null {
-        .parse_error = "Failed to parse PM2 message as JSON"
-        .original_message = .message
       }
+      # anything unparsed keeps .message verbatim rather than being dropped
 
-      if !exists(.component) {
-        .component = "unknown"
-      }
+      .component = component
+      .application = "facesign"
+      .environment = get_env_var("OTEL_ENVIRONMENT") ?? "unknown"
+      del(.command)
 
   express_metric_labels:
     type: remap
@@ -129,6 +213,13 @@ transforms:
     source: |
       .tags.component = "java"
 
+  internal_metric_labels:
+    type: remap
+    inputs:
+      - internal_metrics
+    source: |
+      .tags.component = "vector"
+
   global_labels:
     type: remap
     inputs:
@@ -136,6 +227,7 @@ transforms:
       - caddy_metric_labels
       - node_metric_labels
       - java_metric_labels
+      - internal_metric_labels
     source: |
       .tags.application = "facesign"
       .tags.environment = get_env_var("OTEL_ENVIRONMENT") ?? "unknown"
@@ -175,6 +267,13 @@ sinks:
       strategy: basic
       user: "${OTEL_USER}"
       password: "${OTEL_PASSWORD}"
+    # Default is `drop`, which silently discards any event whose timestamp is
+    # behind the stream head. Requires Loki >= 2.4 (unordered writes).
+    out_of_order_action: accept
+    buffer:
+      type: memory
+      max_events: 10000
+      when_full: block
     encoding:
       codec: json
     labels:

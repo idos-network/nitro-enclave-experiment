@@ -1,10 +1,13 @@
 import { createPublicKey } from "node:crypto";
 import { GetPublicKeyCommand, KMSClient, SignCommand } from "@aws-sdk/client-kms";
+import { defaultProvider } from "@aws-sdk/credential-provider-node";
 import { AWS_REGION, SIGNING_KEY_KMS_KEY_ARN, SIGNING_KEY_KMS_KEY_ID } from "../env.ts";
 
-// One client per region/credentials (AWS recommendation); it refreshes expiring credentials itself.
+// One client + memoized credentials. A new KMSClient per call re-runs the
+// provider chain (IMDS) and fails under load with "Could not load credentials from any providers".
 const kms = new KMSClient({
   region: AWS_REGION,
+  credentials: defaultProvider(),
   requestHandler: { connectionTimeout: 1_000, requestTimeout: 3_000 },
 });
 
