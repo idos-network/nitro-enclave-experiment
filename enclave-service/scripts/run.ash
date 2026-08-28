@@ -47,6 +47,6 @@ fi
 
 mkdir -p /tmp/vector
 
-echo "Running service with pm2-runtime"
+echo "Running service with Vector"
 export HOME=/app
 exec vector --config /etc/vector/vector.yaml

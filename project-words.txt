@@ -24,6 +24,9 @@ facesign
 facetec
 facetecserver
 fileb
+respawn
+unparseable
+IMDS
 genkey
 genpkey
 groff
