@@ -22,8 +22,9 @@ const client = new MongoClient(MONGO_URI, {
   wtimeoutMS: 2500,
 });
 
+const credentialsProvider = defaultProvider();
+
 async function ensureKmsProviders() {
-  const credentialsProvider = defaultProvider();
   const credentials = await credentialsProvider();
 
   return {

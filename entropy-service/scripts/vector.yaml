@@ -1,13 +1,61 @@
 data_dir: /tmp/vector
 
+# Vector supervises the processes directly instead of pm2-runtime.
+# pm2's `log_type: json` wrapped raw *pipe chunks* (not lines) into one JSON
+# envelope, so bursts of log lines collapsed into a single unparseable event and
+# lines >64KB were split mid-line. The exec source frames on newlines at the
+# pipe, so one log line is always one event.
 sources:
-  pm2_app:
+  app:
     type: exec
-    command: ["pm2-runtime", "ecosystem.config.cjs"]
     mode: streaming
-    decoding: 
-      codec: json
-    
+    command: ["npm", "start"]
+    working_directory: /app
+    environment:
+      NODE_ENV: production
+    streaming:
+      respawn_on_exit: true
+      respawn_interval_secs: 5
+    framing:
+      method: newline_delimited
+    # bytes, never json: a non-JSON line must be kept, not silently dropped
+    decoding:
+      codec: bytes
+    maximum_buffer_size_bytes: 4194304
+
+  caddy:
+    type: exec
+    mode: streaming
+    command: ["caddy", "run", "--config", "/app/Caddyfile", "--adapter", "caddyfile"]
+    working_directory: /app
+    streaming:
+      respawn_on_exit: true
+      respawn_interval_secs: 5
+    framing:
+      method: newline_delimited
+    decoding:
+      codec: bytes
+    maximum_buffer_size_bytes: 4194304
+
+  node_exporter:
+    type: exec
+    mode: streaming
+    command: ["node_exporter", "--no-collector.kernel_hung"]
+    working_directory: /usr/local/bin
+    streaming:
+      respawn_on_exit: true
+      respawn_interval_secs: 5
+    framing:
+      method: newline_delimited
+    decoding:
+      codec: bytes
+    maximum_buffer_size_bytes: 4194304
+
+  # Exposes component_discarded_events_total / component_errors_total so log
+  # loss is visible in Victoria Metrics instead of silent.
+  internal_metrics:
+    type: internal_metrics
+
   express_metrics:
     type: prometheus_scrape
     endpoints:
@@ -27,38 +75,42 @@ sources:
     scrape_interval_secs: 15
 
 transforms:
+  tag_app:
+    type: remap
+    inputs: [app]
+    source: '.component = "express"'
+
+  tag_caddy:
+    type: remap
+    inputs: [caddy]
+    source: '.component = "caddy"'
+
+  tag_node_exporter:
+    type: remap
+    inputs: [node_exporter]
+    source: '.component = "node"'
+
   logs:
     type: remap
     inputs:
-      - pm2_app
+      - tag_app
+      - tag_caddy
+      - tag_node_exporter
     source: |
-      pm2_app_name = .app_name
-      component = pm2_app_name
-
-      if pm2_app_name == "entropy" {
-        component = "express"
-      } else if pm2_app_name == "node-exporter" {
-        component = "node"
-      } else if pm2_app_name == "Caddy" {
-        component = "caddy"
-      }
-
-      .application = "entropy"
-      .environment = get_env_var("OTEL_ENVIRONMENT") ?? "unknown"
-      .component = component
+      # merge!() lets the parsed payload win, so stash the label first
+      component = .component
 
       parsed, err = parse_json(.message)
-      if err != null {
-        .parse_error = "Failed to parse PM2 message as JSON"
-        .original_message = .message
-      } else if err != null {
-        .parse_error = "Failed to parse PM2 message as JSON"
-        .original_message = .message
+      if err == null && is_object(parsed) {
+        . = merge!(., object!(parsed))
+        del(.message)
       }
+      # non-JSON lines keep .message verbatim rather than being dropped
 
-      if !exists(.component) {
-        .component = "unknown"
-      }
+      .component = component
+      .application = "entropy"
+      .environment = get_env_var("OTEL_ENVIRONMENT") ?? "unknown"
+      del(.command)
 
   express_metric_labels:
     type: remap
@@ -81,12 +133,20 @@ transforms:
     source: |
       .tags.component = "node"
 
+  internal_metric_labels:
+    type: remap
+    inputs:
+      - internal_metrics
+    source: |
+      .tags.component = "vector"
+
   global_labels:
     type: remap
     inputs:
       - express_metric_labels
       - caddy_metric_labels
       - node_metric_labels
+      - internal_metric_labels
     source: |
       .tags.application = "entropy"
       .tags.environment = get_env_var("OTEL_ENVIRONMENT") ?? "unknown"
@@ -126,6 +186,13 @@ sinks:
       strategy: basic
       user: "${OTEL_USER}"
       password: "${OTEL_PASSWORD}"
+    # Default is `drop`, which silently discards any event whose timestamp is
+    # behind the stream head. Requires Loki >= 2.4 (unordered writes).
+    out_of_order_action: accept
+    buffer:
+      type: memory
+      max_events: 10000
+      when_full: block
     encoding:
       codec: json
     labels:
