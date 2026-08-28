@@ -7,7 +7,7 @@ setup_nbd() {
   echo "💾 Starting and checking nbdkit for $SERVICE_NAME..."
 
   echo "–> opening socat for nbd on localhost:10809"
-  socat TCP4-LISTEN:10809,fork,bind=127.0.0.1 VSOCK-CONNECT:3:10809 &
+  socat -b65536 TCP4-LISTEN:10809,fork,backlog=1024,bind=127.0.0.1 VSOCK-CONNECT:3:10809 &
 
   echo "–> waiting for mounting nbd0 device"
   while ! nbd-client -c /dev/nbd0; do

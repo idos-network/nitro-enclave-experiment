@@ -7,6 +7,7 @@ Caddyfile
 ciphertext
 cooldown
 cryptsetup
+CSFLE
 Dartifact
 davelosert
 dearmor
@@ -30,6 +31,7 @@ groff
 healthcheck
 idos
 idphoto
+IMDS
 keygen
 keyid
 keypair
@@ -61,6 +63,7 @@ pubout
 rdparty
 redoc
 redocly
+respawn
 RSASSA
 scure
 secp
@@ -71,6 +74,7 @@ socat
 spellcheck
 timberio
 topk
+unparseable
 unstub
 vite
 vitest
