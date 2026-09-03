@@ -82,7 +82,9 @@ describe("POST /session/public-key", () => {
 
     const res = await request(app).post("/session/public-key").send(body).expect(404);
 
-    expect(res.body).toEqual({ error: "Encryption key pair not found" });
+    expect(res.body).toEqual({
+      error: "Provided encryption key pair, can't be decrypted by session keys.",
+    });
   });
 
   it("returns 400 when audience is signed by another key", async () => {

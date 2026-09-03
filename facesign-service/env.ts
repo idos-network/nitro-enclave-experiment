@@ -6,6 +6,7 @@ export const DB_COLLECTION_NAME = "faceSignGroupMembers";
 export const DB_NAME = "face-sign-data";
 export const FACETEC_DB_NAME = "facetec-sdk-data";
 export const FACETEC_SESSION_COLLECTION = "Session";
+export const FLE_KEY_ALIAS = "facetec-server-encryption";
 export const KEY_1_MULTIBASE_PUBLIC_PATH = "./multibase_key_1_public.txt";
 export const HOST = "INSERT YOUR HOST HERE";
 export const JWT_PRIVATE_KEY = "./jwt_token_private.pem";
