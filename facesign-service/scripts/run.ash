@@ -134,8 +134,20 @@ fi
 echo "Decrypting JWT token private key"
 aws kms decrypt --ciphertext-blob "$(cat $JWT_TOKEN_SECRET_FILE)" --output text --query Plaintext --region eu-west-1 | base64 -d > $HOME_FACESIGN_SERVICE/jwt_token_private.pem
 
-mkdir -p /tmp/vector
+mkdir -p /mnt/encrypted/vector
 
-echo "Running service with Vector"
+source "$SCRIPT_DIR/shared/s6.ash"
+
 export HOME=/home/deploy
-exec vector --config /etc/vector/vector.yaml
+# node directly, not `npm start`: s6-supervise signals its direct child, and an
+# npm wrapper would leak the node process on restart and keep holding the port.
+s6_service express 'cd "$HOME_FACESIGN_SERVICE" && exec node index.ts'
+s6_service uls     'cd "$HOME_FACETEC_USAGE_LOGS" && exec node index.js start'
+s6_service java    'cd "$HOME_FACETEC_CUSTOM_SERVER/deploy" && sleep 5 && exec bash run.ash'
+s6_service caddy   'cd /home/deploy && exec caddy run --config /home/deploy/Caddyfile --adapter caddyfile'
+s6_service node    'exec node_exporter --no-collector.kernel_hung'
+s6_service vector  'exec vector --config /etc/vector/vector.yaml'
+s6_service_once uls
+
+echo "Running services under s6"
+exec s6-svscan /etc/s6

@@ -45,8 +45,18 @@ if [ ! -f "./$CADDYFILE" ]; then
   exit 1
 fi
 
-mkdir -p /tmp/vector
+mkdir -p /mnt/encrypted/vector
 
-echo "Running service with Vector"
+source "$SCRIPT_DIR/shared/s6.ash"
+
 export HOME=/app
-exec vector --config /etc/vector/vector.yaml
+
+# node directly, not `npm start`: s6-supervise signals its direct child, and an
+# npm wrapper would leak the node process on restart and keep holding the port.
+s6_service express 'cd /app && export NODE_ENV=production && exec node index.ts'
+s6_service caddy   'cd /app && exec caddy run --config /app/Caddyfile --adapter caddyfile'
+s6_service node    'exec node_exporter --no-collector.kernel_hung'
+s6_service vector  'exec vector --config /etc/vector/vector.yaml'
+
+echo "Running services under s6"
+exec s6-svscan /etc/s6
