@@ -23,7 +23,7 @@ set -a
 source ./config.env
 set +a
 
-if true; then #SSH#
+if false; then #SSH#
   source "$SCRIPT_DIR/shared/ssh.ash"
   setup_ssh "$SSH_PUBLIC_KEY"
 fi
@@ -141,7 +141,7 @@ source "$SCRIPT_DIR/shared/s6.ash"
 export HOME=/home/deploy
 # node directly, not `npm start`: s6-supervise signals its direct child, and an
 # npm wrapper would leak the node process on restart and keep holding the port.
-s6_service express 'cd "$HOME_FACESIGN_SERVICE" && exec node index.ts'
+s6_service express 'cd "$HOME_FACESIGN_SERVICE" && export NODE_ENV=production && exec node index.ts'
 s6_service uls     'cd "$HOME_FACETEC_USAGE_LOGS" && exec node index.js start'
 s6_service java    'cd "$HOME_FACETEC_CUSTOM_SERVER/deploy" && sleep 5 && exec bash run.ash'
 s6_service caddy   'cd /home/deploy && exec caddy run --config /home/deploy/Caddyfile --adapter caddyfile'
