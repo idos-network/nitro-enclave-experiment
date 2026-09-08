@@ -5,6 +5,9 @@ const h = vi.hoisted(() => {
 
   return {
     docs,
+    // Set to make the next findOneAndUpdate throw. `insert`, when given, is
+    // written first, standing in for the racing writer that caused the clash.
+    nextUpsertThrows: null as { error: Error; insert?: Buffer } | null,
     createIndex: vi.fn(async () => {}),
     listCollections: vi.fn(() => ({ toArray: async () => [{ name: "__keyVault" }] })),
     credentialsProvider: vi.fn(async () => ({
@@ -60,6 +63,17 @@ vi.mock("mongodb", () => {
               { faceSignUserId }: { faceSignUserId: string },
               update: { $setOnInsert: { entropy: Buffer } },
             ) => {
+              const failure = h.nextUpsertThrows;
+              if (failure) {
+                h.nextUpsertThrows = null;
+
+                if (failure.insert) {
+                  h.docs.set(faceSignUserId, { faceSignUserId, entropy: failure.insert });
+                }
+
+                throw failure.error;
+              }
+
               const existing = h.docs.get(faceSignUserId);
               if (existing) {
                 return existing;
@@ -82,7 +96,14 @@ vi.mock("mongodb", () => {
   };
 });
 
-const { Binary } = await import("mongodb");
+const mongodb = await import("mongodb");
+const { Binary } = mongodb;
+// The mock takes (message, code); the real signature is (ErrorDescription).
+const MongoServerError = mongodb.MongoServerError as unknown as new (
+  message: string,
+  code: number,
+) => Error & { code: number };
+
 const { connectDB, fetchOrCreateFaceSignEntropy } = await import("../providers/db.ts");
 
 describe("fetchOrCreateFaceSignEntropy", () => {
@@ -103,6 +124,31 @@ describe("fetchOrCreateFaceSignEntropy", () => {
     expect(a.entropy).toBe(b.entropy);
     expect([a.insert, b.insert].filter(Boolean)).toHaveLength(1);
     expect(h.docs.get(userId)?.entropy.toString()).toBe(a.entropy);
+  });
+
+  // Against real Mongo the racing insert lands between our findOne and the
+  // upsert, so the unique index rejects us with E11000 instead of returning a
+  // document. The mock above cannot race for real, so drive that branch here.
+  it("returns the stored entropy when the upsert loses on a duplicate key", async () => {
+    const userId = "duplicate-key-user";
+    const winner = "winner mnemonic";
+
+    h.nextUpsertThrows = {
+      error: new MongoServerError("E11000 duplicate key error", 11000),
+      insert: Buffer.from(winner),
+    };
+
+    const result = await fetchOrCreateFaceSignEntropy(userId);
+
+    expect(result).toEqual({ insert: false, entropy: winner });
+    expect(h.docs.get(userId)?.entropy.toString()).toBe(winner);
+  });
+
+  it("rethrows an upsert failure that is not a duplicate key", async () => {
+    h.nextUpsertThrows = { error: new MongoServerError("connection reset", 6) };
+
+    await expect(fetchOrCreateFaceSignEntropy("rethrow-user")).rejects.toThrow("connection reset");
+    expect(h.docs.has("rethrow-user")).toBe(false);
   });
 });
 
