@@ -98,6 +98,42 @@ function ensureKeyOnce(): Promise<UUID> {
   return dataKeyIdPromise;
 }
 
+type ExtendedJsonBinary = { $binary?: { base64?: string; subType: string } };
+type SerializedBinary = { type?: number; data?: number[] };
+
+// Mongo returns the ciphertext in whatever shape it was written in: a driver
+// Binary, a BSON Binary that lost its class over a JSON round trip, a raw
+// Buffer, base64, or extended JSON. Normalizing here means every caller can
+// hand over the field it read from the document as-is.
+function toBinary(value: unknown): Binary {
+  if (value instanceof Binary) {
+    return value;
+  }
+
+  const serialized = value as SerializedBinary | null;
+  if (serialized?.type === 6 && Array.isArray(serialized.data)) {
+    return new Binary(Buffer.from(serialized.data), 6);
+  }
+
+  if (Buffer.isBuffer(value)) {
+    return new Binary(value, 6);
+  }
+
+  if (typeof value === "string") {
+    return new Binary(Buffer.from(value, "base64"), 6);
+  }
+
+  const extendedJson = (value as ExtendedJsonBinary | null)?.$binary;
+  if (extendedJson?.base64) {
+    return new Binary(
+      Buffer.from(extendedJson.base64, "base64"),
+      Number.parseInt(extendedJson.subType, 16),
+    );
+  }
+
+  throw new Error("Invalid encrypted payload format");
+}
+
 export async function connectDB() {
   if (!db) {
     await client.connect();
@@ -125,8 +161,8 @@ export async function connectDB() {
         algorithm: "AEAD_AES_256_CBC_HMAC_SHA_512-Random",
       });
     },
-    decrypt: async <T>(value: Binary): Promise<T> => {
-      return clientEncryption.decrypt<T>(value);
+    decrypt: async <T>(value: unknown): Promise<T> => {
+      return clientEncryption.decrypt<T>(toBinary(value));
     },
   };
 }
@@ -173,31 +209,8 @@ export async function getAuditTrailImage(
     return null;
   }
 
-  // Convert from encrypted BSON to base64
-  let payloadForDecrypt: any = image;
-
-  // Check for proper binary type = 6, data = array
-  if (
-    typeof payloadForDecrypt === "object" &&
-    payloadForDecrypt.type === 6 &&
-    Array.isArray(payloadForDecrypt.data)
-  ) {
-    payloadForDecrypt = new Binary(payloadForDecrypt.data, 6);
-  } else if (Buffer.isBuffer(payloadForDecrypt)) {
-    payloadForDecrypt = new Binary(payloadForDecrypt, 6);
-  } else if (typeof payloadForDecrypt === "string") {
-    const buf = Buffer.from(payloadForDecrypt, "base64");
-    payloadForDecrypt = new Binary(buf, 6);
-  } else if (payloadForDecrypt?.$binary?.base64) {
-    const buf = Buffer.from(payloadForDecrypt.$binary.base64, "base64");
-    payloadForDecrypt = new Binary(buf, Number.parseInt(payloadForDecrypt.$binary.subType, 16));
-  }
-
-  if (!payloadForDecrypt) {
-    throw new Error("Invalid entropy format");
-  }
-
-  const decrypted = await decrypt<any>(payloadForDecrypt);
+  // biome-ignore lint/suspicious/noExplicitAny: decrypt returns whatever was stored
+  const decrypted = await decrypt<any>(image);
   return Buffer.from(decrypted.buffer, "base64");
 }
 
