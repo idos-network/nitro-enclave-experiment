@@ -54,6 +54,7 @@ nodesource
 nodistro
 noout
 pcrs
+pino
 pinocchio
 pipefail
 pkcs

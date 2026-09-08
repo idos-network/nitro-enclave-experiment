@@ -24,7 +24,7 @@ set -a
 source ./config.env
 set +a
 
-if true; then #SSH#
+if false; then #SSH#
   source "$SCRIPT_DIR/shared/ssh.ash"
   setup_ssh "$SSH_PUBLIC_KEY"
 fi
