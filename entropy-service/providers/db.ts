@@ -1,7 +1,16 @@
 import { defaultProvider } from "@aws-sdk/credential-provider-node";
 import * as bip39 from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
-import { Binary, ClientEncryption, type Db, MongoClient, type UUID } from "mongodb";
+import {
+  Binary,
+  ClientEncryption,
+  type Db,
+  type Document,
+  MongoClient,
+  MongoServerError,
+  type UUID,
+  type WithId,
+} from "mongodb";
 import {
   AWS_REGION,
   DB_NAME,
@@ -109,10 +118,44 @@ function ensureKeyOnce(): Promise<UUID> {
   return dataKeyIdPromise;
 }
 
+type ExtendedJsonBinary = { $binary?: { base64?: string; subType: string } };
+
+// Mongo returns the ciphertext in whatever shape it was written in: a driver
+// Binary, a raw Buffer, base64, or extended JSON. Normalizing here means every
+// caller can hand over the field it read from the document as-is.
+function toBinary(value: unknown): Binary {
+  if (value instanceof Binary) {
+    return value;
+  }
+
+  if (Buffer.isBuffer(value)) {
+    return new Binary(value, 6);
+  }
+
+  if (typeof value === "string") {
+    return new Binary(Buffer.from(value, "base64"), 6);
+  }
+
+  const extendedJson = (value as ExtendedJsonBinary | null)?.$binary;
+  if (extendedJson?.base64) {
+    return new Binary(
+      Buffer.from(extendedJson.base64, "base64"),
+      Number.parseInt(extendedJson.subType, 16),
+    );
+  }
+
+  throw new Error("Invalid entropy format");
+}
+
 export async function connectDB() {
   if (!db) {
     await client.connect();
     db = client.db(DB_NAME);
+
+    // Create a unique index on faceSignUserId
+    await db
+      .collection(FACE_SIGN_ENTROPY_COLLECTION)
+      .createIndex({ faceSignUserId: 1 }, { unique: true });
   }
 
   const dataKeyId = await ensureKeyOnce();
@@ -126,38 +169,23 @@ export async function connectDB() {
         algorithm: "AEAD_AES_256_CBC_HMAC_SHA_512-Random",
       });
     },
-    decrypt: async <T>(value: Binary): Promise<T> => {
-      return clientEncryption.decrypt<T>(value);
+    decrypt: async <T>(value: unknown): Promise<T> => {
+      return clientEncryption.decrypt<T>(toBinary(value));
     },
   };
 }
+
 export async function fetchOrCreateFaceSignEntropy(
   faceSignUserId: string,
 ): Promise<{ insert: boolean; entropy: string }> {
   const { db, encrypt, decrypt } = await connectDB();
+  const collection = db.collection(FACE_SIGN_ENTROPY_COLLECTION);
 
   // try to find existing encrypted record
-  const existing = await db.collection(FACE_SIGN_ENTROPY_COLLECTION).findOne({ faceSignUserId });
+  const existing = await collection.findOne({ faceSignUserId });
 
   if (existing?.entropy) {
-    // biome-ignore lint/suspicious/noExplicitAny: We don't know the type yet
-    let payloadForDecrypt: any = existing.entropy;
-
-    if (Buffer.isBuffer(payloadForDecrypt)) {
-      payloadForDecrypt = new Binary(payloadForDecrypt, 6);
-    } else if (typeof payloadForDecrypt === "string") {
-      const buf = Buffer.from(payloadForDecrypt, "base64");
-      payloadForDecrypt = new Binary(buf, 6);
-    } else if (payloadForDecrypt?.$binary?.base64) {
-      const buf = Buffer.from(payloadForDecrypt.$binary.base64, "base64");
-      payloadForDecrypt = new Binary(buf, Number.parseInt(payloadForDecrypt.$binary.subType, 16));
-    }
-
-    if (!payloadForDecrypt) {
-      throw new Error("Invalid entropy format");
-    }
-
-    const decrypted = await decrypt<Buffer>(payloadForDecrypt);
+    const decrypted = await decrypt<Buffer>(existing.entropy);
     return { insert: false, entropy: decrypted.toString() };
   }
 
@@ -165,13 +193,33 @@ export async function fetchOrCreateFaceSignEntropy(
   const mnemonic = bip39.generateMnemonic(wordlist, 256);
   const encryptedEntropy = await encrypt(mnemonic);
 
-  await db
-    .collection(FACE_SIGN_ENTROPY_COLLECTION)
-    .findOneAndUpdate(
+  // $setOnInsert + upsert leaves exactly one entropy per user, but the caller
+  // that loses the race must return the *stored* one, not the mnemonic it just
+  // generated and threw away.
+  let stored: WithId<Document> | null;
+
+  try {
+    stored = await collection.findOneAndUpdate(
       { faceSignUserId },
       { $setOnInsert: { entropy: encryptedEntropy } },
-      { upsert: true },
+      { upsert: true, returnDocument: "after" },
     );
+  } catch (error) {
+    // A racing insert that landed between our findOne and the upsert surfaces
+    // against the unique index as E11000; the winner's document is now there.
+    if (!(error instanceof MongoServerError) || error.code !== 11000) {
+      throw error;
+    }
 
-  return { insert: true, entropy: mnemonic };
+    stored = await collection.findOne({ faceSignUserId });
+  }
+
+  if (!stored?.entropy) {
+    throw new Error("Entropy upsert stored no document");
+  }
+
+  const entropy = (await decrypt<Buffer>(stored.entropy)).toString();
+
+  // We created it only if what is stored is the mnemonic we generated.
+  return { insert: entropy === mnemonic, entropy };
 }
