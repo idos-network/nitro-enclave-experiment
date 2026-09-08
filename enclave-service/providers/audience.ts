@@ -25,7 +25,6 @@ export async function verifyAudience(
       }
     } catch (error) {
       writeLog("session_request_invalid_body", { error: String(error), root });
-      return null;
     }
   }
 
