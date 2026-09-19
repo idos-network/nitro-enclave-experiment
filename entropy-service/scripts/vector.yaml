@@ -5,19 +5,32 @@ sources:
     type: file
     include:
       - /mnt/encrypted/logs/*/current
-      # keep reading the tail of a file s6-log has just rotated away
-      - /mnt/encrypted/logs/*/@*.s
+      # keep reading the tail of a file s6-log has just rotated away. @* not
+      # @*.s: an enclave restart kills s6-log mid-rotation and leaves that
+      # archive named .u forever, which @*.s never matches.
+      - /mnt/encrypted/logs/*/@*
     exclude:
       # vector's own logs, or it would re-ingest everything it prints
       - /mnt/encrypted/logs/vector/*
     read_from: beginning
-    # s6-log rotates by rename, so follow the inode, not the first line
+    # checksum, not device_and_inode: express rotates n10 s10000000, so ext4
+    # recycles the inode of a deleted archive into the new `current`, which
+    # then inherits that archive's ~10MB checkpoint and vector resumes past
+    # EOF reading nothing. Checksums key on content, which is exactly what
+    # s6-log's rename-based rotation preserves - current -> @x.u -> @x.s stays
+    # one file to vector, so the rename does not re-ingest either.
     fingerprint:
-      strategy: device_and_inode
+      strategy: checksum
+      # default hashes only the first line, and express opens every boot with
+      # the same constant startup line - `current` then collides with the @*.u
+      # archive that a previous restart opened with that same line, and vector
+      # reads only one of the two. 5 lines reaches the timestamped pino output.
+      lines: 5
     max_line_bytes: 4194304
 
-  # Exposes component_discarded_events_total / component_errors_total so log
-  # loss is visible in Victoria Metrics instead of silent.
+  # Exposes vector_component_discarded_events_total and
+  # vector_component_errors_total so log loss is visible in Victoria Metrics
+  # instead of silent. Counters only exist once they first increment.
   internal_metrics:
     type: internal_metrics
 
