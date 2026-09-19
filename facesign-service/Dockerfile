@@ -196,10 +196,6 @@ RUN pnpm install --prod --frozen-lockfile
 # Download or copy all required secrets and setup environment
 WORKDIR /home/deploy
 
-# Setup PM2
-RUN npm install -g pm2@7.0.1
-COPY ./scripts/ecosystem.config.cjs ./ecosystem.config.cjs
-
 # Setup node-metrics
 ARG NODE_EXPORTER_VERSION=1.11.0
 ARG NODE_EXPORTER_SHA256=4f8fbd23b8380b8fb720b125fb9029de261dc5fcd68bfe81ae010c0d32f5f6c3

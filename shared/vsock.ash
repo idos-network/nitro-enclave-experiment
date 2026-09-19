@@ -17,7 +17,7 @@ setup_vsock_networking() {
     VSOCK=$(echo "$entry" | jq -r '.vsock')
 
     echo "<- Starting incoming vsock $NAME TCP:$TCP <-> VSOCK:$VSOCK"
-    socat VSOCK-LISTEN:"$VSOCK",fork TCP4-CONNECT:127.0.0.1:"$TCP" &
+    socat VSOCK-LISTEN:"$VSOCK",fork,backlog=1024 TCP4-CONNECT:127.0.0.1:"$TCP" &
   done
 
   # Prepare outgoing proxies
@@ -31,7 +31,7 @@ setup_vsock_networking() {
 
     if [ "$ENCLAVE_SKIP" != "true" ]; then
       echo "-> Starting $NAME outgoing vsock TCP:$ENCLAVE_IP:$TCP <-> VSOCK:$VSOCK (host $HOST)"
-      socat TCP4-LISTEN:"$TCP",fork,bind=$ENCLAVE_IP VSOCK-CONNECT:3:"$VSOCK" &
+      socat TCP4-LISTEN:"$TCP",fork,backlog=1024,bind=$ENCLAVE_IP VSOCK-CONNECT:3:"$VSOCK" &
 
       if [ "$HOST" != "127.0.0.1" ]; then
         echo "  -> Adding $ENCLAVE_IP $HOST to /etc/hosts"

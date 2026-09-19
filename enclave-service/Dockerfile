@@ -57,8 +57,6 @@ ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
 
-RUN npm install -g pm2@7.0.1
-
 WORKDIR /app
 
 # Copy project files
@@ -69,7 +67,6 @@ RUN pnpm install --prod --frozen-lockfile
 
 # Copy source files & scripts
 COPY scripts/shared ./scripts/
-COPY scripts/ecosystem.config.cjs .
 
 # Setup node-metrics
 ARG NODE_EXPORTER_VERSION=1.11.0

@@ -146,6 +146,7 @@ app.post(
 );
 
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+  console.error(err);
   if (err instanceof Error) {
     writeLog("error", { error: err.message });
     return res.status(500).json({ error: err.message });

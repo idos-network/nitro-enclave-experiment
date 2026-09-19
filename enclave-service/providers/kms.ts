@@ -1,6 +1,14 @@
 import { createPublicKey } from "node:crypto";
 import { GetPublicKeyCommand, KMSClient, SignCommand } from "@aws-sdk/client-kms";
+import { defaultProvider } from "@aws-sdk/credential-provider-node";
 import { AWS_REGION, SIGNING_KEY_KMS_KEY_ARN, SIGNING_KEY_KMS_KEY_ID } from "../env.ts";
+
+// One client + memoized credentials. A new KMSClient per call re-runs the
+// provider chain (IMDS) and fails under load with "Could not load credentials from any providers".
+const kms = new KMSClient({
+  region: AWS_REGION,
+  credentials: defaultProvider(),
+});
 
 const PUBLIC_KEY_TTL_MS = 60_000;
 let cachedPublicKey:
@@ -21,10 +29,6 @@ export async function getPublicKeyJWK() {
 }
 
 async function fetchPublicKeyJWK() {
-  const kms = new KMSClient({
-    region: AWS_REGION,
-  });
-
   const response = await kms.send(
     new GetPublicKeyCommand({
       KeyId: SIGNING_KEY_KMS_KEY_ARN,
@@ -55,10 +59,6 @@ async function fetchPublicKeyJWK() {
 }
 
 export async function sign(payload: Uint8Array<ArrayBufferLike>) {
-  const kms = new KMSClient({
-    region: AWS_REGION,
-  });
-
   const response = await kms.send(
     new SignCommand({
       KeyId: SIGNING_KEY_KMS_KEY_ARN,
