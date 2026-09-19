@@ -218,7 +218,6 @@ export async function match3d2dId({
       },
       {
         userId,
-        image,
         minMatchLevel,
       },
     );

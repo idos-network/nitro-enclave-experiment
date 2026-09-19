@@ -18,6 +18,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends --no-install-su
     nbd-client \
     net-tools \
     openssh-server \
+    s6 \
     socat \
     && update-ca-certificates \
     && rm -rf /var/cache/apt/archives /var/lib/apt/lists/*

@@ -29,12 +29,15 @@ export function sessionKeyMiddleware(): RequestHandler {
       session.sessionClientPublicKey,
       session.sessionServerPrivateKey,
     );
+
     if (!encryptionKeyPair) {
       writeLog("session_key_unavailable", {
         sessionId: session.id,
       });
 
-      return res.status(404).json({ error: "Encryption key pair not found" });
+      return res
+        .status(404)
+        .json({ error: "Provided encryption key pair, can't be decrypted by session keys." });
     }
 
     const audiencePublicKey = await verifyAudience(

@@ -44,6 +44,7 @@ libmongocrypt
 libnacl
 libnbd
 libsodium
+LOGDIR
 luks
 Multibase
 nacl
@@ -53,6 +54,7 @@ nodesource
 nodistro
 noout
 pcrs
+pino
 pinocchio
 pipefail
 pkcs
@@ -65,6 +67,7 @@ redoc
 redocly
 respawn
 RSASSA
+SCANDIR
 scure
 secp
 servercore
@@ -72,8 +75,10 @@ sessionless
 shellcheck
 socat
 spellcheck
+svscan
 timberio
 topk
+unflushed
 unparseable
 unstub
 vite

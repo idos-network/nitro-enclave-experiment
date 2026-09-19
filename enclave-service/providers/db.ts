@@ -138,6 +138,7 @@ export interface SessionRecordDocument {
   sessionServerPrivateKeyEnc: Binary;
   sessionServerJwtChainEnc: Binary;
   allowedAudienceRootsEnc: Binary;
+  createdAt: Date;
 }
 
 export async function storeSession(
@@ -163,6 +164,7 @@ export async function storeSession(
     sessionClientPublicKeyB64,
     sessionServerJwtChainEnc,
     allowedAudienceRootsEnc,
+    createdAt: new Date(),
   };
 
   await db.collection(DB_ENCLAVE_COLLECTION).insertOne(record);
