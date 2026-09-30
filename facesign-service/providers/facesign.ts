@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { readFileSync } from "node:fs";
 import jwt from "jsonwebtoken";
 import { FACE_SIGN_GROUP_NAME, JWT_PRIVATE_KEY } from "../env.ts";
@@ -68,9 +69,9 @@ export async function faceSignLogin({
   }
 
   const userAttestmentToken = jwt.sign(
-    { sub: groupUserId },
+    { sub: groupUserId, jti: crypto.randomUUID() },
     readFileSync(JWT_PRIVATE_KEY, "utf-8"),
-    { algorithm: "ES512" }, // Token contains "iat" which is used in entropy-service to check token age
+    { algorithm: "ES512", audience: "entropy-service" }, // Token contains "iat" which is used in entropy-service to check token age
   );
 
   return {
