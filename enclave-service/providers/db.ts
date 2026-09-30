@@ -10,6 +10,7 @@ import {
   MONGO_URI,
   SESSION_TTL_SECONDS,
 } from "../env.ts";
+import { getLogger } from "../utils/logger-context.ts";
 
 let db: Db | null = null;
 
@@ -119,6 +120,13 @@ export async function connectDB() {
       sessions.createIndex({ createdAt: 1 }, { expireAfterSeconds: SESSION_TTL_SECONDS }),
     ]);
     db = client.db(DB_NAME);
+
+    // getSession() looks sessions up by sessionId on every public-key/decrypt
+    // call; without an index that is a full collection scan. Idempotent, and
+    // not awaited: a failed build only costs speed, so log it and keep serving.
+    db.collection(DB_ENCLAVE_COLLECTION)
+      .createIndex({ sessionId: 1 }, { unique: true })
+      .catch((error) => getLogger().error({ error: String(error) }, "sessionId index failed"));
   }
 
   const dataKeyId = await ensureKeyOnce();
