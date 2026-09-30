@@ -82,7 +82,7 @@ paths:
                 $ref: "#/components/schemas/FaceSignEntropyResponse"
         "400":
           description: |
-            Missing token, invalid/malformed JWT, missing `sub`/`iat`, or token older than 60 seconds.
+            Missing token, invalid/malformed JWT, missing `sub`/`iat`/`jti`, wrong `aud`, token older than 60 seconds, or token already used.
           content:
             application/json:
               schema:
@@ -97,6 +97,9 @@ paths:
                 expiredToken:
                   value:
                     error: Token already expired
+                usedToken:
+                  value:
+                    error: Token already used
 
 components:
   parameters:
@@ -118,7 +121,8 @@ components:
           type: string
           description: |
             ES512 JWT (typically `userAttestmentToken` from FaceSign login/confirmation).
-            Claims must include `sub` (user id) and `iat`. Rejected if `iat` is more than 60 seconds ago.
+            Claims must include `sub` (user id), `iat`, `jti` and `aud: entropy-service`. Rejected if `iat` is more than
+            60 seconds ago. Single use: a second request with the same `jti` is rejected.
 
     FaceSignEntropyResponse:
       type: object

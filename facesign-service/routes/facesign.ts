@@ -93,9 +93,9 @@ export const confirmation = async (req: Request, res: Response) => {
   await insertMember({ groupName: FACE_SIGN_GROUP_NAME, userId });
 
   const userAttestmentToken = jwt.sign(
-    { sub: userId },
+    { sub: userId, jti: crypto.randomUUID() },
     readFileSync(JWT_PRIVATE_KEY, "utf-8"),
-    { algorithm: "ES512" }, // Token contains "iat" which is used in entropy-service to check token age
+    { algorithm: "ES512", audience: "entropy-service" }, // Token contains "iat" which is used in entropy-service to check token age
   );
 
   writeLog("facesign_user_confirmed", {

@@ -6,10 +6,10 @@ import {
   ClientEncryption,
   type Db,
   type Document,
+  type WithId,
   MongoClient,
   MongoServerError,
   type UUID,
-  type WithId,
 } from "mongodb";
 import {
   AWS_REGION,
@@ -18,6 +18,7 @@ import {
   FLE_KEY_ALIAS,
   FLE_KMS_KEY_ID,
   MONGO_URI,
+  USED_TOKENS_COLLECTION,
 } from "../env.ts";
 
 let db: Db | null = null;
@@ -173,6 +174,30 @@ export async function connectDB() {
       return clientEncryption.decrypt<T>(toBinary(value));
     },
   };
+}
+
+let usedTokensIndexes: Promise<unknown> | null = null;
+
+/**
+ * Marks token `jti` as used. Returns false when it was already used (replay).
+ * TTL only needs to outlive the token max age (60s), the unique index does the work.
+ */
+export async function consumeTokenId(jti: string): Promise<boolean> {
+  await client.connect();
+  const collection = client
+    .db(DB_NAME)
+    .collection<{ _id: string; createdAt: Date }>(USED_TOKENS_COLLECTION);
+
+  usedTokensIndexes ??= collection.createIndex({ createdAt: 1 }, { expireAfterSeconds: 5 * 60 });
+  await usedTokensIndexes;
+
+  try {
+    await collection.insertOne({ _id: jti, createdAt: new Date() });
+    return true;
+  } catch (err) {
+    if (err instanceof MongoServerError && err.code === 11000) return false;
+    throw err;
+  }
 }
 
 export async function fetchOrCreateFaceSignEntropy(

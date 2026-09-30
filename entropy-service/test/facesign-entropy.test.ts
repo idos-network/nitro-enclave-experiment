@@ -22,6 +22,7 @@ vi.mock("fs", async () => {
 // Mock modules before importing the app
 vi.mock("../providers/db.ts", () => ({
   fetchOrCreateFaceSignEntropy: vi.fn(),
+  consumeTokenId: vi.fn(async () => true),
 }));
 
 import * as db from "../providers/db.ts";
@@ -46,10 +47,12 @@ describe("FaceSign Entropy API", () => {
     const token = jwt.sign(
       {
         sub: userId,
+        jti: crypto.randomUUID(),
       },
       privateKey,
       {
         algorithm: "ES512",
+        audience: "entropy-service",
       },
     );
 
@@ -83,10 +86,12 @@ describe("FaceSign Entropy API", () => {
     const token = jwt.sign(
       {
         sub: userId,
+        jti: crypto.randomUUID(),
       },
       privateKey,
       {
         algorithm: "ES512",
+        audience: "entropy-service",
       },
     );
 
@@ -126,16 +131,60 @@ describe("FaceSign Entropy API", () => {
     });
   });
 
+  it("rejects confirmation token (no entropy-service audience)", async () => {
+    const entropySpy = vi.spyOn(db, "fetchOrCreateFaceSignEntropy");
+    entropySpy.mockClear();
+    const token = jwt.sign({ sub: crypto.randomUUID(), action: "confirmation" }, privateKey, {
+      algorithm: "ES512",
+    });
+
+    const response = await request(app).post("/facesign/entropy").send({ token });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: "Invalid token" });
+    expect(entropySpy).not.toHaveBeenCalled();
+  });
+
+  it("rejects token without jti", async () => {
+    const token = jwt.sign({ sub: crypto.randomUUID() }, privateKey, {
+      algorithm: "ES512",
+      audience: "entropy-service",
+    });
+
+    const response = await request(app).post("/facesign/entropy").send({ token });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: "Invalid token" });
+  });
+
+  it("rejects replayed token", async () => {
+    vi.spyOn(db, "consumeTokenId").mockResolvedValueOnce(false);
+    const entropySpy = vi.spyOn(db, "fetchOrCreateFaceSignEntropy");
+    entropySpy.mockClear();
+    const token = jwt.sign({ sub: crypto.randomUUID(), jti: crypto.randomUUID() }, privateKey, {
+      algorithm: "ES512",
+      audience: "entropy-service",
+    });
+
+    const response = await request(app).post("/facesign/entropy").send({ token });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: "Token already used" });
+    expect(entropySpy).not.toHaveBeenCalled();
+  });
+
   it("expired token", async () => {
     const userId = crypto.randomUUID();
     const token = jwt.sign(
       {
         sub: userId,
+        jti: crypto.randomUUID(),
         iat: Math.floor(Date.now() / 1000) - 60, // Issued 60 seconds ago
       },
       privateKey,
       {
         algorithm: "ES512",
+        audience: "entropy-service",
       },
     );
 

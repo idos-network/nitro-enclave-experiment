@@ -6,6 +6,7 @@ export const ACTION_TYPES = [
   "entropy_error_invalid_token",
   "entropy_error_missing_iat_or_sub",
   "entropy_error_too_old",
+  "entropy_error_token_reused",
 ] as const;
 
 export type ActionType = (typeof ACTION_TYPES)[number];

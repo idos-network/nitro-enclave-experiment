@@ -8,7 +8,7 @@ import jwt from "jsonwebtoken";
 import swaggerUi from "swagger-ui-express";
 import YAML from "yaml";
 import { JWT_PUBLIC_KEY } from "./env.ts";
-import { fetchOrCreateFaceSignEntropy } from "./providers/db.ts";
+import { consumeTokenId, fetchOrCreateFaceSignEntropy } from "./providers/db.ts";
 import loggerMiddleware from "./providers/logger.ts";
 import { writeLog } from "./utils/logger-context.ts";
 import { runWithRequestContext } from "./utils/request-context.ts";
@@ -70,20 +70,25 @@ app.post("/facesign/entropy", async (req, res) => {
     return res.status(400).json({ error: "Token is required" });
   }
 
-  let result: { sub: string; iat: number };
+  let result: { sub: string; iat: number; jti?: string };
 
   try {
     const publicKey = readFileSync(JWT_PUBLIC_KEY);
-    result = jwt.verify(token, publicKey, { algorithms: ["ES512"] }) as {
+    result = jwt.verify(token, publicKey, {
+      algorithms: ["ES512"],
+      // Only attestment tokens carry this audience; confirmation tokens (same signing key) must be rejected
+      audience: "entropy-service",
+    }) as {
       sub: string;
       iat: number;
+      jti?: string;
     };
   } catch (error) {
     writeLog("entropy_error_invalid_token", { error });
     return res.status(400).json({ error: "Invalid token" });
   }
 
-  if (!result.iat || !result.sub) {
+  if (!result.iat || !result.sub || !result.jti) {
     writeLog("entropy_error_missing_iat_or_sub");
     return res.status(400).json({ error: "Invalid token" });
   }
@@ -94,6 +99,12 @@ app.post("/facesign/entropy", async (req, res) => {
       now: Date.now() / 1000,
     });
     return res.status(400).json({ error: "Token already expired" });
+  }
+
+  // Single use: a leaked token can't be replayed within its 60s window
+  if (!(await consumeTokenId(result.jti))) {
+    writeLog("entropy_error_token_reused", { userId: result.sub, ip: req.ip });
+    return res.status(400).json({ error: "Token already used" });
   }
 
   const { insert, entropy } = await fetchOrCreateFaceSignEntropy(result.sub as string);
