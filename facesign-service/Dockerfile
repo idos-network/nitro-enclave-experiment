@@ -6,8 +6,10 @@ FROM debian:trixie-slim AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-ENV FACETEC_SDK_VERSION="INSERT_FACETEC_SDK_VERSION_HERE"
-ENV FACETEC_SDK_BUCKET="INSERT_FACETEC_SDK_BUCKET_HERE"
+ARG FACETEC_SDK_VERSION
+ARG FACETEC_SDK_BUCKET
+ARG FACETEC_SDK_REGION
+ENV FACETEC_SDK_VERSION=$FACETEC_SDK_VERSION FACETEC_SDK_BUCKET=$FACETEC_SDK_BUCKET FACETEC_SDK_REGION=$FACETEC_SDK_REGION
 
 ARG FACETEC_S3_CORE=s3://$FACETEC_SDK_BUCKET/FaceTec-Server-Webservice/FaceTecSDK-Server-Core-$FACETEC_SDK_VERSION
 ARG FACETEC_S3_CUSTOM=s3://$FACETEC_SDK_BUCKET/FaceTec-Server-Webservice/FaceTec-Server-Webservice-$FACETEC_SDK_VERSION
@@ -60,13 +62,16 @@ FROM debian:trixie-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-ENV FACETEC_SDK_VERSION="INSERT_FACETEC_SDK_VERSION_HERE"
-ENV FACETEC_SDK_BUCKET="INSERT_FACETEC_SDK_BUCKET_HERE"
+ARG FACETEC_SDK_VERSION
+ARG FACETEC_SDK_BUCKET
+ARG FACETEC_SDK_REGION
+ENV FACETEC_SDK_VERSION=$FACETEC_SDK_VERSION FACETEC_SDK_BUCKET=$FACETEC_SDK_BUCKET FACETEC_SDK_REGION=$FACETEC_SDK_REGION
 
 # Install dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends --no-install-suggests \
     ca-certificates \
     cryptsetup \
+    e2fsprogs \
     curl \
     default-jdk \
     iproute2 \
@@ -226,8 +231,10 @@ COPY --from=vector /usr/local/bin/vector /usr/bin/vector
 COPY ./scripts/vector.yaml /etc/vector/vector.yaml
 
 # S3 buckets contains configurations and aws keys arn
-# This will be replaced during the CI/CD process from secrets
-ENV S3_SECRETS_BUCKET="INSERT_S3_SECRETS_BUCKET_HERE"
+# Passed via --build-arg from scripts/enclave-build.ash
+ARG S3_SECRETS_BUCKET
+ARG S3_SECRETS_REGION
+ENV S3_SECRETS_BUCKET=$S3_SECRETS_BUCKET S3_SECRETS_REGION=$S3_SECRETS_REGION
 
 EXPOSE 8080
 CMD ["/bin/bash", "/home/deploy/run.ash"]

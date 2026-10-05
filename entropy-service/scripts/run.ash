@@ -12,12 +12,12 @@ source "$SCRIPT_DIR/shared/basic.ash"
 configure_basic_networking "$S3_SECRETS_BUCKET"
 
 # Get vsock.json for enclave networking
-aws s3 cp "s3://$S3_SECRETS_BUCKET/entropy/vsock.json" ./vsock.json --region eu-west-1
+aws s3 cp "s3://$S3_SECRETS_BUCKET/entropy/vsock.json" ./vsock.json --region "$S3_SECRETS_REGION"
 source "$SCRIPT_DIR/shared/vsock.ash"
 setup_vsock_networking "./vsock.json"
 
 # Get config.env and source it
-aws s3 cp "s3://$S3_SECRETS_BUCKET/entropy/config.env" ./config.env --region eu-west-1
+aws s3 cp "s3://$S3_SECRETS_BUCKET/entropy/config.env" ./config.env --region "$S3_SECRETS_REGION"
 
 # Load env vars from config.env to global space
 set -a
@@ -39,7 +39,7 @@ setup_nbd "entropy"
 
 echo "Fetching Caddyfile from S3"
 CADDYFILE=Caddyfile
-aws s3 cp "s3://$S3_SECRETS_BUCKET/entropy/$CADDYFILE" "./$CADDYFILE" --region eu-west-1
+aws s3 cp "s3://$S3_SECRETS_BUCKET/entropy/$CADDYFILE" "./$CADDYFILE" --region "$S3_SECRETS_REGION"
 if [ ! -f "./$CADDYFILE" ]; then
   echo "Couldn't download $CADDYFILE from S3, exiting"
   exit 1
@@ -47,7 +47,7 @@ fi
 
 echo "Fetching JWT token secret from S3"
 JWT_TOKEN_PUBLIC_FILE=jwt_token_public.pem
-aws s3 cp "s3://$S3_SECRETS_BUCKET/$JWT_TOKEN_PUBLIC_FILE" "./$JWT_TOKEN_PUBLIC_FILE" --region eu-west-1
+aws s3 cp "s3://$S3_SECRETS_BUCKET/$JWT_TOKEN_PUBLIC_FILE" "./$JWT_TOKEN_PUBLIC_FILE" --region "$S3_SECRETS_REGION"
 if [ ! -f "./$JWT_TOKEN_PUBLIC_FILE" ]; then
   echo "Couldn't download $JWT_TOKEN_PUBLIC_FILE from S3..."
   exit 1

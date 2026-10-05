@@ -25,6 +25,6 @@ configure_basic_networking() {
   socat TCP4-LISTEN:80,fork,backlog=1024,bind=127.0.0.2 VSOCK-CONNECT:3:6000 &
   socat TCP4-LISTEN:443,fork,backlog=1024,bind=127.0.0.3 VSOCK-CONNECT:3:6001 &
   socat TCP4-LISTEN:443,fork,backlog=1024,bind=127.0.0.4 VSOCK-CONNECT:3:6002 &
-  echo "127.0.0.3 $S3_SECRETS_BUCKET.s3.eu-west-1.amazonaws.com" >> /etc/hosts
-  echo "127.0.0.4 $S3_SECRETS_BUCKET.s3-eu-west-1.amazonaws.com" >> /etc/hosts
+  echo "127.0.0.3 $S3_SECRETS_BUCKET.s3.$S3_SECRETS_REGION.amazonaws.com" >> /etc/hosts
+  echo "127.0.0.4 $S3_SECRETS_BUCKET.s3-$S3_SECRETS_REGION.amazonaws.com" >> /etc/hosts
 }

@@ -18,11 +18,14 @@ if [[ "${S3_SECRETS_BUCKET:-null}" == "null" ]]; then
   exit 1
 fi
 
-sed -i "s/INSERT_S3_SECRETS_BUCKET_HERE/$S3_SECRETS_BUCKET/g" ~ec2-user/enclave-service/Dockerfile
+# Bucket region (may differ from instance region; KMS region comes from config.env AWS_REGION)
+S3_SECRETS_REGION=$(aws s3api get-bucket-location --bucket "$S3_SECRETS_BUCKET" --query "LocationConstraint || 'us-east-1'" --output text)
 
 # Build origin Docker image
 docker build \
     -t "$TARGET_DOCKER_IMAGE" \
+    --build-arg S3_SECRETS_BUCKET="$S3_SECRETS_BUCKET" \
+    --build-arg S3_SECRETS_REGION="$S3_SECRETS_REGION" \
     -f ~ec2-user/enclave-service/Dockerfile \
     ~ec2-user/enclave-service/ \
 ;

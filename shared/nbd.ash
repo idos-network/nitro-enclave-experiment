@@ -20,16 +20,16 @@ setup_nbd() {
   ENC_FILE=luks_entropy_password.enc
   PLAIN_FILE=luks_entropy_password.txt
 
-  aws s3 cp "s3://$S3_SECRETS_BUCKET/$SERVICE_NAME/$ENC_FILE" "$ENC_FILE" --region eu-west-1 2>aws_s3_cp_error.log || true
+  aws s3 cp "s3://$S3_SECRETS_BUCKET/$SERVICE_NAME/$ENC_FILE" "$ENC_FILE" --region "$S3_SECRETS_REGION" 2>aws_s3_cp_error.log || true
 
   if [ ! -f "$ENC_FILE" ]; then
     echo "-> Couldn't download luks_entropy_password.enc from S3, generating a new one"
-    aws kms encrypt --key-id "$AWS_KMS_LUKS_ARN" --plaintext "$(openssl rand -hex 64)" --output text --query CiphertextBlob --region eu-west-1 > "$ENC_FILE"
-    aws s3 cp "$ENC_FILE" "s3://$S3_SECRETS_BUCKET/$SERVICE_NAME/$ENC_FILE" --region eu-west-1
+    aws kms encrypt --key-id "$AWS_KMS_LUKS_ARN" --plaintext "$(openssl rand -hex 64)" --output text --query CiphertextBlob --region "$AWS_REGION" > "$ENC_FILE"
+    aws s3 cp "$ENC_FILE" "s3://$S3_SECRETS_BUCKET/$SERVICE_NAME/$ENC_FILE" --region "$S3_SECRETS_REGION"
   fi
 
   echo "-> Decrypting AWS luks password key"
-  aws kms decrypt --ciphertext-blob "$(cat $ENC_FILE)" --output text --query Plaintext --region eu-west-1 > "$PLAIN_FILE"
+  aws kms decrypt --ciphertext-blob "$(cat $ENC_FILE)" --output text --query Plaintext --region "$AWS_REGION" > "$PLAIN_FILE"
 
   if cryptsetup isLuks /dev/nbd0; then
     echo "-> /dev/nbd0 is luks already, continuing..."
