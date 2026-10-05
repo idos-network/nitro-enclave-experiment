@@ -18,7 +18,7 @@ export function encrypt(
     throw Error(
       `Couldn't encrypt the provided message. ${JSON.stringify(
         {
-          nonce: Buffer.from(nonce).toString("base64"),
+          nonce: Buffer.from(nonce).toString("base64url"),
           recipient: recipientEncryptionPublicKeyBase64Url,
         },
         null,

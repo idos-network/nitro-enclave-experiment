@@ -3,6 +3,7 @@ export const GROUP_NAME = "enclave-service";
 export const MONGO_URI = process.env.MONGO_URI!;
 export const DB_ENCLAVE_COLLECTION = "idOSEnclave";
 export const DB_NAME = "enclave";
+export const SESSION_TTL_SECONDS = 24 * 60 * 60;
 export const FLE_KMS_KEY_ID = process.env.AWS_KMS_FLE_ARN!;
 export const FLE_KEY_ALIAS = "enclave-enclave-key";
 export const AWS_REGION = process.env.AWS_REGION!;

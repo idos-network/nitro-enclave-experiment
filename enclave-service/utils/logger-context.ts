@@ -16,9 +16,7 @@ const fallbackLogger = pino({
 });
 
 export const writeLog = (eventType: ActionType, data: Record<string, unknown> = {}) => {
-  actions.inc({
-    [eventType]: 1,
-  });
+  actions.inc({ action: eventType });
 
   getLogger().info({
     eventType,

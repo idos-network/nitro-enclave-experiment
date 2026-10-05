@@ -1,6 +1,6 @@
 import type { RequestHandler } from "express";
 import nacl from "tweetnacl";
-import { verifyAudience } from "../providers/audience.ts";
+import { AudienceError, verifyAudience } from "../providers/audience.ts";
 import { getSession } from "../providers/db.ts";
 import { getEncryptionKeyPair } from "../providers/keys.ts";
 import type { CommonRequest, DecryptRequest } from "../utils/dto.ts";
@@ -23,7 +23,7 @@ export function sessionKeyMiddleware(): RequestHandler {
       return res.status(404).json({ error: "Session not found" });
     }
 
-    const encryptionKeyPair = await getEncryptionKeyPair(
+    const encryptionKeyPair = getEncryptionKeyPair(
       sessionRequest.session.encryptedKey,
       sessionRequest.session.nonce,
       session.sessionClientPublicKey,
@@ -37,14 +37,17 @@ export function sessionKeyMiddleware(): RequestHandler {
       return res.status(404).json({ error: "Encryption key pair not found" });
     }
 
-    const audiencePublicKey = await verifyAudience(
-      session.allowedAudienceRoots,
-      sessionRequest.audience.jwtChain,
-    );
-    if (!audiencePublicKey) {
-      return res.status(400).json({
-        error: "Invalid audience (wrong signature, wrong chain, etc.)",
-      });
+    let audiencePublicKey: Buffer;
+    try {
+      audiencePublicKey = await verifyAudience(
+        session.allowedAudienceRoots,
+        sessionRequest.audience.jwtChain,
+      );
+    } catch (error) {
+      if (!(error instanceof AudienceError)) throw error;
+
+      writeLog("audience_invalid", { sessionId: session.id, error: error.message });
+      return res.status(error.status).json({ error: error.message });
     }
 
     res.locals.encryptionKeyPair = encryptionKeyPair;
