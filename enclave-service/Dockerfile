@@ -9,6 +9,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends --no-install-suggests \
     ca-certificates \
     cryptsetup \
+    e2fsprogs \
     curl \
     iproute2 \
     iptables \
@@ -89,8 +90,10 @@ COPY --from=vector /usr/local/bin/vector /usr/bin/vector
 COPY scripts/vector.yaml /etc/vector/vector.yaml
 
 # S3 buckets contains configurations and aws keys arn
-# This will be replaced during the CI/CD process from secrets
-ENV S3_SECRETS_BUCKET="INSERT_S3_SECRETS_BUCKET_HERE"
+# Passed via --build-arg from scripts/enclave-build.ash
+ARG S3_SECRETS_BUCKET
+ARG S3_SECRETS_REGION
+ENV S3_SECRETS_BUCKET=$S3_SECRETS_BUCKET S3_SECRETS_REGION=$S3_SECRETS_REGION
 
 # Expose port (default 8000, configurable via PORT env var)
 EXPOSE 8000

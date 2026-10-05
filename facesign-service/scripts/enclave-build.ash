@@ -27,14 +27,18 @@ if [[ "${FACETEC_SDK_BUCKET:-null}" == "null" ]]; then
     exit 1
 fi
 
-# Replace placeholders in Dockerfile
-sed -i "s/INSERT_FACETEC_SDK_VERSION_HERE/$FACETEC_SDK_VERSION/g" ~ec2-user/facesign-service/Dockerfile
-sed -i "s/INSERT_S3_SECRETS_BUCKET_HERE/$S3_SECRETS_BUCKET/g" ~ec2-user/facesign-service/Dockerfile
-sed -i "s/INSERT_FACETEC_SDK_BUCKET_HERE/$FACETEC_SDK_BUCKET/g" ~ec2-user/facesign-service/Dockerfile
+# Bucket region (may differ from instance region; KMS region comes from config.env AWS_REGION)
+S3_SECRETS_REGION=$(aws s3api get-bucket-location --bucket "$S3_SECRETS_BUCKET" --query "LocationConstraint || 'us-east-1'" --output text)
+FACETEC_SDK_REGION=$(aws s3api get-bucket-location --bucket "$FACETEC_SDK_BUCKET" --query "LocationConstraint || 'us-east-1'" --output text)
 
 # Build origin Docker image
 docker build \
     -t "$TARGET_DOCKER_IMAGE" \
+    --build-arg FACETEC_SDK_VERSION="$FACETEC_SDK_VERSION" \
+    --build-arg FACETEC_SDK_BUCKET="$FACETEC_SDK_BUCKET" \
+    --build-arg FACETEC_SDK_REGION="$FACETEC_SDK_REGION" \
+    --build-arg S3_SECRETS_BUCKET="$S3_SECRETS_BUCKET" \
+    --build-arg S3_SECRETS_REGION="$S3_SECRETS_REGION" \
     -f ~ec2-user/facesign-service/Dockerfile \
     ~ec2-user/facesign-service/ \
 ;
