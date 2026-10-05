@@ -8,7 +8,8 @@ export const ACTION_TYPES = [
   "encrypt_request_missing_required_fields",
   "decrypt_request",
   "decrypt_request_missing_required_fields",
-  "audience_jwks_url_not_found",
+  "audience_jwks_unavailable",
+  "audience_invalid",
   "error",
 ] as const;
 

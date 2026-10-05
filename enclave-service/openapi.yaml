@@ -135,6 +135,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "404":
           $ref: "#/components/responses/SessionNotFound"
+        "502":
+          $ref: "#/components/responses/AudienceJwksUnavailable"
 
   /encrypt:
     post:
@@ -203,6 +205,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "404":
           $ref: "#/components/responses/SessionNotFound"
+        "502":
+          $ref: "#/components/responses/AudienceJwksUnavailable"
 
 components:
   parameters:
@@ -229,6 +233,12 @@ components:
             oneOf:
               - $ref: "#/components/schemas/ValidationError"
               - $ref: "#/components/schemas/Error"
+    AudienceJwksUnavailable:
+      description: JWKS of the allowed audience root(s) could not be fetched
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
     SessionNotFound:
       description: Session key pair unavailable
       content:

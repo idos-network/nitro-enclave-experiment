@@ -8,6 +8,7 @@ import {
   FLE_KEY_ALIAS,
   FLE_KMS_KEY_ID,
   MONGO_URI,
+  SESSION_TTL_SECONDS,
 } from "../env.ts";
 
 let db: Db | null = null;
@@ -92,6 +93,12 @@ async function ensureKey(): Promise<UUID> {
 export async function connectDB() {
   if (!db) {
     await client.connect();
+    const sessions = client.db(DB_NAME).collection(DB_ENCLAVE_COLLECTION);
+    await Promise.all([
+      sessions.createIndex({ sessionId: 1 }, { unique: true }),
+      // Mongo's TTL monitor deletes expired session records (incl. encrypted private keys).
+      sessions.createIndex({ createdAt: 1 }, { expireAfterSeconds: SESSION_TTL_SECONDS }),
+    ]);
     db = client.db(DB_NAME);
   }
 
@@ -119,6 +126,7 @@ export interface SessionRecordDocument {
   sessionServerPrivateKeyEnc: Binary;
   sessionServerJwtChainEnc: Binary;
   allowedAudienceRootsEnc: Binary;
+  createdAt: Date;
 }
 
 export async function storeSession(
@@ -144,6 +152,7 @@ export async function storeSession(
     sessionClientPublicKeyB64,
     sessionServerJwtChainEnc,
     allowedAudienceRootsEnc,
+    createdAt: new Date(),
   };
 
   await db.collection(DB_ENCLAVE_COLLECTION).insertOne(record);
@@ -165,11 +174,11 @@ export async function getSession(sessionId: string): Promise<Session | null> {
     .collection<SessionRecordDocument>(DB_ENCLAVE_COLLECTION)
     .findOne({ sessionId });
 
-  if (!session) {
+  // The TTL monitor runs ~every 60s, so also reject expired records (and legacy ones without createdAt).
+  const expiresAt = (session?.createdAt?.getTime() ?? 0) + SESSION_TTL_SECONDS * 1000;
+  if (!session || expiresAt < Date.now()) {
     return null;
   }
-
-  // TODO: TTL!
 
   const [sessionServerPrivateKey, allowedAudienceRoots, sessionServerJwtChain] = await Promise.all([
     decrypt<Binary>(session.sessionServerPrivateKeyEnc),

@@ -2,6 +2,12 @@ import { createPublicKey } from "node:crypto";
 import { GetPublicKeyCommand, KMSClient, SignCommand } from "@aws-sdk/client-kms";
 import { AWS_REGION, SIGNING_KEY_KMS_KEY_ARN, SIGNING_KEY_KMS_KEY_ID } from "../env.ts";
 
+// One client per region/credentials (AWS recommendation); it refreshes expiring credentials itself.
+const kms = new KMSClient({
+  region: AWS_REGION,
+  requestHandler: { connectionTimeout: 1_000, requestTimeout: 3_000 },
+});
+
 const PUBLIC_KEY_TTL_MS = 60_000;
 let cachedPublicKey:
   | { jwk: Awaited<ReturnType<typeof fetchPublicKeyJWK>>; expiresAt: number }
@@ -21,10 +27,6 @@ export async function getPublicKeyJWK() {
 }
 
 async function fetchPublicKeyJWK() {
-  const kms = new KMSClient({
-    region: AWS_REGION,
-  });
-
   const response = await kms.send(
     new GetPublicKeyCommand({
       KeyId: SIGNING_KEY_KMS_KEY_ARN,
@@ -55,10 +57,6 @@ async function fetchPublicKeyJWK() {
 }
 
 export async function sign(payload: Uint8Array<ArrayBufferLike>) {
-  const kms = new KMSClient({
-    region: AWS_REGION,
-  });
-
   const response = await kms.send(
     new SignCommand({
       KeyId: SIGNING_KEY_KMS_KEY_ARN,

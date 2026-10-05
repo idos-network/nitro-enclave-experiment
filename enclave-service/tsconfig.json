@@ -18,6 +18,7 @@
     "moduleDetection": "force",
     "skipLibCheck": true,
     "moduleResolution": "nodenext",
-    "allowImportingTsExtensions": true
+    "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true
   }
 }

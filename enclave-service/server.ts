@@ -146,10 +146,8 @@ app.post(
 );
 
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-  if (err instanceof Error) {
-    writeLog("error", { error: err.message });
-    return res.status(500).json({ error: err.message });
-  }
+  // Log everything, but never leak internals (AWS/KMS/Mongo messages) to the client.
+  writeLog("error", { error: err instanceof Error ? err.message : String(err) });
   return res.status(500).json({ error: "Internal server error" });
 });
 

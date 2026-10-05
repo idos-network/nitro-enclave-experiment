@@ -1,9 +1,16 @@
 import { generateKeyPairSync } from "node:crypto";
+import { SignJWT } from "jose";
 import request from "supertest";
 import nacl from "tweetnacl";
 import { beforeEach, describe, expect, it } from "vitest";
-import { app, createSession, getSession, resetMocks } from "./app.ts";
+import { app, createSession, getSession, resetMocks, sessions } from "./app.ts";
 import { audience, createAudience, decryptAudienceResponse, sessionBody } from "./helpers.ts";
+
+function setAllowedAudienceRoots(sessionId: string, roots: string[]) {
+  const stored = sessions().get(sessionId);
+  if (!stored) throw new Error(`Session ${sessionId} not stored`);
+  stored.allowedAudienceRoots = roots;
+}
 
 describe("POST /session/public-key", () => {
   beforeEach(resetMocks);
@@ -101,7 +108,48 @@ describe("POST /session/public-key", () => {
       .expect(400);
 
     expect(res.body).toEqual({
-      error: "Invalid audience (wrong signature, wrong chain, etc.)",
+      error: `Audience JWT is not signed by any allowed audience root (${session.audienceRoot}).`,
     });
+  });
+
+  it("returns 400 with a clear message for an unsupported algorithm", async () => {
+    const session = await createSession();
+    const jwtChain = await new SignJWT({ recipientPublicKeyX: audience.recipient.x })
+      .setProtectedHeader({ alg: "HS256" })
+      .sign(new Uint8Array(32));
+
+    const res = await request(app)
+      .post("/session/public-key")
+      .send(sessionBody(session, nacl.randomBytes(32), { ...audience, jwtChain }))
+      .expect(400);
+
+    expect(res.body).toEqual({
+      error: 'Unsupported audience JWT algorithm "HS256". Supported: EdDSA (Ed25519).',
+    });
+  });
+
+  it("returns 502 when the audience JWKS is unreachable", async () => {
+    const session = await createSession();
+    // fetch mock only serves AUDIENCE_ROOT, anything else throws like a network error.
+    setAllowedAudienceRoots(session.id, ["relay.idos.network"]);
+
+    const res = await request(app)
+      .post("/session/public-key")
+      .send(sessionBody(session, nacl.randomBytes(32), audience))
+      .expect(502);
+
+    expect(res.body).toEqual({
+      error: "Could not fetch JWKS for audience root(s): relay.idos.network.",
+    });
+  });
+
+  it("falls through to the next allowed root", async () => {
+    const session = await createSession();
+    setAllowedAudienceRoots(session.id, ["relay.idos.network", session.audienceRoot]);
+
+    await request(app)
+      .post("/session/public-key")
+      .send(sessionBody(session, nacl.randomBytes(32), audience))
+      .expect(200);
   });
 });
