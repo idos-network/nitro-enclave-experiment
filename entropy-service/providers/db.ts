@@ -89,7 +89,7 @@ async function ensureKey(): Promise<UUID> {
       );
   }
 
-  const clientEncryption = await getClientEncryption();
+  const clientEncryption = getClientEncryption();
   const existingKey = await clientEncryption.getKeyByAltName(FLE_KEY_ALIAS);
 
   if (existingKey) {
