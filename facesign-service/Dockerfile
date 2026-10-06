@@ -36,7 +36,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends --no-install-su
     && apt-get purge -y --auto-remove unzip \
     && apt-get clean \
     && rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
-    
+
 # Copy FaceTec Server Core and Webservice into the image.
 RUN aws s3 sync s3://$FACETEC_SDK_BUCKET/FaceTec-Server-Webservice/FaceTecSDK-Server-Core-$FACETEC_SDK_VERSION/libs /home/FaceTec_Server_Core/libs
 
@@ -211,6 +211,8 @@ RUN curl -fsSL "https://truststore.pki.rds.amazonaws.com/global/global-bundle.pe
     && echo "${RDS_CA_BUNDLE_SHA256}  /etc/ssl/rds-global-bundle.pem" | sha256sum -c - \
     && awk '/BEGIN CERTIFICATE/{n++} {print > ("/usr/local/share/ca-certificates/rds-" n ".crt")}' /etc/ssl/rds-global-bundle.pem \
     && update-ca-certificates
+# Node ignores the system store; trust the bundle even if MONGO_URI lacks tlsCAFile
+ENV NODE_EXTRA_CA_CERTS=/etc/ssl/rds-global-bundle.pem
 
 # Setup node-metrics
 ARG NODE_EXPORTER_VERSION=1.11.0
@@ -226,7 +228,7 @@ RUN curl -fsSL "https://github.com/prometheus/node_exporter/releases/download/v$
 COPY ./scripts/run.ash ./
 COPY ./scripts/shared ./shared/
 
-# Copy vector binary & config
+# Copy vector binary & config
 COPY --from=vector /usr/local/bin/vector /usr/bin/vector
 COPY ./scripts/vector.yaml /etc/vector/vector.yaml
 

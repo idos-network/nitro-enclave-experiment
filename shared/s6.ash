@@ -19,6 +19,13 @@ s6_service() {
 
   mkdir -p "$S6_SCANDIR/$name/log" "$S6_LOGDIR/$name"
 
+  # Files written before `t` (below) carry no stamp, so on the persistent
+  # volume they still share one fingerprint and vector keeps flip-flopping
+  # between them. Drop anything not starting with a TAI64N `@`.
+  for f in "$S6_LOGDIR/$name"/@* "$S6_LOGDIR/$name/current"; do
+    [ -f "$f" ] && [ "$(head -c1 "$f")" != "@" ] && rm -f "$f"
+  done
+
   # exec 2>&1 so stderr shares the logger pipe - nothing bypasses the logdir
   printf '#!/bin/bash\nexec 2>&1\n%s\n' "$cmd" > "$S6_SCANDIR/$name/run"
 
@@ -29,7 +36,11 @@ s6_service() {
   # pipe and stall the node event loop. Losing log lines is the cheaper
   # failure - the same trade-off as vector dying costing logs, not the service.
   # Trailing `1` also copies each line to stdout, i.e. `nitro-cli console`.
-  printf '#!/bin/bash\nexec s6-log n10 s10000000 %s/%s 1\n' \
+  # `t` prefixes each line with a TAI64N stamp so no two log files start with
+  # the same bytes - FaceTec opens every boot with a constant banner, which made
+  # vector's checksum fingerprint of `current` collide with the previous boot's
+  # @*.u archive and share its checkpoint. vector.yaml strips the stamp again.
+  printf '#!/bin/bash\nexec s6-log t n10 s10000000 %s/%s 1\n' \
     "$S6_LOGDIR" "$name" > "$S6_SCANDIR/$name/log/run"
 
   # Without this s6-supervise restarts a dead service in ~1s. The vector
