@@ -6,10 +6,10 @@ import {
   ClientEncryption,
   type Db,
   type Document,
-  type WithId,
   MongoClient,
   MongoServerError,
   type UUID,
+  type WithId,
 } from "mongodb";
 import {
   AWS_REGION,
