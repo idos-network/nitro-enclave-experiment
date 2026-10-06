@@ -4,7 +4,7 @@ export const ACTION_TYPES = [
   "entropy_fetched",
   "entropy_error_missing_token",
   "entropy_error_invalid_token",
-  "entropy_error_missing_iat_or_sub",
+  "entropy_error_missing_iat_sub_or_jti",
   "entropy_error_too_old",
   "entropy_error_token_reused",
 ] as const;

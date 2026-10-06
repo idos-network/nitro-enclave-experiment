@@ -188,7 +188,13 @@ export async function consumeTokenId(jti: string): Promise<boolean> {
     .db(DB_NAME)
     .collection<{ _id: string; createdAt: Date }>(USED_TOKENS_COLLECTION);
 
-  usedTokensIndexes ??= collection.createIndex({ createdAt: 1 }, { expireAfterSeconds: 5 * 60 });
+  // Cleared on failure so a transient error isn't cached forever.
+  usedTokensIndexes ??= collection
+    .createIndex({ createdAt: 1 }, { expireAfterSeconds: 5 * 60 })
+    .catch((error) => {
+      usedTokensIndexes = null;
+      throw error;
+    });
   await usedTokensIndexes;
 
   try {
@@ -198,6 +204,17 @@ export async function consumeTokenId(jti: string): Promise<boolean> {
     if (err instanceof MongoServerError && err.code === 11000) return false;
     throw err;
   }
+}
+
+/**
+ * Undoes consumeTokenId when the request failed after reserving the token,
+ * so the client can retry with the same token while it is still valid.
+ */
+export async function releaseTokenId(jti: string): Promise<void> {
+  await client
+    .db(DB_NAME)
+    .collection<{ _id: string; createdAt: Date }>(USED_TOKENS_COLLECTION)
+    .deleteOne({ _id: jti });
 }
 
 export async function fetchOrCreateFaceSignEntropy(

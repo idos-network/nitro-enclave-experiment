@@ -8,7 +8,7 @@ import jwt from "jsonwebtoken";
 import swaggerUi from "swagger-ui-express";
 import YAML from "yaml";
 import { JWT_PUBLIC_KEY } from "./env.ts";
-import { consumeTokenId, fetchOrCreateFaceSignEntropy } from "./providers/db.ts";
+import { consumeTokenId, fetchOrCreateFaceSignEntropy, releaseTokenId } from "./providers/db.ts";
 import loggerMiddleware from "./providers/logger.ts";
 import { writeLog } from "./utils/logger-context.ts";
 import { runWithRequestContext } from "./utils/request-context.ts";
@@ -89,7 +89,7 @@ app.post("/facesign/entropy", async (req, res) => {
   }
 
   if (!result.iat || !result.sub || !result.jti) {
-    writeLog("entropy_error_missing_iat_or_sub");
+    writeLog("entropy_error_missing_iat_sub_or_jti");
     return res.status(400).json({ error: "Invalid token" });
   }
 
@@ -107,7 +107,15 @@ app.post("/facesign/entropy", async (req, res) => {
     return res.status(400).json({ error: "Token already used" });
   }
 
-  const { insert, entropy } = await fetchOrCreateFaceSignEntropy(result.sub as string);
+  let insert: boolean;
+  let entropy: string;
+  try {
+    ({ insert, entropy } = await fetchOrCreateFaceSignEntropy(result.sub as string));
+  } catch (error) {
+    // Nothing was handed out, so the token is still unspent - let it retry.
+    await releaseTokenId(result.jti);
+    throw error;
+  }
 
   if (insert) {
     writeLog("entropy_created", { userId: result.sub, ip: req.ip });

@@ -23,6 +23,7 @@ vi.mock("fs", async () => {
 vi.mock("../providers/db.ts", () => ({
   fetchOrCreateFaceSignEntropy: vi.fn(),
   consumeTokenId: vi.fn(async () => true),
+  releaseTokenId: vi.fn(async () => {}),
 }));
 
 import * as db from "../providers/db.ts";
@@ -171,6 +172,20 @@ describe("FaceSign Entropy API", () => {
     expect(response.status).toBe(400);
     expect(response.body).toEqual({ error: "Token already used" });
     expect(entropySpy).not.toHaveBeenCalled();
+  });
+
+  it("releases the token when the entropy fetch fails", async () => {
+    vi.spyOn(db, "fetchOrCreateFaceSignEntropy").mockRejectedValueOnce(new Error("db down"));
+    const jti = crypto.randomUUID();
+    const token = jwt.sign({ sub: crypto.randomUUID(), jti }, privateKey, {
+      algorithm: "ES512",
+      audience: "entropy-service",
+    });
+
+    const response = await request(app).post("/facesign/entropy").send({ token });
+
+    expect(response.status).toBe(500);
+    expect(db.releaseTokenId).toHaveBeenCalledWith(jti);
   });
 
   it("expired token", async () => {
