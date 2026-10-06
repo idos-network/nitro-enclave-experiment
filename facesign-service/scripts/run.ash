@@ -143,7 +143,8 @@ export HOME=/home/deploy
 # npm wrapper would leak the node process on restart and keep holding the port.
 s6_service express 'cd "$HOME_FACESIGN_SERVICE" && export NODE_ENV=production && exec node index.ts'
 s6_service uls     'cd "$HOME_FACETEC_USAGE_LOGS" && exec node index.js start'
-s6_service java    'cd "$HOME_FACETEC_CUSTOM_SERVER/deploy" && sleep 5 && exec bash run.ash'
+# Java's AWS SDK (MONGODB-AWS auth) reads IMDS via the metadata proxy from shared/basic.ash
+s6_service java    'cd "$HOME_FACETEC_CUSTOM_SERVER/deploy" && export AWS_EC2_METADATA_SERVICE_ENDPOINT=http://127.0.0.2 && sleep 5 && exec bash run.ash'
 s6_service caddy   'cd /home/deploy && exec caddy run --config /home/deploy/Caddyfile --adapter caddyfile'
 s6_service node    'exec node_exporter --no-collector.kernel_hung'
 s6_service vector  'exec vector --config /etc/vector/vector.yaml'

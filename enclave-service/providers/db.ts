@@ -15,7 +15,7 @@ import { getLogger } from "../utils/logger-context.ts";
 let db: Db | null = null;
 
 // FLE configuration
-const KEY_DB = "encryption";
+const KEY_DB = "enclaveEncryption";
 const KEY_COLLECTION = "__keyVault";
 const keyVaultNamespace = `${KEY_DB}.${KEY_COLLECTION}`;
 
