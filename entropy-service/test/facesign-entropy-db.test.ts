@@ -2,9 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 
 const h = vi.hoisted(() => {
   const docs = new Map<string, { faceSignUserId: string; entropy: Buffer }>();
+  const usedTokens = new Set<string>();
 
   return {
     docs,
+    usedTokens,
     // Set to make the next findOneAndUpdate throw. `insert`, when given, is
     // written first, standing in for the racing writer that caused the clash.
     nextUpsertThrows: null as { error: Error; insert?: Buffer } | null,
@@ -57,6 +59,17 @@ vi.mock("mongodb", () => {
         return {
           collection: () => ({
             createIndex: h.createIndex,
+            // Stands in for the _id unique index: a second insert of the same
+            // jti fails with E11000, as real Mongo would.
+            insertOne: async ({ _id }: { _id: string }) => {
+              if (h.usedTokens.has(_id)) {
+                throw new MongoServerError("E11000 duplicate key error", 11000);
+              }
+              h.usedTokens.add(_id);
+            },
+            deleteOne: async ({ _id }: { _id: string }) => {
+              h.usedTokens.delete(_id);
+            },
             findOne: async ({ faceSignUserId }: { faceSignUserId: string }) =>
               h.docs.get(faceSignUserId) ?? null,
             findOneAndUpdate: async (
@@ -104,7 +117,31 @@ const MongoServerError = mongodb.MongoServerError as unknown as new (
   code: number,
 ) => Error & { code: number };
 
-const { connectDB, fetchOrCreateFaceSignEntropy } = await import("../providers/db.ts");
+const { connectDB, consumeTokenId, fetchOrCreateFaceSignEntropy, releaseTokenId } = await import(
+  "../providers/db.ts"
+);
+
+describe("consumeTokenId", () => {
+  // Must run before any other consumeTokenId call, while the index promise is unset.
+  it("retries index creation after a failed attempt", async () => {
+    h.createIndex.mockRejectedValueOnce(new Error("index failed"));
+
+    await expect(consumeTokenId("index-retry")).rejects.toThrow("index failed");
+    await expect(consumeTokenId("index-retry")).resolves.toBe(true);
+  });
+
+  it("lets exactly one of two concurrent redemptions win", async () => {
+    const results = await Promise.all([consumeTokenId("race-jti"), consumeTokenId("race-jti")]);
+
+    expect(results.sort()).toEqual([false, true]);
+  });
+
+  it("allows a released token to be consumed again", async () => {
+    expect(await consumeTokenId("released-jti")).toBe(true);
+    await releaseTokenId("released-jti");
+    expect(await consumeTokenId("released-jti")).toBe(true);
+  });
+});
 
 describe("fetchOrCreateFaceSignEntropy", () => {
   it("creates a unique index on faceSignUserId", async () => {
