@@ -84,7 +84,13 @@ export const confirmation = async (req: Request, res: Response) => {
     groupName: FACE_SIGN_GROUP_NAME,
     minMatchLevel: 15,
   });
-  if (!searchResult.success || searchResult.results.length > 0) {
+
+  // First user ever: 3d-db group does not exist yet, so there can't be any duplicates
+  const groupDoesNotExist =
+    searchResult.error &&
+    searchResult.errorMessage?.includes("groupName when that groupName does not exist");
+
+  if (!groupDoesNotExist && (!searchResult.success || searchResult.results.length > 0)) {
     return res.status(409).json({ errorMessage: "User already exists" });
   }
 

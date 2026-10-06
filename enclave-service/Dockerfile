@@ -74,6 +74,8 @@ COPY scripts/shared ./scripts/
 ARG RDS_CA_BUNDLE_SHA256=fe45bbebf92ad3e27a583bbb2ddd1553c521ed4d49af5514dc0a40372ea5395c
 RUN curl -fsSL "https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem" -o /etc/ssl/rds-global-bundle.pem \
     && echo "${RDS_CA_BUNDLE_SHA256}  /etc/ssl/rds-global-bundle.pem" | sha256sum -c -
+# Node ignores the system store; trust the bundle even if MONGO_URI lacks tlsCAFile
+ENV NODE_EXTRA_CA_CERTS=/etc/ssl/rds-global-bundle.pem
 
 # Setup node-metrics
 ARG NODE_EXPORTER_VERSION=1.11.0

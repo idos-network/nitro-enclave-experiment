@@ -19,13 +19,9 @@ sources:
     # EOF reading nothing. Checksums key on content, which is exactly what
     # s6-log's rename-based rotation preserves - current -> @x.u -> @x.s stays
     # one file to vector, so the rename does not re-ingest either.
+    # Default 1 line suffices: s6-log `t` (shared/s6.ash) makes it unique.
     fingerprint:
       strategy: checksum
-      # default hashes only the first line, and express opens every boot with
-      # the same constant startup line - `current` then collides with the @*.u
-      # archive that a previous restart opened with that same line, and vector
-      # reads only one of the two. 5 lines reaches the timestamped pino output.
-      lines: 5
     max_line_bytes: 4194304
 
   # Exposes vector_component_discarded_events_total and
@@ -66,6 +62,9 @@ transforms:
       }
       del(.file)
       del(.host)
+
+      # drop the TAI64N stamp s6-log `t` prepends (shared/s6.ash)
+      .message = replace(string!(.message), r'^@[0-9a-f]{24} ', "")
 
       parsed, err = parse_json(.message)
       if err == null && is_object(parsed) {
