@@ -9,6 +9,8 @@ overrides:
   postcss: '>= 8.5.18'
   ip-address: '>= 10.3.1'
   nanoid: '>= 3.3.17'
+  proxy-addr: '>= 2.0.8'
+  source-map-js: '>= 1.2.2'
 
 importers:
 
@@ -20,6 +22,9 @@ importers:
       '@aws-sdk/credential-providers':
         specifier: ^3.1146.0
         version: 3.1146.0
+      '@prometheus-io/client':
+        specifier: ^0.16.1
+        version: 0.16.1
       cors:
         specifier: ^2.8.6
         version: 2.8.6
@@ -28,7 +33,7 @@ importers:
         version: 5.2.1
       express-prom-bundle:
         specifier: ^8.0.0
-        version: 8.0.0(prom-client@15.1.3)
+        version: 8.0.0(@prometheus-io/client@0.16.1)
       express-rate-limit:
         specifier: ^8.6.2
         version: 8.6.2(express@5.2.1)
@@ -54,8 +59,8 @@ importers:
         specifier: ^11.0.0
         version: 11.0.0
       prom-client:
-        specifier: ^15.1.3
-        version: 15.1.3
+        specifier: npm:@prometheus-io/client@^0.16.1
+        version: '@prometheus-io/client@0.16.1'
       swagger-ui-express:
         specifier: ^5.0.1
         version: 5.0.1(express@5.2.1)
@@ -390,6 +395,10 @@ packages:
 
   '@pinojs/redact@0.4.0':
     resolution: {integrity: sha512-k2ENnmBugE/rzQfEcdWHcCY+/FM3VLzH9cYEsbdsoqrvzAKRhUZeRNhAZvB8OitQJ1TBed3yqWtdjzS6wJKBwg==}
+
+  '@prometheus-io/client@0.16.1':
+    resolution: {integrity: sha512-XkFPsGFGoSs/UMg/vh0QLDpanl/tsrOV5PLHdpGe8Ho+ir/Llhytr15j6y8ZwLrpIGzK9gTVVpIalA6C4UjUZw==}
+    engines: {node: ^22 || ^24 || >=26}
 
   '@rolldown/binding-android-arm64@1.2.3':
     resolution: {integrity: sha512-zrJtHDcaZJ1Fp7xf4hNl+7seH9Cn/N5TwLYkhgXREtBwAd/jaqW3uqeHxpDugJLVICWg4eW44kOQEGJ1r6jCGw==}
@@ -1524,13 +1533,8 @@ packages:
   process-warning@5.1.0:
     resolution: {integrity: sha512-jQSaVHsPgtyw60e1rQ/A+/ArPEj/S8pS/vFnyGa/gYFXrKk/6RuDkoqVDQ5NI5MmS01698ltlAk0NoDBNLujRw==}
 
-  prom-client@15.1.3:
-    resolution: {integrity: sha512-6ZiOBfCywsD4k1BN9IX0uZhF+tJkV8q8llP64G5Hajs4JOeVLPCwpPVcpXy3BwYiUGgyJzsJJQeOIv7+hDSq8g==}
-    engines: {node: ^16 || ^18 || >=20}
-    deprecated: prom-client has been replaced by @prometheus-io/client
-
-  proxy-addr@2.0.7:
-    resolution: {integrity: sha512-llQsMLSUDUPT44jdrU/O37qlnifitDP+ZwrmmZcoSKyLKvtZxpyV0n2/bD/N4tBAAZ/gJEdZU7KMraoK1+XYAg==}
+  proxy-addr@2.0.8:
+    resolution: {integrity: sha512-5nnx0yGyVUcY6t9RnWcARWtwT9F1D8O9rt08htPvnd49W1IgZtmLkhu9WfMzQj1cFxjHIO6connUNVW5k7AVyQ==}
     engines: {node: '>= 0.10'}
 
   pump@3.0.4:
@@ -1659,8 +1663,8 @@ packages:
   sonic-boom@4.2.1:
     resolution: {integrity: sha512-w6AxtubXa2wTXAUsZMMWERrsIRAdrK0Sc+FUytWvYAhBJLyuI4llrMIC1DtlNSdI99EI86KZum2MMq3EAZlF9Q==}
 
-  source-map-js@1.2.1:
-    resolution: {integrity: sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==}
+  source-map-js@1.2.2:
+    resolution: {integrity: sha512-KGj/8Y43x35aZVDtt+J4mK1hoLGHULMYfSkODJNQjNDC3oW1PqPoxMwo0pLUsWM/UEGzON/NxeHywEfNXNP3Vw==}
     engines: {node: '>=0.10.0'}
 
   sparse-bitfield@3.0.3:
@@ -2366,6 +2370,11 @@ snapshots:
 
   '@pinojs/redact@0.4.0': {}
 
+  '@prometheus-io/client@0.16.1':
+    dependencies:
+      '@opentelemetry/api': 1.9.1
+      tdigest: 0.1.2
+
   '@rolldown/binding-android-arm64@1.2.3':
     optional: true
 
@@ -2913,11 +2922,11 @@ snapshots:
 
   expect-type@1.4.0: {}
 
-  express-prom-bundle@8.0.0(prom-client@15.1.3):
+  express-prom-bundle@8.0.0(@prometheus-io/client@0.16.1):
     dependencies:
       '@types/express': 5.0.6
       on-finished: 2.4.1
-      prom-client: 15.1.3
+      prom-client: '@prometheus-io/client@0.16.1'
       url-value-parser: 2.2.0
 
   express-rate-limit@8.6.2(express@5.2.1):
@@ -2949,7 +2958,7 @@ snapshots:
       on-finished: 2.4.1
       once: 1.4.0
       parseurl: 1.3.3
-      proxy-addr: 2.0.7
+      proxy-addr: 2.0.8
       qs: 6.15.3
       range-parser: 1.3.0
       router: 2.2.0
@@ -3211,7 +3220,7 @@ snapshots:
     dependencies:
       '@babel/parser': 7.29.8
       '@babel/types': 7.29.8
-      source-map-js: 1.2.1
+      source-map-js: 1.2.2
 
   make-dir@4.0.0:
     dependencies:
@@ -3378,7 +3387,7 @@ snapshots:
     dependencies:
       nanoid: 3.3.18
       picocolors: 1.1.1
-      source-map-js: 1.2.1
+      source-map-js: 1.2.2
 
   prebuild-install@7.1.3:
     dependencies:
@@ -3397,12 +3406,7 @@ snapshots:
 
   process-warning@5.1.0: {}
 
-  prom-client@15.1.3:
-    dependencies:
-      '@opentelemetry/api': 1.9.1
-      tdigest: 0.1.2
-
-  proxy-addr@2.0.7:
+  proxy-addr@2.0.8:
     dependencies:
       forwarded: 0.2.0
       ipaddr.js: 1.9.1
@@ -3570,7 +3574,7 @@ snapshots:
     dependencies:
       atomic-sleep: 1.0.0
 
-  source-map-js@1.2.1: {}
+  source-map-js@1.2.2: {}
 
   sparse-bitfield@3.0.3:
     dependencies:

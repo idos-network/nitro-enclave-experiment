@@ -2,19 +2,15 @@ allowBuilds:
   '@scarf/scarf': true
   mongodb-client-encryption: true
 
-minimumReleaseAgeExclude:
-  - '@biomejs/biome@2.5.8'
-  - '@biomejs/cli-darwin-arm64@2.5.8'
-  - '@biomejs/cli-darwin-x64@2.5.8'
-  - '@biomejs/cli-linux-arm64-musl@2.5.8'
-  - '@biomejs/cli-linux-arm64@2.5.8'
-  - '@biomejs/cli-linux-x64-musl@2.5.8'
-  - '@biomejs/cli-linux-x64@2.5.8'
-  - '@biomejs/cli-win32-arm64@2.5.8'
-  - '@biomejs/cli-win32-x64@2.5.8'
-
 overrides:
   form-data: ">= 4.0.6"
   postcss: ">=8.5.18"
   ip-address: ">= 10.3.1"
   nanoid: ">= 3.3.17"
+  proxy-addr: ">= 2.0.8"
+  source-map-js: ">= 1.2.2"
+
+peerDependencyRules:
+  allowedVersions:
+    # prom-client is aliased to its successor @prometheus-io/client (package.json)
+    express-prom-bundle>prom-client: "0.16"

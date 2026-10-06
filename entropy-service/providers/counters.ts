@@ -1,4 +1,4 @@
-import promClient from "prom-client";
+import promClient from "@prometheus-io/client";
 import { ACTION_TYPES } from "../utils/actions.ts";
 
 export const actions = new promClient.Counter({
