@@ -68,6 +68,12 @@ RUN pnpm install --prod --frozen-lockfile
 # Copy source files & scripts
 COPY scripts/shared ./scripts/
 
+# DocumentDB's TLS cert is signed by the Amazon RDS CA, not a public one.
+# MONGO_URI points at it with tlsCAFile=/etc/ssl/rds-global-bundle.pem
+ARG RDS_CA_BUNDLE_SHA256=fe45bbebf92ad3e27a583bbb2ddd1553c521ed4d49af5514dc0a40372ea5395c
+RUN curl -fsSL "https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem" -o /etc/ssl/rds-global-bundle.pem \
+    && echo "${RDS_CA_BUNDLE_SHA256}  /etc/ssl/rds-global-bundle.pem" | sha256sum -c -
+
 # Setup node-metrics
 ARG NODE_EXPORTER_VERSION=1.11.0
 ARG NODE_EXPORTER_SHA256=4f8fbd23b8380b8fb720b125fb9029de261dc5fcd68bfe81ae010c0d32f5f6c3
