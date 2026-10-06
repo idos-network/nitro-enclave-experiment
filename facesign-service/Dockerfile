@@ -198,10 +198,14 @@ RUN pnpm install --prod --frozen-lockfile
 WORKDIR /home/deploy
 
 # DocumentDB's TLS cert is signed by the Amazon RDS CA, not a public one.
-# MONGO_URI points at it with tlsCAFile=/etc/ssl/rds-global-bundle.pem
+# MONGO_URI points at it with tlsCAFile=/etc/ssl/rds-global-bundle.pem. Java
+# ignores tlsCAFile, so the certs also go to the system store, which the
+# ca-certificates-java hook mirrors into the JVM cacerts (one cert per file).
 ARG RDS_CA_BUNDLE_SHA256=fe45bbebf92ad3e27a583bbb2ddd1553c521ed4d49af5514dc0a40372ea5395c
 RUN curl -fsSL "https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem" -o /etc/ssl/rds-global-bundle.pem \
-    && echo "${RDS_CA_BUNDLE_SHA256}  /etc/ssl/rds-global-bundle.pem" | sha256sum -c -
+    && echo "${RDS_CA_BUNDLE_SHA256}  /etc/ssl/rds-global-bundle.pem" | sha256sum -c - \
+    && awk '/BEGIN CERTIFICATE/{n++} {print > ("/usr/local/share/ca-certificates/rds-" n ".crt")}' /etc/ssl/rds-global-bundle.pem \
+    && update-ca-certificates
 
 # Setup node-metrics
 ARG NODE_EXPORTER_VERSION=1.11.0
