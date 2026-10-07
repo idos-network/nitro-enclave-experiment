@@ -1,5 +1,6 @@
 export const ACTION_TYPES = [
   "session_created",
+  "session_revoked",
   "session_request_invalid_body",
   "session_key_unavailable",
   "public_key_request",

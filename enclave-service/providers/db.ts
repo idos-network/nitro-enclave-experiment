@@ -185,6 +185,11 @@ export async function storeSession(
   await db.collection(DB_ENCLAVE_COLLECTION).insertOne(record);
 }
 
+export async function deleteSession(sessionId: string) {
+  const { db } = await connectDB();
+  await db.collection(DB_ENCLAVE_COLLECTION).deleteOne({ sessionId });
+}
+
 export interface Session {
   id: string;
   allowedAudienceRoots: string[];

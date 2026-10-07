@@ -103,6 +103,36 @@ paths:
         "400":
           $ref: "#/components/responses/BadRequest"
 
+  /session/revoke:
+    post:
+      tags: [Session]
+      summary: Revoke a session
+      description: |
+        Deletes the session and its server private key. The caller proves
+        possession of the session client private key with the same `session`
+        block used by `/session/public-key` (any `encryptedKey` boxed from the
+        client key to the session server key).
+      operationId: revokeSession
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [session]
+              properties:
+                session:
+                  $ref: "#/components/schemas/SessionContext"
+      responses:
+        "204":
+          description: Session revoked
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/SessionNotFound"
+
   /session/public-key:
     post:
       tags: [Session]
