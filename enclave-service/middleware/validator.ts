@@ -5,6 +5,7 @@ import type {
   CreateSessionRequest,
   DecryptRequest,
   EncryptRequest,
+  RevokeSessionRequest,
 } from "../utils/dto.ts";
 import { writeLog } from "../utils/logger-context.ts";
 
@@ -12,7 +13,9 @@ import { writeLog } from "../utils/logger-context.ts";
  * Parse RequestSchema and return 400 on bad body
  */
 export function validatorMiddleware(
-  schema: z.ZodSchema<CreateSessionRequest | EncryptRequest | DecryptRequest | CommonRequest>,
+  schema: z.ZodSchema<
+    CreateSessionRequest | EncryptRequest | DecryptRequest | CommonRequest | RevokeSessionRequest
+  >,
 ): RequestHandler {
   return async (req, res, next) => {
     const parsed = schema.safeParse(req.body);

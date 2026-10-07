@@ -72,6 +72,9 @@ const mocks = vi.hoisted(() => {
         sessionServerJwtChain: stored.sessionServerJwtChain,
       };
     }),
+    deleteSession: vi.fn(async (sessionId: string) => {
+      sessions.delete(sessionId);
+    }),
     sign: vi.fn(),
     getPublicKeyJWK: vi.fn(),
   };
@@ -88,6 +91,7 @@ mocks.getPublicKeyJWK.mockImplementation(async () => ({
 vi.mock("../providers/db.ts", () => ({
   storeSession: mocks.storeSession,
   getSession: mocks.getSession,
+  deleteSession: mocks.deleteSession,
   connectDB: vi.fn(),
 }));
 
@@ -157,6 +161,7 @@ export function resetMocks() {
 /** Accessors — vitest forbids exporting `vi.hoisted` bindings directly. */
 export const storeSession = () => mocks.storeSession;
 export const getSession = () => mocks.getSession;
+export const deleteSession = () => mocks.deleteSession;
 export const sessions = () => mocks.sessions;
 export const sign = (): Mock<(payload: Uint8Array) => Promise<Buffer>> => mocks.sign;
 export const getPublicKeyJWK = (): Mock<() => Promise<typeof SIGNING_PUBLIC_KEY_JWK>> =>

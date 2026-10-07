@@ -21,6 +21,10 @@ export const CommonRequestSchema = z.object({
 
 export type CommonRequest = z.infer<typeof CommonRequestSchema>;
 
+// Revocation proves possession of the session client private key via `session` alone.
+export const RevokeSessionRequestSchema = CommonRequestSchema.pick({ session: true });
+export type RevokeSessionRequest = z.infer<typeof RevokeSessionRequestSchema>;
+
 export const EncryptRequestSchema = z.object({
   arguments: z.object({
     payload: z.base64url(), // base64url encoded string (encrypted for decryption and vice-versa)

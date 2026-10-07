@@ -8,8 +8,9 @@ import YAML from "yaml";
 
 import { sessionKeyMiddleware } from "./middleware/session-key.ts";
 import { validatorMiddleware } from "./middleware/validator.ts";
-
+import { deleteSession, getSession } from "./providers/db.ts";
 import { decrypt, encrypt } from "./providers/encryption.ts";
+import { getEncryptionKeyPair } from "./providers/keys.ts";
 import { getPublicKeyJWK } from "./providers/kms.ts";
 import loggerMiddleware from "./providers/logger.ts";
 import { createSession } from "./providers/session.ts";
@@ -22,6 +23,8 @@ import {
   DecryptRequestSchema,
   type EncryptRequest,
   EncryptRequestSchema,
+  type RevokeSessionRequest,
+  RevokeSessionRequestSchema,
 } from "./utils/dto.ts";
 import { writeLog } from "./utils/logger-context.ts";
 import { splitPayload } from "./utils/payload.ts";
@@ -76,6 +79,32 @@ app.post(
     const session = await createSession(res.locals.validatedBody);
     writeLog("session_created", { sessionId: session.id });
     res.status(200).json(session);
+  },
+);
+
+app.post(
+  "/session/revoke",
+  validatorMiddleware(RevokeSessionRequestSchema),
+  async (_req, res: Response<any, { validatedBody: RevokeSessionRequest }>) => {
+    const { id, encryptedKey, nonce } = res.locals.validatedBody.session;
+
+    const session = await getSession(id);
+    // Same 404 for missing and unproven sessions, so revoke can't probe session ids.
+    if (
+      !session ||
+      !getEncryptionKeyPair(
+        encryptedKey,
+        nonce,
+        session.sessionClientPublicKey,
+        session.sessionServerPrivateKey,
+      )
+    ) {
+      return res.status(404).json({ error: "Session not found" });
+    }
+
+    await deleteSession(id);
+    writeLog("session_revoked", { sessionId: id });
+    return res.status(204).end();
   },
 );
 
