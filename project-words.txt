@@ -3,6 +3,7 @@ autorestart
 awscliv
 biomejs
 blkid
+buildx
 Caddyfile
 ciphertext
 cooldown
