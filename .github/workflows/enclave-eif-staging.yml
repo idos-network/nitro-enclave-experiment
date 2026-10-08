@@ -1,0 +1,72 @@
+name: Enclave EIF (staging)
+
+on:
+  push:
+    branches: [deploy_to_staging]
+    paths:
+      - "enclave-service/**"
+      - "shared/**"
+      - "aws-nitro-kernel/blobs/**"
+      - ".github/workflows/enclave-eif-staging.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: enclave-eif-staging
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-eif:
+    name: Build enclave-service EIF
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      # Dockerfile does COPY scripts/shared; sync_enclave.sh does the same on the host
+      - name: Copy shared scripts into build context
+        run: cp -a shared enclave-service/scripts/
+
+      - name: Build EIF with custom kernel
+        id: eif
+        # ponytail: pin to a tag once the buildx branch is merged in the action repo
+        uses: idos-network/nitro-enclaves-eif-build-action@buildx
+        with:
+          context: enclave-service/
+          dockerfile: Dockerfile
+          kernel-blobs: aws-nitro-kernel/blobs/
+          eif-name: idos-enclave.eif
+          build-args: |
+            S3_SECRETS_BUCKET=${{ secrets.STAGING_S3_BUCKET }}
+            S3_SECRETS_REGION=${{ vars.STAGING_S3_REGION || 'eu-west-1' }}
+
+      - name: Upload EIF
+        uses: actions/upload-artifact@v4
+        with:
+          name: idos-enclave-eif-${{ github.sha }}
+          if-no-files-found: error
+          retention-days: 90
+          path: |
+            ${{ steps.eif.outputs.eif-path }}
+            ${{ steps.eif.outputs.info-path }}
+
+      - name: Proof
+        env:
+          SHA256: ${{ steps.eif.outputs.eif-sha256 }}
+          PCR0: ${{ steps.eif.outputs.pcr0 }}
+          PCR1: ${{ steps.eif.outputs.pcr1 }}
+          PCR2: ${{ steps.eif.outputs.pcr2 }}
+        run: |
+          {
+            echo "## idos-enclave.eif @ ${GITHUB_SHA}"
+            echo '```'
+            echo "sha256 = ${SHA256}"
+            echo "PCR0   = ${PCR0}"
+            echo "PCR1   = ${PCR1}"
+            echo "PCR2   = ${PCR2}"
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"

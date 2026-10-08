@@ -8,6 +8,44 @@ bash scripts/install-git-hooks.sh
 
 Pre-commit runs `pnpm types`, `pnpm format`, and `pnpm test` in each `*-service`, then `npx cspell`.
 
+## Enclave EIF from GitHub Actions
+
+[`enclave-eif-staging.yml`](.github/workflows/enclave-eif-staging.yml) builds the
+`enclave-service` EIF with the custom kernel from `aws-nitro-kernel/blobs` on every
+push to `deploy_to_staging` (or manually via *Run workflow*). It uses
+[idos-network/nitro-enclaves-eif-build-action](https://github.com/idos-network/nitro-enclaves-eif-build-action).
+
+Each run uploads `idos-enclave.eif` + `idos-enclave-info.json` as the artifact
+`idos-enclave-eif-<commit sha>` and prints the EIF sha256 and PCR0-2 in the job summary.
+The PCRs belong to that exact file, so deploy the file, don't rebuild on the host.
+
+### Download to the EC2 host
+
+One-time: install `gh` and log in with a fine-grained PAT scoped to this repo with
+*Actions: Read*.
+
+```bash
+sudo dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo && sudo dnf install -y gh
+gh auth login --with-token   # paste the token
+```
+
+Fetch the latest successful build into `$NITRO_CLI_ARTIFACTS` (use a run id from the
+run URL instead of `$RUN` for a specific build):
+
+```bash
+RUN=$(gh run list -R idos-network/nitro-enclave-experiment --workflow "Enclave EIF (staging)" --status success -L1 --json databaseId -q '.[0].databaseId')
+gh run download "$RUN" -R idos-network/nitro-enclave-experiment -D /tmp/eif-download
+mv /tmp/eif-download/*/idos-enclave.eif /tmp/eif-download/*/idos-enclave-info.json "$NITRO_CLI_ARTIFACTS/"
+rm -rf /tmp/eif-download
+```
+
+Verify the PCRs match the job summary, then start it with `enclave-service/scripts/enclave-run.ash`
+as usual (`enclave-build.ash` is not needed on the host):
+
+```bash
+sudo nitro-cli describe-eif --eif-path "$NITRO_CLI_ARTIFACTS/idos-enclave.eif" | jq .Measurements
+```
+
 ## Setting up facesign service
 
 1. Follow up [FaceTec SDK](./facetec-sdk/README.md)
