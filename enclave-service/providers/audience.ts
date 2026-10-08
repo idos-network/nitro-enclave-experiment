@@ -1,4 +1,4 @@
-import { createRemoteJWKSet, decodeProtectedHeader, errors, jwtVerify } from "jose";
+import { createRemoteJWKSet, decodeJwt, decodeProtectedHeader, errors, jwtVerify } from "jose";
 import { writeLog } from "../utils/logger-context.ts";
 
 const SUPPORTED_ALGORITHMS = ["EdDSA"];
@@ -84,6 +84,26 @@ export async function verifyAudience(
   throw new AudienceError(
     `Audience JWT is not signed by any allowed audience root (${allowedAudienceRoots.join(", ")}).`,
   );
+}
+
+/**
+ * TEMPORARY (staging only): read the recipient X25519 public key from the audience JWT
+ * WITHOUT verifying signature, roots or claims. Throws AudienceError on a malformed JWT.
+ */
+export function extractAudience(jwtChain: string): Buffer {
+  let payload: ReturnType<typeof decodeJwt>;
+  try {
+    payload = decodeJwt(jwtChain);
+  } catch {
+    throw new AudienceError("Audience jwtChain is not a valid compact JWS/JWT.");
+  }
+
+  const { recipientPublicKeyX } = payload;
+  if (typeof recipientPublicKeyX !== "string") {
+    throw new AudienceError('Audience JWT is missing the "recipientPublicKeyX" claim.');
+  }
+
+  return Buffer.from(recipientPublicKeyX, "base64url");
 }
 
 // Checked upfront: jose's "alg not allowed" is easy to misread as a signature problem.
