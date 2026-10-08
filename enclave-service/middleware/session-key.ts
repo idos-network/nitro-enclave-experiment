@@ -1,6 +1,7 @@
 import type { RequestHandler } from "express";
 import nacl from "tweetnacl";
-import { AudienceError, verifyAudience } from "../providers/audience.ts";
+import { SKIP_AUDIENCE_VERIFICATION } from "../env.ts";
+import { AudienceError, extractAudience, verifyAudience } from "../providers/audience.ts";
 import { getSession } from "../providers/db.ts";
 import { getEncryptionKeyPair } from "../providers/keys.ts";
 import type { CommonRequest, DecryptRequest } from "../utils/dto.ts";
@@ -42,10 +43,9 @@ export function sessionKeyMiddleware(): RequestHandler {
 
     let audiencePublicKey: Buffer;
     try {
-      audiencePublicKey = await verifyAudience(
-        session.allowedAudienceRoots,
-        sessionRequest.audience.jwtChain,
-      );
+      audiencePublicKey = SKIP_AUDIENCE_VERIFICATION
+        ? extractAudience(sessionRequest.audience.jwtChain)
+        : await verifyAudience(session.allowedAudienceRoots, sessionRequest.audience.jwtChain);
     } catch (error) {
       if (!(error instanceof AudienceError)) throw error;
 
