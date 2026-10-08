@@ -191,7 +191,10 @@ RUN sed -i 's#usageLogsDirectory: ""#usageLogsDirectory: "/mnt/encrypted/usage-l
 # Setup FaceSign Service
 WORKDIR $HOME_FACESIGN_SERVICE
 COPY . .
-RUN pnpm install --prod --frozen-lockfile
+# copy, not hardlink: nitro-cli's linuxkit turns tar hardlinks into symlinks, so a .js that
+# pnpm deduplicated with an identical .d.ts can end up as a symlink to the .d.ts and Node refuses it
+RUN pnpm install --prod --frozen-lockfile --package-import-method=copy \
+    && rm -rf "$(pnpm store path)"
 
 # Download or copy all required secrets and setup environment
 WORKDIR /home/deploy

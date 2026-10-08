@@ -29,22 +29,21 @@ sudo dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.re
 gh auth login --with-token   # paste the token
 ```
 
-Fetch the latest successful build into `$NITRO_CLI_ARTIFACTS` (use a run id from the
-run URL instead of `$RUN` for a specific build):
+Then, on the host (the `sync_*.sh` scripts copy it to `~/`):
 
 ```bash
-RUN=$(gh run list -R idos-network/nitro-enclave-experiment --workflow "Enclave EIF (staging)" --status success -L1 --json databaseId -q '.[0].databaseId')
-gh run download "$RUN" -R idos-network/nitro-enclave-experiment -D /tmp/eif-download
-mv /tmp/eif-download/*/idos-enclave.eif /tmp/eif-download/*/idos-enclave-info.json "$NITRO_CLI_ARTIFACTS/"
-rm -rf /tmp/eif-download
+./update-from-github.sh enclave            # latest successful run
+./update-from-github.sh enclave 123456789  # a specific run id from the run URL
 ```
 
-Verify the PCRs match the job summary, then start it with `enclave-service/scripts/enclave-run.ash`
-as usual (`enclave-build.ash` is not needed on the host):
-
-```bash
-sudo nitro-cli describe-eif --eif-path "$NITRO_CLI_ARTIFACTS/idos-enclave.eif" | jq .Measurements
-```
+The first argument is `enclave`, `entropy` or `facesign`; it picks the workflow
+`.github/workflows/<service>-eif-staging.yml` and the EIF name the service's
+`enclave-run.ash` expects. The script downloads the artifact, checks that `describe-eif`
+of the downloaded file gives the same PCRs as the info JSON from GHA, installs both into
+`$NITRO_CLI_ARTIFACTS`, prints the sha256 + PCRs to compare with the job summary,
+terminates any running enclave and starts the new one via the service's
+`scripts/enclave-run.ash` (console attached, like the manual flow).
+`enclave-build.ash` is not needed on the host.
 
 ## Setting up facesign service
 

@@ -64,7 +64,10 @@ WORKDIR /app
 COPY . .
 
 # Install dependencies
-RUN pnpm install --prod --frozen-lockfile
+# copy, not hardlink: nitro-cli's linuxkit turns tar hardlinks into symlinks, so a .js that
+# pnpm deduplicated with an identical .d.ts can end up as a symlink to the .d.ts and Node refuses it
+RUN pnpm install --prod --frozen-lockfile --package-import-method=copy \
+    && rm -rf "$(pnpm store path)"
 
 # Copy source files & scripts
 COPY scripts/shared ./scripts/
