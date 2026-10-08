@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SKIP_AUDIENCE_VERIFICATION } from "../env.ts";
 
 export const CommonRequestSchema = z.object({
   session: z.object({
@@ -37,7 +38,14 @@ export type DecryptRequest = z.infer<typeof DecryptRequestSchema>;
 export const CreateSessionRequestSchema = z.object({
   sessionClientPublicKey: z.base64url().min(43).max(44), // base64url-encoded 32-byte NaCl box public key
   allowedAudienceRoots: z.array(
-    z.enum(["relay.idos.network", "relay.staging.idos.network", "relay.playground.idos.network"]),
+    // TEMPORARY (staging only): roots are never checked when audience verification is skipped.
+    SKIP_AUDIENCE_VERIFICATION
+      ? z.string()
+      : z.enum([
+          "relay.idos.network",
+          "relay.staging.idos.network",
+          "relay.playground.idos.network",
+        ]),
   ), // array of allowed audience roots
 });
 
