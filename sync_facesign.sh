@@ -6,6 +6,7 @@ EC2_USER="ec2-user"
 
 echo "Syncing: $EC2_IP"
 rsync -avz --progress ./facesign-service "$EC2_USER@$EC2_IP:~/" --exclude "node_modules"
+rsync -avz --progress ./update-from-github.sh "$EC2_USER@$EC2_IP:~/"
 rsync -avz --progress ./shared "$EC2_USER@$EC2_IP:~/facesign-service/scripts/" 
 scp ./facetec-sdk/main.patch "$EC2_USER@$EC2_IP:~/facesign-service/scripts/"
 rsync -avz --progress ./aws-nitro-kernel/blobs/ "$EC2_USER@$EC2_IP:nitro-kernel-blobs/"
