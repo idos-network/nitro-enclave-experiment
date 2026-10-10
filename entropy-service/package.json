@@ -16,7 +16,7 @@
     "format:ci": "npx @biomejs/biome ci"
   },
   "dependencies": {
-    "@aws-sdk/credential-provider-node": "3.972.50",
+    "@aws-sdk/credential-provider-node": "3.972.85",
     "@aws-sdk/credential-providers": "^3.1146.0",
     "@scure/bip39": "^2.3.0",
     "cors": "^2.8.6",
