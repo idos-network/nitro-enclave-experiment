@@ -325,7 +325,7 @@ components:
             auth:
               type: object
               required: [apiKey]
-              description: Sent as `Authorization: Bearer <apiKey>`; `Persona-Version` and `Key-Inflection` come from the host
+              description: "Sent as `Authorization: Bearer <apiKey>`; `Persona-Version` and `Key-Inflection` come from the host"
               properties:
                 apiKey:
                   type: string

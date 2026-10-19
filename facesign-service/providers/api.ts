@@ -1,5 +1,5 @@
 import { FACETEC_SERVER } from "../env.ts";
-import { getRequestId } from "../utils/request-context.ts";
+import { getRequestId } from "../shared/node/request-context.ts";
 import { Enrollment3DRecoverableError, FaceTecError, SessionStartError } from "./errors.ts";
 
 export interface StatusResponse {

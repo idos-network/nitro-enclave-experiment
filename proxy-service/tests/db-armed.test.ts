@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { armBody } from "./helpers.ts";
 
-// In-memory Mongo + a ClientEncryption whose "ciphertext" is a tagged JSON wrapper,
+// In-memory Mongo + a ClientEncryption whose "ciphertext" is the plaintext in a Binary,
 // so a test can tell encrypted fields from plaintext ones and swap blobs between records.
 const h = vi.hoisted(() => {
   const docs = new Map<string, Record<string, unknown>>();
@@ -22,22 +22,35 @@ const h = vi.hoisted(() => {
 
 vi.mock("@aws-sdk/credential-provider-node", () => ({ defaultProvider: () => async () => ({}) }));
 
-vi.mock("mongodb", () => ({
-  MongoClient: class {
-    connect = async () => {};
-    db = () => ({
-      listCollections: () => ({ toArray: async () => [{ name: "__keyVault" }] }),
-      createCollection: async () => {},
-      collection: () => h.collection,
-    });
-  },
-  ClientEncryption: class {
-    getKeyByAltName = async () => ({ _id: "data-key-id" });
-    createDataKey = async () => "data-key-id";
-    encrypt = async (value: string) => ({ enc: value });
-    decrypt = async (value: { enc: string }) => value.enc;
-  },
-}));
+vi.mock("mongodb", () => {
+  // shared/node/db.ts only hands a driver Binary to decrypt
+  class Binary {
+    buffer: Buffer;
+    sub_type: number;
+    constructor(buf: Buffer, subType: number) {
+      this.buffer = buf;
+      this.sub_type = subType;
+    }
+  }
+
+  return {
+    Binary,
+    MongoClient: class {
+      connect = async () => {};
+      db = () => ({
+        listCollections: () => ({ toArray: async () => [{ name: "__keyVault" }] }),
+        createCollection: async () => {},
+        collection: () => h.collection,
+      });
+    },
+    ClientEncryption: class {
+      getKeyByAltName = async () => ({ _id: "data-key-id" });
+      createDataKey = async () => "data-key-id";
+      encrypt = async (value: string) => new Binary(Buffer.from(value), 6);
+      decrypt = async (value: Binary) => value.buffer.toString();
+    },
+  };
+});
 
 const { deleteArmed, getArmed, storeArmed } = await import("../providers/db.ts");
 
