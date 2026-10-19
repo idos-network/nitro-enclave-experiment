@@ -59,6 +59,7 @@ Other vendors differ only in `api` + `auth`:
 { "api": "persona", "auth": { "apiKey": "<persona api key>" } }
 { "api": "sumsub",  "auth": { "appToken": "<sumsub app token>", "secretKey": "<sumsub secret key>" } }
 { "api": "kalshi",  "auth": { "apiKeyId": "<key id>", "privateKeyPem": "-----BEGIN PRIVATE KEY-----\n…" } }
+{ "api": "mock",    "auth": { "apiKey": "<any secret>", "delayMs": 200 } } // load tests: no upstream, answers locally after delayMs
 ```
 
 ## 3. Sign a request
