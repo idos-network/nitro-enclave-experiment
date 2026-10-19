@@ -1,4 +1,5 @@
-import { constants, createHmac, sign } from "node:crypto";
+import { constants, createHash, createHmac, sign } from "node:crypto";
+import { SignJWT } from "jose";
 import type { Api, ArmRequest } from "../utils/dto.ts";
 
 export interface UpstreamCall {
@@ -63,7 +64,27 @@ const kalshi: Authorize<"kalshi"> = async (auth, call) => {
   };
 };
 
-const vendors: { [A in Api]: Authorize<A> } = { iron, moonpay, persona, sumsub, kalshi };
+/**
+ * Mock vendor for load tests: does comparable CPU work to a real adapter
+ * (sha256 of the body, HS256 JWT keyed by sha256(apiKey)) and is answered locally in proxy.ts.
+ */
+const mock: Authorize<"mock"> = async (auth, call) => {
+  const bodySha256 = createHash("sha256")
+    .update(call.body ?? "")
+    .digest("base64url");
+  const jwt = await new SignJWT({
+    method: call.method.toUpperCase(),
+    path: call.url.pathname,
+    bodySha256,
+  })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .sign(createHash("sha256").update(auth.apiKey).digest());
+
+  return { Authorization: `Bearer ${jwt}`, "X-Body-Sha256": bodySha256 };
+};
+
+const vendors: { [A in Api]: Authorize<A> } = { iron, moonpay, persona, sumsub, kalshi, mock };
 
 export function authorize(armed: Pick<ArmRequest, "api" | "auth">, call: UpstreamCall) {
   // TS cannot correlate `api` with `auth` across the union; ArmRequestSchema guarantees they match.

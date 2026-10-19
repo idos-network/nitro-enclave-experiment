@@ -240,6 +240,7 @@ components:
         - $ref: "#/components/schemas/ArmPersonaRequest"
         - $ref: "#/components/schemas/ArmSumsubRequest"
         - $ref: "#/components/schemas/ArmKalshiRequest"
+        - $ref: "#/components/schemas/ArmMockRequest"
       discriminator:
         propertyName: api
         mapping:
@@ -248,6 +249,7 @@ components:
           persona: "#/components/schemas/ArmPersonaRequest"
           sumsub: "#/components/schemas/ArmSumsubRequest"
           kalshi: "#/components/schemas/ArmKalshiRequest"
+          mock: "#/components/schemas/ArmMockRequest"
 
     ArmCommon:
       type: object
@@ -370,6 +372,32 @@ components:
                 privateKeyPem:
                   type: string
                   description: PKCS#8 or PKCS#1 PEM; literal `\n` is accepted
+
+    ArmMockRequest:
+      allOf:
+        - $ref: "#/components/schemas/ArmCommon"
+        - type: object
+          required: [api, auth]
+          properties:
+            api:
+              type: string
+              const: mock
+            auth:
+              type: object
+              required: [apiKey]
+              description: |
+                Load-testing vendor with no upstream. The proxy verifies the host JWS as usual, then
+                hashes the body, signs an HS256 JWT keyed by sha256(apiKey), waits `delayMs` and
+                answers 200 with `{ method, path, Authorization, X-Body-Sha256 }` instead of fetching
+                `baseUrl`.
+              properties:
+                apiKey:
+                  type: string
+                delayMs:
+                  type: integer
+                  minimum: 0
+                  maximum: 60000
+                  default: 200
 
     ArmResponse:
       type: object

@@ -61,6 +61,14 @@ export const ArmRequestSchema = z.discriminatedUnion("api", [
     api: z.literal("kalshi"),
     auth: z.object({ apiKeyId: z.string().min(1), privateKeyPem: PrivateKeyPemSchema }),
   }),
+  // No upstream: answers locally after `delayMs` (load testing without a real vendor).
+  CommonArmSchema.extend({
+    api: z.literal("mock"),
+    auth: z.object({
+      apiKey: z.string().min(1),
+      delayMs: z.number().int().min(0).max(60_000).default(200),
+    }),
+  }),
 ]);
 
 export type ArmRequest = z.infer<typeof ArmRequestSchema>;
