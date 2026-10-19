@@ -8,7 +8,7 @@ set -euo pipefail
 
 SERVICE=${1:-}
 case "$SERVICE" in
-  enclave|entropy) EIF=idos-$SERVICE.eif ;;
+  enclave|entropy|proxy) EIF=idos-$SERVICE.eif ;;
   facesign)        EIF=idos-facetec.eif ;;   # matches facesign-service/scripts/enclave-run.ash
   *) echo "Usage: $0 <enclave|entropy|facesign> [staging|production] [run-id]" >&2; exit 1 ;;
 esac
