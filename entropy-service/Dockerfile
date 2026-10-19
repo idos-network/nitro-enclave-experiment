@@ -102,4 +102,4 @@ ENV S3_SECRETS_BUCKET=$S3_SECRETS_BUCKET S3_SECRETS_REGION=$S3_SECRETS_REGION
 EXPOSE 8000
 
 # Run the application
-CMD ["/bin/bash", "/app/scripts/run.ash"]
+CMD ["/bin/bash", "/app/shared/run.ash", "entropy"]
