@@ -1,30 +1,13 @@
 import { readFileSync } from "node:fs";
-import cors from "cors";
-import express, { type Express } from "express";
-import promBundle from "express-prom-bundle";
+import express from "express";
 import { rateLimit } from "express-rate-limit";
-import helmet from "helmet";
 import jwt from "jsonwebtoken";
-import swaggerUi from "swagger-ui-express";
-import YAML from "yaml";
 import { JWT_PUBLIC_KEY } from "./env.ts";
 import { consumeTokenId, fetchOrCreateFaceSignEntropy, releaseTokenId } from "./providers/db.ts";
-import loggerMiddleware from "./providers/logger.ts";
+import { createApp } from "./shared/node/app.ts";
 import { writeLog } from "./utils/logger-context.ts";
-import { runWithRequestContext } from "./utils/request-context.ts";
 
-const app: Express = express();
-
-app.use((req, res, next) => {
-  const requestId = req.header("x-request-id") || crypto.randomUUID();
-  res.setHeader("x-request-id", requestId);
-  runWithRequestContext({ requestId, ...(req.ip !== undefined ? { remoteIp: req.ip } : {}) }, next);
-});
-app.use(loggerMiddleware);
-app.set("trust proxy", "loopback");
-app.use(promBundle({ includeMethod: true }));
-app.use(helmet());
-app.use(cors());
+const app = createApp("Entropy Service");
 app.use(express.json({ limit: "5mb" }));
 
 const limiter = rateLimit({
@@ -36,28 +19,6 @@ const limiter = rateLimit({
   skip: (req) => req.url.startsWith("/metrics") || req.url.startsWith("/health"),
 });
 app.use(limiter);
-
-app.get("/", (_req, res) => {
-  res.status(200).json({ message: "Entropy Service is running" });
-});
-
-app.get("/health", async (_req, res) => {
-  res.status(200).json({ status: "ok" });
-});
-
-if (process.env.NODE_ENV !== "test") {
-  const file = readFileSync("./openapi.yaml", "utf8");
-  const swaggerDocument = YAML.parse(file);
-
-  app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
-  app.get("/openapi.json", (_req, res) => {
-    res.json(swaggerDocument);
-  });
-  app.get("/openapi.yaml", (_req, res) => {
-    res.type("text/yaml");
-    res.send(file);
-  });
-}
 
 app.post("/facesign/entropy", async (req, res) => {
   // Validate token from body

@@ -6,3 +6,4 @@ enclave-service/node_modules/
 coverage/
 brag-output/
 proxy-service/node_modules/
+*-service/shared/

@@ -1,12 +1,4 @@
-import { defaultProvider } from "@aws-sdk/credential-provider-node";
-import {
-  Binary,
-  ClientEncryption,
-  type Db,
-  MongoClient,
-  MongoServerError,
-  type UUID,
-} from "mongodb";
+import { type Db, MongoServerError } from "mongodb";
 import {
   DB_COLLECTION_NAME,
   DB_NAME,
@@ -14,125 +6,16 @@ import {
   FACETEC_SESSION_COLLECTION,
   MONGO_URI,
 } from "../env.ts";
+import { createEncryptedClient } from "../shared/node/db.ts";
 
 let db: Db | null = null;
 let facetecDataDb: Db | null = null;
 
-// FLE configuration
-const KEY_DB = "facetec-server-encryption";
-const KEY_COLLECTION = "__keyVault";
-const FLE_KEY_ALIAS = "fle-images-encryption";
-const keyVaultNamespace = `${KEY_DB}.${KEY_COLLECTION}`;
-
-const client = new MongoClient(MONGO_URI, {
-  maxPoolSize: 40,
-  wtimeoutMS: 2500,
+const { client, codec } = createEncryptedClient(MONGO_URI, {
+  keyDb: "facetec-server-encryption",
+  // Created by the FaceTec server, never by this service
+  keyAlias: "fle-images-encryption",
 });
-
-const credentialsProvider = defaultProvider();
-
-// One ClientEncryption for the whole process. Each instance owns its own
-// libmongocrypt handle, and therefore its own data-encryption-key cache
-// (keyExpirationMS, 60s by default), so building one per request meant a KMS
-// round trip for every encrypt/decrypt. Under load that saturates the socat
-// vsock proxy and fails as "MongoCryptError: KMS request failed" / ECONNRESET.
-//
-// An empty `aws: {}` opts into driver-side credential fetching through
-// credentialProviders, so this long-lived instance refreshes credentials
-// instead of pinning whichever ones existed at startup.
-let clientEncryption: ClientEncryption | null = null;
-
-// Every DEK cache miss costs a KMS decrypt over a fresh TLS connection through
-// the socat vsock proxy. An hour instead of the 60s default keeps the key in
-// enclave memory longer - inside the trust boundary either way - in exchange
-// for ~60x fewer KMS round trips.
-const KEY_EXPIRATION_MS = 60 * 60 * 1000;
-
-function getClientEncryption(): ClientEncryption {
-  clientEncryption ??= new ClientEncryption(client, {
-    keyVaultNamespace,
-    kmsProviders: { aws: {} },
-    credentialProviders: { aws: credentialsProvider },
-    keyExpirationMS: KEY_EXPIRATION_MS,
-  });
-
-  return clientEncryption;
-}
-
-/**
- * Find or create the data encryption key
- */
-async function ensureKey(): Promise<UUID> {
-  await client.connect();
-
-  // Check if collection exists
-  const collections = await client.db(KEY_DB).listCollections({}, { nameOnly: true }).toArray();
-
-  const collectionExists = collections.some((c) => c.name === KEY_COLLECTION);
-
-  if (!collectionExists) {
-    throw new Error("Key collection does not exists, run FaceTec server first!");
-  }
-
-  const clientEncryption = await getClientEncryption();
-  const existingKey = await clientEncryption.getKeyByAltName(FLE_KEY_ALIAS);
-
-  if (!existingKey) {
-    throw new Error("Key does not exists, run FaceTec server first!");
-  }
-
-  return existingKey._id;
-}
-
-// ensureKey() costs a listCollections + getKeyByAltName round trip, and the key
-// never changes once created, so resolve it once per process rather than per
-// request. Cleared on failure so a transient error isn't cached forever.
-let dataKeyIdPromise: Promise<UUID> | null = null;
-
-function ensureKeyOnce(): Promise<UUID> {
-  dataKeyIdPromise ??= ensureKey().catch((error) => {
-    dataKeyIdPromise = null;
-    throw error;
-  });
-
-  return dataKeyIdPromise;
-}
-
-type ExtendedJsonBinary = { $binary?: { base64?: string; subType: string } };
-type SerializedBinary = { type?: number; data?: number[] };
-
-// Mongo returns the ciphertext in whatever shape it was written in: a driver
-// Binary, a BSON Binary that lost its class over a JSON round trip, a raw
-// Buffer, base64, or extended JSON. Normalizing here means every caller can
-// hand over the field it read from the document as-is.
-function toBinary(value: unknown): Binary {
-  if (value instanceof Binary) {
-    return value;
-  }
-
-  const serialized = value as SerializedBinary | null;
-  if (serialized?.type === 6 && Array.isArray(serialized.data)) {
-    return new Binary(Buffer.from(serialized.data), 6);
-  }
-
-  if (Buffer.isBuffer(value)) {
-    return new Binary(value, 6);
-  }
-
-  if (typeof value === "string") {
-    return new Binary(Buffer.from(value, "base64"), 6);
-  }
-
-  const extendedJson = (value as ExtendedJsonBinary | null)?.$binary;
-  if (extendedJson?.base64) {
-    return new Binary(
-      Buffer.from(extendedJson.base64, "base64"),
-      Number.parseInt(extendedJson.subType, 16),
-    );
-  }
-
-  throw new Error("Invalid encrypted payload format");
-}
 
 export async function connectDB() {
   if (!db) {
@@ -149,22 +32,7 @@ export async function connectDB() {
     facetecDataDb = client.db(FACETEC_DB_NAME);
   }
 
-  const dataKeyId = await ensureKeyOnce();
-  const clientEncryption = getClientEncryption();
-
-  return {
-    db,
-    facetecDataDb,
-    encrypt: async (value: string | Buffer | Uint8Array) => {
-      return clientEncryption.encrypt(value, {
-        keyId: dataKeyId,
-        algorithm: "AEAD_AES_256_CBC_HMAC_SHA_512-Random",
-      });
-    },
-    decrypt: async <T>(value: unknown): Promise<T> => {
-      return clientEncryption.decrypt<T>(toBinary(value));
-    },
-  };
+  return { db, facetecDataDb, ...(await codec()) };
 }
 
 export async function getOldestFaceSignUserId(identifiers: string[]): Promise<string> {

@@ -1,10 +1,4 @@
-import fs from "node:fs";
-import cors from "cors";
-import express, { type Express, type NextFunction, type Request, type Response } from "express";
-import promBundle from "express-prom-bundle";
-import helmet from "helmet";
-import swaggerUi from "swagger-ui-express";
-import YAML from "yaml";
+import express, { type Response } from "express";
 
 import { sessionKeyMiddleware } from "./middleware/session-key.ts";
 import { validatorMiddleware } from "./middleware/validator.ts";
@@ -12,8 +6,8 @@ import { deleteSession, getSession } from "./providers/db.ts";
 import { decrypt, encrypt } from "./providers/encryption.ts";
 import { getEncryptionKeyPair } from "./providers/keys.ts";
 import { getPublicKeyJWK } from "./providers/kms.ts";
-import loggerMiddleware from "./providers/logger.ts";
 import { createSession } from "./providers/session.ts";
+import { createApp, errorHandler } from "./shared/node/app.ts";
 import {
   type CommonRequest,
   CommonRequestSchema,
@@ -28,44 +22,9 @@ import {
 } from "./utils/dto.ts";
 import { writeLog } from "./utils/logger-context.ts";
 import { splitPayload } from "./utils/payload.ts";
-import { runWithRequestContext } from "./utils/request-context.ts";
 
-const app: Express = express();
-
-app.use((req, res, next) => {
-  const requestId = req.header("x-request-id") || crypto.randomUUID();
-  res.setHeader("x-request-id", requestId);
-  runWithRequestContext({ requestId, ...(req.ip !== undefined ? { remoteIp: req.ip } : {}) }, next);
-});
-
-app.use(loggerMiddleware);
-app.set("trust proxy", "loopback");
-app.use(promBundle({ includeMethod: true }));
-app.use(helmet());
-app.use(cors());
+const app = createApp("Enclave Service");
 app.use(express.json({ limit: "32mb" }));
-
-app.get("/", (_req, res) => {
-  res.status(200).json({ message: "Enclave Service is running" });
-});
-
-app.get("/health", async (_req, res) => {
-  res.status(200).json({ status: "ok" });
-});
-
-if (process.env.NODE_ENV !== "test") {
-  const file = fs.readFileSync("./openapi.yaml", "utf8");
-  const swaggerDocument = YAML.parse(file);
-
-  app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
-  app.get("/openapi.json", (_req, res) => {
-    res.json(swaggerDocument);
-  });
-  app.get("/openapi.yaml", (_req, res) => {
-    res.type("text/yaml");
-    res.send(file);
-  });
-}
 
 app.get("/.well-known/jwks.json", async (_req, res) => {
   const key = await getPublicKeyJWK();
@@ -174,10 +133,6 @@ app.post(
   },
 );
 
-app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-  // Log everything, but never leak internals (AWS/KMS/Mongo messages) to the client.
-  writeLog("error", { error: err instanceof Error ? err.message : String(err) });
-  return res.status(500).json({ error: "Internal server error" });
-});
+app.use(errorHandler);
 
 export default app;

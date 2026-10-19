@@ -69,9 +69,6 @@ COPY . .
 RUN pnpm install --prod --frozen-lockfile --package-import-method=copy \
     && rm -rf "$(pnpm store path)"
 
-# Copy source files & scripts
-COPY scripts/shared ./scripts/
-
 # DocumentDB's TLS cert is signed by the Amazon RDS CA, not a public one.
 # MONGO_URI points at it with tlsCAFile=/etc/ssl/rds-global-bundle.pem
 ARG RDS_CA_BUNDLE_SHA256=90a6f1a7978a1b1b096dca6c57511ca48d3b8cf052f8e704baf358f34ea2f21b
