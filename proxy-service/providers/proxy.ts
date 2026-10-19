@@ -1,3 +1,4 @@
+import { setTimeout as sleep } from "node:timers/promises";
 import type { Request } from "express";
 import { match } from "path-to-regexp";
 import { UPSTREAM_TIMEOUT_MS } from "../env.ts";
@@ -51,6 +52,16 @@ export async function forward(
   const authHeaders = await authorize(armed, { method: req.method, url, body });
   for (const [name, value] of Object.entries(authHeaders)) {
     headers.set(name, value);
+  }
+
+  if (armed.api === "mock") {
+    await sleep(armed.auth.delayMs);
+    const echo = { method: req.method, path: `${url.pathname}${url.search}`, ...authHeaders };
+    return {
+      status: 200,
+      contentType: "application/json",
+      body: Buffer.from(JSON.stringify(echo)),
+    };
   }
 
   const response = await fetch(url.toString(), {
