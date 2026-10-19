@@ -10,7 +10,9 @@ Pre-commit runs `pnpm types`, `pnpm format`, and `pnpm test` in each `*-service`
 
 ## Shared code
 
-`shared/` holds what every service bootstraps the same way: the `*.ash` enclave boot helpers and
+`shared/` holds what every service bootstraps the same way: the `*.ash` enclave boot helpers,
+`shared/run.ash <service>` (the whole enclave boot for enclave/entropy/proxy; a service adds its own
+steps in `scripts/setup.ash`, facesign keeps its own `scripts/run.ash`) and
 `shared/node/` (express app setup, pino logging, request context, graceful shutdown). Each service
 imports it from `./shared/...`, but that directory is gitignored and does not exist in a fresh clone:
 
