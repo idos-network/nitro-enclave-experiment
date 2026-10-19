@@ -4,3 +4,4 @@ facesign-service/node_modules/
 entropy-service/node_modules/
 enclave-service/node_modules/
 coverage/
+proxy-service/node_modules/
