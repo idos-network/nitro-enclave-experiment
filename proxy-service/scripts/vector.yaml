@@ -1,0 +1,169 @@
+data_dir: /mnt/encrypted/vector
+
+sources:
+  service_logs:
+    type: file
+    include:
+      - /mnt/encrypted/logs/*/current
+      # keep reading the tail of a file s6-log has just rotated away. @* not
+      # @*.s: an enclave restart kills s6-log mid-rotation and leaves that
+      # archive named .u forever, which @*.s never matches.
+      - /mnt/encrypted/logs/*/@*
+    exclude:
+      # vector's own logs, or it would re-ingest everything it prints
+      - /mnt/encrypted/logs/vector/*
+    read_from: beginning
+    # checksum, not device_and_inode: express rotates n10 s10000000, so ext4
+    # recycles the inode of a deleted archive into the new `current`, which
+    # then inherits that archive's ~10MB checkpoint and vector resumes past
+    # EOF reading nothing. Checksums key on content, which is exactly what
+    # s6-log's rename-based rotation preserves - current -> @x.u -> @x.s stays
+    # one file to vector, so the rename does not re-ingest either.
+    # Default 1 line suffices: s6-log `t` (shared/s6.ash) makes it unique.
+    fingerprint:
+      strategy: checksum
+    # default is 100KiB and pino lines carrying a req/res or a ZodError go
+    # past it - vector discards the whole line, so express looked silent
+    max_line_bytes: 4194304
+
+  # Exposes vector_component_discarded_events_total and
+  # vector_component_errors_total so log loss is visible in Victoria Metrics
+  # instead of silent. Counters only exist once they first increment.
+  internal_metrics:
+    type: internal_metrics
+
+  express_metrics:
+    type: prometheus_scrape
+    endpoints:
+      - http://127.0.0.1:7000/metrics
+    scrape_interval_secs: 15
+
+  caddy_metrics:
+    type: prometheus_scrape
+    endpoints:
+      - https://127.0.0.1:9000/metrics
+    scrape_interval_secs: 15
+
+  node_metrics:
+    type: prometheus_scrape
+    endpoints:
+      - http://127.0.0.1:9100/metrics
+    scrape_interval_secs: 15
+
+transforms:
+  logs:
+    type: remap
+    inputs:
+      - service_logs
+    source: |
+      # /mnt/encrypted/logs/<component>/current -> the s6 service name is the label
+      component = "unknown"
+      dir, dir_err = parse_regex(string!(.file), r'/logs/(?P<component>[^/]+)/')
+      if dir_err == null {
+        component = dir.component
+      }
+      del(.file)
+      del(.host)
+
+      # drop the TAI64N stamp s6-log `t` prepends (shared/s6.ash)
+      .message = replace(string!(.message), r'^@[0-9a-f]{24} ', "")
+
+      parsed, err = parse_json(.message)
+      if err == null && is_object(parsed) {
+        . = merge(., object!(parsed))
+        del(.message)
+      }
+      # non-JSON lines keep .message verbatim rather than being dropped
+
+      .component = component
+      .application = "proxy"
+      .environment = get_env_var("OTEL_ENVIRONMENT") ?? "unknown"
+
+  express_metric_labels:
+    type: remap
+    inputs:
+      - express_metrics
+    source: |
+      .tags.component = "express"
+
+  caddy_metric_labels:
+    type: remap
+    inputs:
+      - caddy_metrics
+    source: |
+      .tags.component = "caddy"
+
+  node_metric_labels:
+    type: remap
+    inputs:
+      - node_metrics
+    source: |
+      .tags.component = "node"
+
+  internal_metric_labels:
+    type: remap
+    inputs:
+      - internal_metrics
+    source: |
+      .tags.component = "vector"
+
+  global_labels:
+    type: remap
+    inputs:
+      - express_metric_labels
+      - caddy_metric_labels
+      - node_metric_labels
+      - internal_metric_labels
+    source: |
+      .tags.application = "proxy"
+      .tags.environment = get_env_var("OTEL_ENVIRONMENT") ?? "unknown"
+      .tags.job = "proxy-vector-push"
+
+  metrics_cardinality:
+    type: tag_cardinality_limit
+    inputs:
+      - global_labels
+    mode: exact
+
+sinks:
+  prometheus:
+    # Read this why we are using tag_cardinality_limits
+    # https://vector.dev/docs/reference/configuration/sinks/prometheus_remote_write/
+    type: prometheus_remote_write
+    inputs:
+      - metrics_cardinality
+    endpoint: "${OTEL_BASE_URL}/api/v1/write"
+    healthcheck:
+      # Our Victoria Metrics now did not expose health endpoint
+      enabled: false
+    auth:
+      strategy: basic
+      user: "${OTEL_USER}"
+      password: "${OTEL_PASSWORD}"
+
+  loki:
+    type: loki
+    inputs:
+      - logs
+    endpoint: "${OTEL_BASE_URL}"
+    healthcheck:
+      # Our loki now did not expose health endpoint
+      enabled: false
+    auth:
+      strategy: basic
+      user: "${OTEL_USER}"
+      password: "${OTEL_PASSWORD}"
+    # Default is `drop`, which silently discards any event whose timestamp is
+    # behind the stream head. Requires Loki >= 2.4 (unordered writes).
+    out_of_order_action: accept
+    buffer:
+      type: memory
+      max_events: 10000
+      when_full: block
+    encoding:
+      codec: json
+    labels:
+      application: "{{ application }}"
+      component: "{{ component }}"
+      environment: "{{ environment }}"
+

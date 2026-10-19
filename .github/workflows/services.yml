@@ -32,6 +32,8 @@ jobs:
             name: FaceSign Service
           - dir: enclave-service
             name: Enclave Service
+          - dir: proxy-service
+            name: Proxy Service
 
     name: ${{ matrix.service.name }}
 
