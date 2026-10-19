@@ -1,59 +1,18 @@
-import fs from "node:fs";
-import cors from "cors";
-import express, { type Express, type NextFunction, type Request, type Response } from "express";
-import promBundle from "express-prom-bundle";
-import helmet from "helmet";
-import swaggerUi from "swagger-ui-express";
-import YAML from "yaml";
+import express, { type Response } from "express";
 
 import { armTokenMiddleware } from "./middleware/arm-token.ts";
 import { hostAuthMiddleware } from "./middleware/host-auth.ts";
 import { validatorMiddleware } from "./middleware/validator.ts";
 import { type Armed, deleteArmed, storeArmed } from "./providers/db.ts";
-import loggerMiddleware from "./providers/logger.ts";
 import { forward, isAllowed, resolveUpstreamUrl } from "./providers/proxy.ts";
+import { createApp, errorHandler } from "./shared/node/app.ts";
 import { type ArmRequest, ArmRequestSchema } from "./utils/dto.ts";
 import { writeLog } from "./utils/logger-context.ts";
-import { runWithRequestContext } from "./utils/request-context.ts";
 
-const app: Express = express();
-
-app.use((req, res, next) => {
-  const requestId = req.header("x-request-id") || crypto.randomUUID();
-  res.setHeader("x-request-id", requestId);
-  runWithRequestContext({ requestId, ...(req.ip !== undefined ? { remoteIp: req.ip } : {}) }, next);
-});
-
-app.use(loggerMiddleware);
-app.set("trust proxy", "loopback");
-app.use(promBundle({ includeMethod: true }));
-app.use(helmet());
-app.use(cors());
+const app = createApp("Proxy Service");
 // Proxied bodies are forwarded byte-for-byte (and hashed for the host signature), so keep them raw.
 app.use("/proxy", express.raw({ type: () => true, limit: "32mb" }));
 app.use(express.json({ limit: "32mb" }));
-
-app.get("/", (_req, res) => {
-  res.status(200).json({ message: "Proxy Service is running" });
-});
-
-app.get("/health", async (_req, res) => {
-  res.status(200).json({ status: "ok" });
-});
-
-if (process.env.NODE_ENV !== "test") {
-  const file = fs.readFileSync("./openapi.yaml", "utf8");
-  const swaggerDocument = YAML.parse(file);
-
-  app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
-  app.get("/openapi.json", (_req, res) => {
-    res.json(swaggerDocument);
-  });
-  app.get("/openapi.yaml", (_req, res) => {
-    res.type("text/yaml");
-    res.send(file);
-  });
-}
 
 app.post(
   "/arm",
@@ -111,10 +70,6 @@ app.all(
   },
 );
 
-app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-  // Log everything, but never leak internals (AWS/KMS/Mongo messages) to the client.
-  writeLog("error", { error: err instanceof Error ? err.message : String(err) });
-  return res.status(500).json({ error: "Internal server error" });
-});
+app.use(errorHandler);
 
 export default app;

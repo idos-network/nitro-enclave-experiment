@@ -211,6 +211,6 @@ describe("decrypt", () => {
   it("rejects a shape it cannot read", async () => {
     const { decrypt } = await connectDB();
 
-    await expect(decrypt({ nope: true })).rejects.toThrow("Invalid entropy format");
+    await expect(decrypt({ nope: true })).rejects.toThrow("Invalid encrypted payload format");
   });
 });

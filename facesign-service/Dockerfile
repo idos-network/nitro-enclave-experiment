@@ -223,7 +223,7 @@ RUN curl -fsSL "https://github.com/prometheus/node_exporter/releases/download/v$
 
 # Support boot.ash scripts
 COPY ./scripts/run.ash ./
-COPY ./scripts/shared ./shared/
+COPY ./shared ./shared/
 
 # Copy vector binary & config
 COPY --from=vector /usr/local/bin/vector /usr/bin/vector

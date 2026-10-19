@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import { pinoHttp } from "pino-http";
-import { loggerStorage } from "../utils/logger-context.ts";
-import { getRequestId } from "../utils/request-context.ts";
+import { loggerStorage } from "./logger-context.ts";
+import { getRequestId } from "./request-context.ts";
 
 const sensitiveHeaders = [
   "authorization",

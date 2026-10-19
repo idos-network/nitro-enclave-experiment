@@ -3,6 +3,8 @@
 # Git already starts hooks with cwd at the repo root.
 set -euo pipefail
 
+./scripts/sync-shared.sh
+
 for dir in *-service; do
 	[[ -f "$dir/package.json" ]] || continue
 	echo "==> $dir: types"
