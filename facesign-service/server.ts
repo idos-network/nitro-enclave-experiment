@@ -1,20 +1,13 @@
-import crypto from "node:crypto";
 import { readFileSync } from "node:fs";
-import cors from "cors";
 import express, {
-  type Express,
   type NextFunction,
   type Request,
   type RequestHandler,
   type Response,
   type Router,
 } from "express";
-import promBundle from "express-prom-bundle";
 import { rateLimit } from "express-rate-limit";
-import helmet from "helmet";
 import cron from "node-cron";
-import swaggerUi from "swagger-ui-express";
-import YAML from "yaml";
 
 // Configurations and providers
 import { HOST, KEY_1_MULTIBASE_PUBLIC_PATH } from "./env.ts";
@@ -29,7 +22,6 @@ import {
   InternalServerError,
   SessionStartError,
 } from "./providers/errors.ts";
-import loggerMiddleware from "./providers/logger.ts";
 // FaceSign Routes
 import { confirmation as faceSignConfirmation, login as faceSignLogin } from "./routes/facesign.ts";
 // idOS Relay Routes
@@ -38,21 +30,13 @@ import match from "./routes/match.ts";
 import matchIdDoc from "./routes/match-id-doc.ts";
 import selfie from "./routes/selfie.ts";
 import uniqueness from "./routes/uniqueness.ts";
+import { createApp } from "./shared/node/app.ts";
 import { writeLog } from "./utils/logger-context.ts";
-import { runWithRequestContext } from "./utils/request-context.ts";
 
-const app: Express = express();
-
-app.use((req, res, next) => {
-  const requestId = req.header("x-request-id") || crypto.randomUUID();
-  res.setHeader("x-request-id", requestId);
-  runWithRequestContext({ requestId, ...(req.ip !== undefined ? { remoteIp: req.ip } : {}) }, next);
+const app = createApp("FaceSign Service", async (_req, res) => {
+  const status = await getStatus();
+  res.status(200).json({ status: "ok", version: status.serverInfo.facetecServerWebserviceVersion });
 });
-app.use(loggerMiddleware);
-app.set("trust proxy", "loopback");
-app.use(promBundle({ includeMethod: true }));
-app.use(helmet());
-app.use(cors());
 app.use(express.json({ limit: "25mb" }));
 
 const limiter = rateLimit({
@@ -67,29 +51,6 @@ const limiter = rateLimit({
     req.url.startsWith("/metrics"), // this is used to get the metrics of the service
 });
 app.use(limiter);
-
-app.get("/", (_req, res) => {
-  res.json({ message: "FaceSign Service is running" });
-});
-
-app.get("/health", async (_req, res) => {
-  const status = await getStatus();
-  res.status(200).json({ status: "ok", version: status.serverInfo.facetecServerWebserviceVersion });
-});
-
-if (process.env.NODE_ENV !== "test") {
-  const file = readFileSync("./openapi.yaml", "utf8");
-  const swaggerDocument = YAML.parse(file);
-
-  app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
-  app.get("/openapi.json", (_req, res) => {
-    res.json(swaggerDocument);
-  });
-  app.get("/openapi.yaml", (_req, res) => {
-    res.type("text/yaml");
-    res.send(file);
-  });
-}
 
 export const asyncHandler = (
   // biome-ignore lint/suspicious/noExplicitAny: any is needed here

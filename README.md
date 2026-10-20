@@ -8,6 +8,22 @@ bash scripts/install-git-hooks.sh
 
 Pre-commit runs `pnpm types`, `pnpm format`, and `pnpm test` in each `*-service`, then `npx cspell`.
 
+## Shared code
+
+`shared/` holds what every service bootstraps the same way: the `*.ash` enclave boot helpers,
+`shared/run.ash <service>` (the whole enclave boot for enclave/entropy/proxy; a service adds its own
+steps in `scripts/setup.ash`, facesign keeps its own `scripts/run.ash`) and
+`shared/node/` (express app setup, pino logging, request context, graceful shutdown). Each service
+imports it from `./shared/...`, but that directory is gitignored and does not exist in a fresh clone:
+
+```bash
+scripts/sync-shared.sh
+```
+
+copies `shared/` into every `*-service/shared/`. Run it after editing anything in `shared/`; the
+pre-commit hook, `services.yml` and the EIF workflows do the same, and `sync_*.sh` copies it to the
+host so it ends up in the Docker build context (`COPY . .`).
+
 ## Enclave EIF from GitHub Actions
 
 [`enclave-eif-staging.yml`](.github/workflows/enclave-eif-staging.yml) builds the

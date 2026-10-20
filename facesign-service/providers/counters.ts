@@ -1,5 +1,4 @@
 import promClient from "@prometheus-io/client";
-import { ACTION_TYPES } from "../utils/actions.ts";
 
 export const sessionStarts = new promClient.Counter({
   name: "session_starts_total",
@@ -24,10 +23,4 @@ export const facetecApiErrors = new promClient.Counter({
 export const generalErrors = new promClient.Counter({
   name: "general_errors_total",
   help: "Total number of general errors",
-});
-
-export const actions = new promClient.Counter({
-  name: "actions_total",
-  help: "Total number of actions",
-  labelNames: ACTION_TYPES,
 });

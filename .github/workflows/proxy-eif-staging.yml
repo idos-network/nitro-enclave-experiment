@@ -27,9 +27,9 @@ jobs:
         with:
           persist-credentials: false
 
-      # Dockerfile does COPY scripts/shared; sync_enclave.sh does the same on the host
-      - name: Copy shared scripts into build context
-        run: cp -a shared proxy-service/scripts/
+      # Dockerfile does COPY . . and expects shared/ inside the context (scripts/sync-shared.sh locally)
+      - name: Copy shared into build context
+        run: cp -a shared proxy-service/
 
       - name: Build EIF with custom kernel
         id: eif

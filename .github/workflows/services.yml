@@ -5,10 +5,12 @@ on:
     branches: [master, main]
     paths:
       - "*-service/**"
+      - "shared/**"
       - ".github/workflows/services.yml"
   pull_request:
     paths:
       - "*-service/**"
+      - "shared/**"
       - ".github/workflows/services.yml"
   workflow_dispatch:
 
@@ -41,6 +43,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+
+      - name: Copy shared into the service
+        run: cp -a shared ${{ matrix.service.dir }}/
 
       - name: Install pnpm
         uses: pnpm/action-setup@v6
