@@ -66,12 +66,7 @@ export async function verifyAudience(
       continue;
     }
 
-    const { recipientPublicKeyX } = payload;
-    if (typeof recipientPublicKeyX !== "string") {
-      throw new AudienceError('Audience JWT is missing the "recipientPublicKeyX" claim.');
-    }
-
-    return Buffer.from(recipientPublicKeyX, "base64url");
+    return recipientPublicKey(payload.recipientPublicKeyX);
   }
 
   if (unreachableRoots.length > 0) {
@@ -98,12 +93,23 @@ export function extractAudience(jwtChain: string): Buffer {
     throw new AudienceError("Audience jwtChain is not a valid compact JWS/JWT.");
   }
 
-  const { recipientPublicKeyX } = payload;
-  if (typeof recipientPublicKeyX !== "string") {
+  return recipientPublicKey(payload.recipientPublicKeyX);
+}
+
+// nacl.box needs exactly 32 bytes; reject here so a bad key is a 400, not a failure at response encryption.
+function recipientPublicKey(claim: unknown): Buffer {
+  if (typeof claim !== "string") {
     throw new AudienceError('Audience JWT is missing the "recipientPublicKeyX" claim.');
   }
 
-  return Buffer.from(recipientPublicKeyX, "base64url");
+  const key = Buffer.from(claim, "base64url");
+  if (key.length !== 32) {
+    throw new AudienceError(
+      'Audience JWT "recipientPublicKeyX" claim is not a 32-byte X25519 key.',
+    );
+  }
+
+  return key;
 }
 
 // Checked upfront: jose's "alg not allowed" is easy to misread as a signature problem.

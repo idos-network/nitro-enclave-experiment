@@ -28,8 +28,8 @@ if [[ "${FACETEC_SDK_BUCKET:-null}" == "null" ]]; then
 fi
 
 # Bucket region (may differ from instance region; KMS region comes from config.env AWS_REGION)
-S3_SECRETS_REGION=$(aws s3api get-bucket-location --bucket "$S3_SECRETS_BUCKET" --query "LocationConstraint || 'us-east-1'" --output text)
-FACETEC_SDK_REGION=$(aws s3api get-bucket-location --bucket "$FACETEC_SDK_BUCKET" --query "LocationConstraint || 'us-east-1'" --output text)
+S3_SECRETS_REGION=$(aws s3api get-bucket-location --bucket "$S3_SECRETS_BUCKET" --query "LocationConstraint || 'us-east-1'" --output text | sed 's/^EU$/eu-west-1/')
+FACETEC_SDK_REGION=$(aws s3api get-bucket-location --bucket "$FACETEC_SDK_BUCKET" --query "LocationConstraint || 'us-east-1'" --output text | sed 's/^EU$/eu-west-1/')
 
 # Build origin Docker image
 docker build \
