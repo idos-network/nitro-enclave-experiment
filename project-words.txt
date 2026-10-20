@@ -30,9 +30,11 @@ genkey
 genpkey
 groff
 healthcheck
+HMAC
 idos
 idphoto
 IMDS
+kalshi
 keygen
 keyid
 keypair
@@ -76,12 +78,14 @@ sessionless
 shellcheck
 socat
 spellcheck
+sumsub
 svscan
 timberio
 topk
 unflushed
 unparseable
 unstub
+uuidgen
 vite
 vitest
 vsock

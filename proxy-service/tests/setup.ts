@@ -1,0 +1,5 @@
+process.env.NODE_ENV ??= "test";
+process.env.MONGO_URI ??= "mongodb://localhost:27017";
+process.env.AWS_REGION ??= "eu-central-1";
+process.env.AWS_KMS_FLE_ARN ??= "arn:aws:kms:eu-central-1:000000000000:key/fle-test";
+process.env.ARM_TOKENS ??= "arm-token-one, arm-token-two";
