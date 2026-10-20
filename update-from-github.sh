@@ -26,6 +26,7 @@ REPO=idos-network/nitro-enclave-experiment
 WORKFLOW=$SERVICE-eif-$ENV.yml   # .github/workflows/<service>-eif-<env>.yml
 INFO=${EIF%.eif}-info.json
 DEST=${NITRO_CLI_ARTIFACTS:-/var/lib/nitro_enclaves}
+export NITRO_CLI_ARTIFACTS=$DEST   # enclave-run.ash reads it under set -u
 
 RUN=${3:-$(gh run list -R "$REPO" --workflow "$WORKFLOW" --status success -L1 --json databaseId -q '.[0].databaseId')}
 [[ -n "$RUN" ]] || { echo "No successful run of $WORKFLOW found" >&2; exit 1; }
@@ -49,8 +50,9 @@ if [[ "$EXPECTED" != "$ACTUAL" ]]; then
   exit 1
 fi
 
-echo "Terminating running enclaves"
-sudo nitro-cli terminate-enclave --all >/dev/null || true   # fails when nothing is running
+# run-enclave without --enclave-name names the enclave after the EIF file.
+echo "Terminating ${EIF%.eif} enclave"
+sudo nitro-cli terminate-enclave --enclave-name "${EIF%.eif}" >/dev/null || true   # fails when it is not running
 
 sudo install -m 0644 "$SRC/$EIF" "$SRC/$INFO" "$DEST/"
 
