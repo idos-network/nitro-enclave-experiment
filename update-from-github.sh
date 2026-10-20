@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Installs a service EIF built by GitHub Actions into $NITRO_CLI_ARTIFACTS, prints its
 # sha256 + PCRs to compare with the run's job summary, then restarts the enclave with it.
-# Usage: ./update-from-github.sh <enclave|entropy|facesign> [run-id]   (default: latest successful run)
+# Usage: ./update-from-github.sh <enclave|entropy|facesign> [staging|production] [run-id]
+#        (defaults: staging, latest successful run)
 # Needs: gh logged in with a PAT that has Actions: Read on the repo.
 set -euo pipefail
 
@@ -9,15 +10,21 @@ SERVICE=${1:-}
 case "$SERVICE" in
   enclave|entropy) EIF=idos-$SERVICE.eif ;;
   facesign)        EIF=idos-facetec.eif ;;   # matches facesign-service/scripts/enclave-run.ash
-  *) echo "Usage: $0 <enclave|entropy|facesign> [run-id]" >&2; exit 1 ;;
+  *) echo "Usage: $0 <enclave|entropy|facesign> [staging|production] [run-id]" >&2; exit 1 ;;
+esac
+
+ENV=${2:-staging}
+case "$ENV" in
+  staging|production) ;;
+  *) echo "Usage: $0 <enclave|entropy|facesign> [staging|production] [run-id]" >&2; exit 1 ;;
 esac
 
 REPO=idos-network/nitro-enclave-experiment
-WORKFLOW=$SERVICE-eif-staging.yml   # .github/workflows/<service>-eif-staging.yml
+WORKFLOW=$SERVICE-eif-$ENV.yml   # .github/workflows/<service>-eif-<env>.yml
 INFO=${EIF%.eif}-info.json
 DEST=${NITRO_CLI_ARTIFACTS:-/var/lib/nitro_enclaves}
 
-RUN=${2:-$(gh run list -R "$REPO" --workflow "$WORKFLOW" --status success -L1 --json databaseId -q '.[0].databaseId')}
+RUN=${3:-$(gh run list -R "$REPO" --workflow "$WORKFLOW" --status success -L1 --json databaseId -q '.[0].databaseId')}
 [[ -n "$RUN" ]] || { echo "No successful run of $WORKFLOW found" >&2; exit 1; }
 
 TMP=$(mktemp -d)
