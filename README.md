@@ -32,13 +32,14 @@ gh auth login --with-token   # paste the token
 Then, on the host (the `sync_*.sh` scripts copy it to `~/`):
 
 ```bash
-./update-from-github.sh enclave            # latest successful run
-./update-from-github.sh enclave 123456789  # a specific run id from the run URL
+./update-from-github.sh enclave                       # latest successful staging run
+./update-from-github.sh enclave production            # latest successful production run
+./update-from-github.sh enclave staging 123456789     # a specific run id from the run URL
 ```
 
-The first argument is `enclave`, `entropy` or `facesign`; it picks the workflow
-`.github/workflows/<service>-eif-staging.yml` and the EIF name the service's
-`enclave-run.ash` expects. The script downloads the artifact, checks that `describe-eif`
+The first argument is `enclave`, `entropy` or `facesign`, the second `staging` (default)
+or `production`; together they pick the workflow `.github/workflows/<service>-eif-<env>.yml`
+and the EIF name the service's `enclave-run.ash` expects. The script downloads the artifact, checks that `describe-eif`
 of the downloaded file gives the same PCRs as the info JSON from GHA, installs both into
 `$NITRO_CLI_ARTIFACTS`, prints the sha256 + PCRs to compare with the job summary,
 terminates any running enclave and starts the new one via the service's
