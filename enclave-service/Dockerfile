@@ -71,7 +71,7 @@ COPY scripts/shared ./scripts/
 
 # DocumentDB's TLS cert is signed by the Amazon RDS CA, not a public one.
 # MONGO_URI points at it with tlsCAFile=/etc/ssl/rds-global-bundle.pem
-ARG RDS_CA_BUNDLE_SHA256=fe45bbebf92ad3e27a583bbb2ddd1553c521ed4d49af5514dc0a40372ea5395c
+ARG RDS_CA_BUNDLE_SHA256=90a6f1a7978a1b1b096dca6c57511ca48d3b8cf052f8e704baf358f34ea2f21b
 RUN curl -fsSL "https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem" -o /etc/ssl/rds-global-bundle.pem \
     && echo "${RDS_CA_BUNDLE_SHA256}  /etc/ssl/rds-global-bundle.pem" | sha256sum -c -
 # Node ignores the system store; trust the bundle even if MONGO_URI lacks tlsCAFile

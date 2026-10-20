@@ -26,7 +26,7 @@ set +a
 
 if false; then #SSH#
   source "$SCRIPT_DIR/shared/ssh.ash"
-  setup_ssh "$SSH_PUBLIC_KEY"
+  setup_ssh "${SSH_PUBLIC_KEY:-}"
 fi
 
 # Add mongo host to /etc/hosts
