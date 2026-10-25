@@ -60,6 +60,13 @@ export function resetMocks() {
 /** The mocked upstream (vendor) `fetch`. */
 export const upstream = () => fetchMock;
 
+export function upstreamJson(status: number, body: unknown): globalThis.Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json; charset=utf-8" },
+  });
+}
+
 export async function arm(body: ArmRequest = armBody()): Promise<string> {
   const res = await request(app)
     .post("/arm")

@@ -50,7 +50,6 @@ describe("armed records in Mongo", () => {
     const { dataEnc, ...plaintext } = doc ?? {};
     expect(dataEnc).toBeDefined();
     expect(Object.keys(plaintext).sort()).toEqual(["armedId", "createdAt"]);
-    expect(JSON.stringify(plaintext)).not.toContain(armBody().baseUrl);
     expect(JSON.stringify(plaintext)).not.toContain("iron-secret");
   });
 
@@ -63,7 +62,7 @@ describe("armed records in Mongo", () => {
 
   it("rejects a blob copied from another record", async () => {
     await storeArmed("victim", armBody());
-    await storeArmed("attacker", armBody({ baseUrl: "https://evil.example.com" }));
+    await storeArmed("attacker", armBody({ environment: "production" }));
 
     const victim = h.docs.get("victim");
     const attacker = h.docs.get("attacker");

@@ -6,7 +6,7 @@ signing every request with its own Ed25519 key. API reference: [openapi.yaml](./
 (served at `/docs` when running).
 
 ```
-host ──(1) POST /arm  {hostPublicKey, api, auth, baseUrl, allow}──▶ enclave ──▶ Mongo (FLE blob)
+host ──(1) POST /arm  {hostPublicKey, api, environment, auth, allow}──▶ enclave ──▶ Mongo (FLE blob)
 host ◀─────────────────────── { id } ─────────────────────────────┘
 host ──(2) GET /proxy/{id}/api/identifications/123 + Bearer <JWS> ─▶ enclave ──(auth added)──▶ vendor
 host ◀───────────────── vendor status + body ──────────────────────┘
@@ -28,9 +28,12 @@ Keep the private key in the host, send only `hostPublicKey` to the enclave.
 ## 2. Arm
 
 `ARM_TOKENS` (comma separated) lives in the enclave `config.env`. One of them goes in the
-`Authorization` header. `baseUrl` is an origin only (no path). `allow[].path` uses Express 5 route
+`Authorization` header. `environment` (`production` | `sandbox`) picks the vendor origin baked into
+`providers/vendors/`; the host never supplies a URL. `allow[].path` uses Express 5 route
 syntax (`path-to-regexp`): `:id` matches one segment, `*rest` the remainder. It is matched against the
-pathname after URL normalization; the query string is not checked.
+pathname after URL normalization, case-sensitively; the query string is not checked. A pathname with an
+encoded `/`, `\` or `%` (`%2F`, `%5C`, `%25`) is rejected, since a vendor might decode it into segments the
+allowlist never saw.
 
 ```bash
 curl -sS -X POST "$PROXY_URL/arm" \
@@ -39,7 +42,7 @@ curl -sS -X POST "$PROXY_URL/arm" \
   -d '{
     "api": "iron",
     "hostPublicKey": "<hostPublicKey from step 1>",
-    "baseUrl": "https://api.iron.example.com",
+    "environment": "sandbox",
     "auth": { "apiKey": "<iron api key>" },
     "allow": [
       { "method": "GET",  "path": "/api/customers/:id" },

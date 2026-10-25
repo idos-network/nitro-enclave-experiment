@@ -20,6 +20,18 @@ describe("resolveUpstreamUrl", () => {
     expect(resolveUpstreamUrl("https://iron.example.com", "https://evil.example.com/x")).toBeNull();
   });
 
+  it("rejects encoded slashes, backslashes and percent signs in the path", () => {
+    for (const path of [
+      "/api/identifications/..%2F..%2Fx",
+      "/api/identifications/a%5Cb",
+      "/api/identifications/a%252Fb",
+    ]) {
+      expect(resolveUpstreamUrl("https://iron.example.com", path)).toBeNull();
+    }
+    // Still allowed in the query string, which the allowlist never inspects.
+    expect(resolveUpstreamUrl("https://iron.example.com", "/api/x?q=a%2Fb")).not.toBeNull();
+  });
+
   it("keeps userinfo-looking paths on the base origin", () => {
     expect(resolveUpstreamUrl("https://iron.example.com", "/@evil.example.com/x")?.origin).toBe(
       "https://iron.example.com",
@@ -32,7 +44,6 @@ describe("isAllowed (Express route syntax)", () => {
 
   it("matches a single path parameter", () => {
     expect(isAllowed(allow, "GET", "/api/identifications/abc")).toBe(true);
-    expect(isAllowed(allow, "GET", "/api/identifications/abc%2F123")).toBe(true);
     // Sumsub-style matrix segment
     expect(isAllowed(allow, "GET", "/api/identifications/-;externalUserId=u-1")).toBe(true);
   });
@@ -42,6 +53,10 @@ describe("isAllowed (Express route syntax)", () => {
     expect(isAllowed(allow, "GET", "/api/identifications")).toBe(false);
     expect(isAllowed(allow, "GET", "/api/identifications/")).toBe(false);
     expect(isAllowed(allow, "PUT", "/api/identifications/abc")).toBe(false);
+  });
+
+  it("is case sensitive", () => {
+    expect(isAllowed(allow, "GET", "/API/identifications/abc")).toBe(false);
   });
 
   it("supports wildcards like Express routes", () => {

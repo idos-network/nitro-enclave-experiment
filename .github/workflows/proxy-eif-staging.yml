@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
 
@@ -34,7 +34,7 @@ jobs:
       - name: Build EIF with custom kernel
         id: eif
         # ponytail: pin to a tag once the buildx branch is merged in the action repo
-        uses: idos-network/nitro-enclaves-eif-build-action@buildx
+        uses: idos-network/nitro-enclaves-eif-build-action@4d3b1c49da8453b31386140ef480c66d9d6c7230 # buildx
         with:
           context: proxy-service/
           dockerfile: Dockerfile
@@ -45,7 +45,7 @@ jobs:
             S3_SECRETS_REGION=${{ vars.STAGING_S3_REGION || 'eu-west-1' }}
 
       - name: Upload EIF
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: idos-proxy-eif-${{ github.sha }}
           if-no-files-found: error
