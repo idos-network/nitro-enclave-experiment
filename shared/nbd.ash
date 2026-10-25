@@ -1,6 +1,8 @@
 #!/bin/bash
 # shellcheck shell=dash
 
+source "$(dirname "${BASH_SOURCE[0]}")/kms.ash"
+
 setup_nbd() {
   local SERVICE_NAME=$1
 
@@ -29,7 +31,8 @@ setup_nbd() {
   fi
 
   echo "-> Decrypting AWS luks password key"
-  aws kms decrypt --ciphertext-blob "$(cat $ENC_FILE)" --output text --query Plaintext --region "$AWS_REGION" > "$PLAIN_FILE"
+  # Same bytes as before (base64 plaintext + newline), so existing LUKS volumes still open
+  kms_decrypt "$(cat $ENC_FILE)" > "$PLAIN_FILE"
 
   if cryptsetup isLuks /dev/nbd0; then
     echo "-> /dev/nbd0 is luks already, continuing..."

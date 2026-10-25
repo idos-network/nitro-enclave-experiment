@@ -4,6 +4,8 @@
 // resolved from this package would break `instanceof` checks and the services' vi.mock("mongodb").
 // That is also why the driver is described structurally below rather than with its own types.
 
+import { getLogger } from "./logger.ts";
+
 const KEY_COLLECTION = "__keyVault";
 
 // Every DEK cache miss costs a KMS decrypt over a fresh TLS connection through
@@ -30,11 +32,15 @@ interface KeyVaultClient {
 }
 
 interface Encryption<KeyId, Bin> {
-  getKeyByAltName(alias: string): Promise<{ _id: KeyId } | null>;
+  getKeyByAltName(alias: string): Promise<{ _id: KeyId; masterKey?: { provider?: string } } | null>;
   createDataKey(
-    provider: "aws",
-    options: { masterKey: { key: string; region: string }; keyAltNames: string[] },
+    provider: "aws" | "local",
+    options: { masterKey?: { key: string; region: string }; keyAltNames: string[] },
   ): Promise<KeyId>;
+  rewrapManyDataKey(
+    filter: object,
+    options: { provider: "local" },
+  ): Promise<{ bulkWriteResult?: { modifiedCount?: number } }>;
   encrypt(
     value: string | Buffer | Uint8Array,
     options: { keyId: KeyId; algorithm: "AEAD_AES_256_CBC_HMAC_SHA_512-Random" },
@@ -48,8 +54,8 @@ export interface FleOptions<Client extends KeyVaultClient, Credentials, KeyId, B
     client: Client,
     options: {
       keyVaultNamespace: string;
-      kmsProviders: { aws: Record<string, never> };
-      credentialProviders: { aws: Credentials };
+      kmsProviders: { aws?: Record<string, never>; local?: { key: Buffer } };
+      credentialProviders?: { aws: Credentials };
       keyExpirationMS: number;
     },
   ) => Encryption<KeyId, Bin>;
@@ -59,8 +65,18 @@ export interface FleOptions<Client extends KeyVaultClient, Credentials, KeyId, B
   keyAlias: string;
   /** KMS key used to create the vault and data key when missing. Without it they must already exist. */
   masterKey?: { key: string; region: string };
+  /**
+   * 96-byte master key of the `local` KMS provider. With it data keys are wrapped locally
+   * instead of by KMS: libmongocrypt's KMS Decrypt can't carry a Recipient attestation, so the
+   * `aws` provider works with the host's bare instance-role credentials. The service gets this
+   * key from an attested KMS Decrypt at boot.
+   */
+  localMasterKey?: Buffer;
   /** Pass the driver's Binary to let decrypt() take any shape the ciphertext was stored in. */
-  Binary?: new (buffer: Buffer, subType: number) => Bin;
+  Binary?: new (
+    buffer: Buffer,
+    subType: number,
+  ) => Bin;
 }
 
 type ExtendedJsonBinary = { $binary?: { base64?: string; subType: string } };
@@ -73,7 +89,8 @@ type SerializedBinary = { type?: number; data?: number[] };
 export function createFle<Client extends KeyVaultClient, Credentials, KeyId, Bin>(
   options: FleOptions<Client, Credentials, KeyId, Bin>,
 ) {
-  const { client, keyDb, keyAlias, masterKey, Binary } = options;
+  const { client, keyDb, keyAlias, masterKey, localMasterKey, Binary } = options;
+  const keyVaultNamespace = `${keyDb}.${KEY_COLLECTION}`;
 
   // One ClientEncryption for the whole process. Each instance owns its own
   // libmongocrypt handle, and therefore its own data-encryption-key cache
@@ -88,13 +105,38 @@ export function createFle<Client extends KeyVaultClient, Credentials, KeyId, Bin
 
   function getClientEncryption(): Encryption<KeyId, Bin> {
     clientEncryption ??= new options.ClientEncryption(client, {
-      keyVaultNamespace: `${keyDb}.${KEY_COLLECTION}`,
-      kmsProviders: { aws: {} },
-      credentialProviders: { aws: options.credentialsProvider },
+      keyVaultNamespace,
       keyExpirationMS: KEY_EXPIRATION_MS,
+      ...(localMasterKey
+        ? { kmsProviders: { local: { key: localMasterKey } } }
+        : { kmsProviders: { aws: {} }, credentialProviders: { aws: options.credentialsProvider } }),
     });
 
     return clientEncryption;
+  }
+
+  /**
+   * One-off migration: rewrap data keys still wrapped by KMS (`aws` provider) with the local
+   * master key. Their _id stays, so encrypted fields keep decrypting. It needs a plain
+   * kms:Decrypt by the host role, so it has to run before the key policy requires PCRs.
+   */
+  async function rewrapAwsDataKeys(key: Buffer) {
+    const rewrap = new options.ClientEncryption(client, {
+      keyVaultNamespace,
+      keyExpirationMS: KEY_EXPIRATION_MS,
+      kmsProviders: { aws: {}, local: { key } },
+      credentialProviders: { aws: options.credentialsProvider },
+    });
+
+    const { bulkWriteResult } = await rewrap.rewrapManyDataKey(
+      { "masterKey.provider": "aws" },
+      { provider: "local" },
+    );
+
+    getLogger().info(
+      { rewrapped: bulkWriteResult?.modifiedCount ?? 0 },
+      "FLE data keys rewrapped from aws to local",
+    );
   }
 
   /** Find or create the data encryption key. */
@@ -104,7 +146,7 @@ export function createFle<Client extends KeyVaultClient, Credentials, KeyId, Bin
     const collections = await client.db(keyDb).listCollections({}, { nameOnly: true }).toArray();
 
     if (!collections.some((c) => c.name === KEY_COLLECTION)) {
-      if (!masterKey) {
+      if (!masterKey && !localMasterKey) {
         throw new Error(`Key vault ${keyDb}.${KEY_COLLECTION} does not exist`);
       }
 
@@ -125,7 +167,15 @@ export function createFle<Client extends KeyVaultClient, Credentials, KeyId, Bin
     const existingKey = await getClientEncryption().getKeyByAltName(keyAlias);
 
     if (existingKey) {
+      if (localMasterKey && existingKey.masterKey?.provider === "aws") {
+        await rewrapAwsDataKeys(localMasterKey);
+      }
+
       return existingKey._id;
+    }
+
+    if (localMasterKey) {
+      return await getClientEncryption().createDataKey("local", { keyAltNames: [keyAlias] });
     }
 
     if (!masterKey) {

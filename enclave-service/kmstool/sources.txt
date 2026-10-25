@@ -1,0 +1,14 @@
+# kmstool_enclave_cli build sources, in build order: <dir> <url> <sha256>.
+# Versions are the ones aws-nitro-enclaves-sdk-c's containers/Dockerfile.al2 uses at the SDK tag.
+aws-lc https://github.com/aws/aws-lc/archive/refs/tags/v1.12.0.tar.gz 6898116ac058a4bae5982218f68e4560c8e29002072fa15382cc875f76d407ae
+s2n-tls https://github.com/aws/s2n-tls/archive/refs/tags/v1.3.46.tar.gz d1d01b5b85eafb20923ea1dbbac2363a7428a84dceb4d5d5ffed44379e28ba3e
+aws-c-common https://github.com/awslabs/aws-c-common/archive/refs/tags/v0.8.0.tar.gz 43a95662f958df6284d502a191cfdedea8ef76a96746a06cbdec94eeba97de61
+aws-c-sdkutils https://github.com/awslabs/aws-c-sdkutils/archive/refs/tags/v0.1.2.tar.gz d654670c145212ed3ce0699a988b9f83ebf3e7c44ed74d4d0772dc95ad46b38e
+aws-c-cal https://github.com/awslabs/aws-c-cal/archive/refs/tags/v0.5.18.tar.gz f2c2ac040258e06b79681845d6ff995b831b2918e13fd6e210c795903fc977c0
+aws-c-io https://github.com/awslabs/aws-c-io/archive/refs/tags/v0.11.0.tar.gz cd8fdcae6dcab2c91f699369220230f4973fd9c7dbda569c42326c8ead073be7
+aws-c-compression https://github.com/awslabs/aws-c-compression/archive/refs/tags/v0.2.14.tar.gz 8737863ced57d92f5a0bdde554bf0fe70eaa76aae118fec09a6c361dfc55d0d5
+aws-c-http https://github.com/awslabs/aws-c-http/archive/refs/tags/v0.7.6.tar.gz e0ed628372ab022ed311442f87629bb551acebea3900bf9b571a4da94a30905a
+aws-c-auth https://github.com/awslabs/aws-c-auth/archive/refs/tags/v0.6.15.tar.gz 52b1bf58155e726cc135257c1ea1e9af7c7f4e0f674d066165b11db20bb85477
+json-c https://github.com/json-c/json-c/archive/refs/tags/json-c-0.16-20220414.tar.gz 3ecaeedffd99a60b1262819f9e60d7d983844073abc74e495cb822b251904185
+aws-nitro-enclaves-nsm-api https://github.com/aws/aws-nitro-enclaves-nsm-api/archive/refs/tags/v0.4.0.tar.gz b31783dba1a8e52f2232f79362886fe18e50d077f2e15f487779ed8677ffe905
+aws-nitro-enclaves-sdk-c https://github.com/aws/aws-nitro-enclaves-sdk-c/archive/refs/tags/v0.4.5.tar.gz 26966410227292bc82aa23b5b462d403578508404ac3b118317461099ab318b6
