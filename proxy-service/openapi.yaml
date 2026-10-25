@@ -1,0 +1,433 @@
+openapi: 3.1.0
+info:
+  title: Proxy Service
+  description: |
+    TEE proxy that holds vendor API credentials. A host is "armed" once with
+    its Ed25519 public key, the vendor (`api`), that vendor's credentials
+    (`auth`), the vendor base URL and an allowlist of method + path patterns.
+    Afterwards the host calls the vendor through `/proxy/{id}/...`, signing
+    every request with its key, and the enclave forwards only allowlisted
+    calls after building the vendor authorization (static headers for Iron,
+    per-request signatures for vendors that need them).
+  version: 1.0.0
+
+servers:
+  - url: https://proxy.staging.sandbox.fractal.id/
+    description: Staging environment
+  - url: http://localhost:7000
+    description: Local development
+
+tags:
+  - name: Health
+  - name: Arm
+  - name: Proxy
+
+paths:
+  /:
+    get:
+      tags: [Health]
+      summary: Service info
+      operationId: getRoot
+      responses:
+        "200":
+          description: Service is running
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: string
+                    example: Proxy Service is running
+
+  /health:
+    get:
+      tags: [Health]
+      summary: Health check
+      operationId: getHealth
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /arm:
+    post:
+      tags: [Arm]
+      summary: Arm the proxy for a host
+      description: |
+        Stores the host public key, vendor, vendor credentials, base URL and
+        allowlist as one field-level encrypted blob in Mongo and returns the
+        armed `id` used in `/proxy/{id}/...`.
+      operationId: arm
+      security:
+        - armToken: []
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ArmRequest"
+      responses:
+        "200":
+          description: Armed
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArmResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          description: Missing or unknown arm token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /arm/{id}:
+    delete:
+      tags: [Arm]
+      summary: Disarm
+      description: Deletes the armed record; later `/proxy/{id}/...` calls get 404.
+      operationId: disarm
+      security:
+        - armToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: "#/components/parameters/XRequestId"
+      responses:
+        "204":
+          description: Disarmed
+        "401":
+          description: Missing or unknown arm token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Unknown armed id
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /proxy/{id}/{path}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: Armed id from `POST /arm`
+        schema:
+          type: string
+          format: uuid
+      - name: path
+        in: path
+        required: true
+        description: Vendor path (and query) relative to the armed vendor origin, e.g. `api/identifications/123`
+        schema:
+          type: string
+      - $ref: "#/components/parameters/XRequestId"
+    get:
+      $ref: "#/components/pathItems/ProxyOperation"
+    post:
+      $ref: "#/components/pathItems/ProxyOperation"
+    put:
+      $ref: "#/components/pathItems/ProxyOperation"
+    patch:
+      $ref: "#/components/pathItems/ProxyOperation"
+    delete:
+      $ref: "#/components/pathItems/ProxyOperation"
+
+components:
+  securitySchemes:
+    armToken:
+      type: http
+      scheme: bearer
+      description: One of the `ARM_TOKENS` configured in the enclave `config.env`.
+    hostSignature:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Compact JWS signed with the armed host Ed25519 key (`alg: EdDSA`).
+        Payload: `{ method, path, bodySha256, iat, exp }` where `path` is the
+        vendor path including query (everything after `/proxy/{id}`) and
+        `bodySha256` is the base64url SHA-256 of the raw request body (of the
+        empty string for bodiless requests). Must carry `iat` and `exp`; `iat`
+        may be at most 5 minutes old.
+
+  pathItems:
+    ProxyOperation:
+      tags: [Proxy]
+      summary: Forward a signed call to the vendor
+      description: |
+        Verifies the host signature, checks `method` + `path` against the
+        armed allowlist, adds the vendor authorization built from the armed
+        `auth` (overriding same-named request headers), forwards the raw body
+        and returns the vendor status, content type and body unchanged. The
+        host's `Authorization` header is never forwarded.
+      security:
+        - hostSignature: []
+      requestBody:
+        required: false
+        content:
+          "*/*":
+            schema:
+              type: string
+              format: binary
+      responses:
+        "2XX":
+          description: Vendor response, passed through
+        "4XX":
+          description: |
+            Vendor response passed through, or one of the proxy's own:
+            401 invalid host signature, 403 call not in the allowlist,
+            404 unknown armed id (`Error` body).
+        "502":
+          description: Vendor unreachable or timed out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  parameters:
+    XRequestId:
+      name: x-request-id
+      in: header
+      required: false
+      description: Optional request correlation id; echoed on the response.
+      schema:
+        type: string
+
+  headers:
+    XRequestId:
+      description: Request correlation id (from request or generated).
+      schema:
+        type: string
+
+  responses:
+    BadRequest:
+      description: Request body failed validation
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ValidationError"
+
+  schemas:
+    ArmRequest:
+      description: One variant per vendor, discriminated by `api`.
+      oneOf:
+        - $ref: "#/components/schemas/ArmIronRequest"
+        - $ref: "#/components/schemas/ArmMoonPayRequest"
+        - $ref: "#/components/schemas/ArmPersonaRequest"
+        - $ref: "#/components/schemas/ArmSumsubRequest"
+        - $ref: "#/components/schemas/ArmKalshiRequest"
+        - $ref: "#/components/schemas/ArmMockRequest"
+      discriminator:
+        propertyName: api
+        mapping:
+          iron: "#/components/schemas/ArmIronRequest"
+          moonpay: "#/components/schemas/ArmMoonPayRequest"
+          persona: "#/components/schemas/ArmPersonaRequest"
+          sumsub: "#/components/schemas/ArmSumsubRequest"
+          kalshi: "#/components/schemas/ArmKalshiRequest"
+          mock: "#/components/schemas/ArmMockRequest"
+
+    ArmCommon:
+      type: object
+      required: [hostPublicKey, environment, allow]
+      properties:
+        hostPublicKey:
+          type: string
+          pattern: '^[A-Za-z0-9_-]{43,44}$'
+          description: Base64url-encoded 32-byte Ed25519 public key (the JWK `x`)
+        environment:
+          type: string
+          enum: [production, sandbox]
+          description: Selects the vendor origin baked into the enclave (providers/vendors/)
+        allow:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [method, path]
+            properties:
+              method:
+                type: string
+                enum: [GET, POST, PUT, PATCH, DELETE]
+              path:
+                type: string
+                description: Express 5 route pattern (path-to-regexp), matched against the resolved pathname
+                example: /api/identifications/:id
+
+    ArmIronRequest:
+      allOf:
+        - $ref: "#/components/schemas/ArmCommon"
+        - type: object
+          required: [api, auth]
+          properties:
+            api:
+              type: string
+              const: iron
+            auth:
+              type: object
+              required: [apiKey]
+              description: Sent as `X-API-Key` on every forwarded call; `X-API-Version` comes from the host
+              properties:
+                apiKey:
+                  type: string
+
+    ArmMoonPayRequest:
+      allOf:
+        - $ref: "#/components/schemas/ArmCommon"
+        - type: object
+          required: [api, auth]
+          properties:
+            api:
+              type: string
+              const: moonpay
+            auth:
+              type: object
+              required: [apiKey]
+              description: Sent as `x-api-key` on every forwarded call
+              properties:
+                apiKey:
+                  type: string
+
+    ArmPersonaRequest:
+      allOf:
+        - $ref: "#/components/schemas/ArmCommon"
+        - type: object
+          required: [api, auth]
+          properties:
+            api:
+              type: string
+              const: persona
+            auth:
+              type: object
+              required: [apiKey]
+              description: "Sent as `Authorization: Bearer <apiKey>`; `Persona-Version` and `Key-Inflection` come from the host"
+              properties:
+                apiKey:
+                  type: string
+
+    ArmSumsubRequest:
+      allOf:
+        - $ref: "#/components/schemas/ArmCommon"
+        - type: object
+          required: [api, auth]
+          properties:
+            api:
+              type: string
+              const: sumsub
+            auth:
+              type: object
+              required: [appToken, secretKey]
+              description: |
+                Every forwarded call gets `X-App-Token`, `X-App-Access-Ts` (seconds) and
+                `X-App-Access-Sig` = hex(HMAC-SHA256(secretKey, ts + METHOD + path?query + raw body)).
+              properties:
+                appToken:
+                  type: string
+                secretKey:
+                  type: string
+
+    ArmKalshiRequest:
+      allOf:
+        - $ref: "#/components/schemas/ArmCommon"
+        - type: object
+          required: [api, auth]
+          properties:
+            api:
+              type: string
+              const: kalshi
+            auth:
+              type: object
+              required: [apiKeyId, privateKeyPem]
+              description: |
+                Every forwarded call gets `KALSHI-ACCESS-KEY`, `KALSHI-ACCESS-TIMESTAMP` and
+                `KALSHI-ACCESS-SIGNATURE` = base64(RSA-PSS-SHA256(timestamp_ms + METHOD + path)).
+              properties:
+                apiKeyId:
+                  type: string
+                privateKeyPem:
+                  type: string
+                  description: PKCS#8 or PKCS#1 PEM; literal `\n` is accepted
+
+    ArmMockRequest:
+      allOf:
+        - $ref: "#/components/schemas/ArmCommon"
+        - type: object
+          required: [api, auth]
+          properties:
+            api:
+              type: string
+              const: mock
+            auth:
+              type: object
+              required: [apiKey]
+              description: |
+                Load-testing vendor with no upstream. The proxy verifies the host JWS as usual, then
+                hashes the body, signs an HS256 JWT keyed by sha256(apiKey), waits `delayMs` and
+                answers 200 with `{ method, path, Authorization, X-Body-Sha256 }` instead of fetching
+                the vendor.
+              properties:
+                apiKey:
+                  type: string
+                delayMs:
+                  type: integer
+                  minimum: 0
+                  maximum: 60000
+                  default: 200
+
+    ArmResponse:
+      type: object
+      required: [id]
+      properties:
+        id:
+          type: string
+          format: uuid
+
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          example: Armed id not found
+
+    ValidationError:
+      type: object
+      required: [error, details]
+      properties:
+        error:
+          type: string
+          example: Invalid request body
+        details:
+          type: array
+          items:
+            type: object
+            required: [path, code]
+            properties:
+              path:
+                type: string
+              code:
+                type: string
