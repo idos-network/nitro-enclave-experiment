@@ -1,6 +1,46 @@
 # Copy Vector from a pinned image.
 FROM timberio/vector@sha256:32fd554fdd6dc3c17b5ec8e983e9889f37b0c87fa3c8cc28aa318d69cf34d392 AS vector
 
+# Build kmstool_enclave_cli + libnsm.so (aws-nitro-enclaves-sdk-c): KMS Decrypt with this
+# enclave's attestation document as Recipient, see shared/kms.ash. Pinned Rust image, every
+# source tarball SHA-256 verified (kmstool/sources.txt), nsm-api crates pinned by Cargo.lock.
+FROM rust:1.92-slim-bookworm@sha256:f1f73538ebe623fd3673a35aff3df358ae1084c64c55646516e5b17b321b6c9b AS kmstool
+
+RUN apt-get update && apt-get install -y --no-install-recommends --no-install-suggests \
+    ca-certificates \
+    cmake \
+    curl \
+    g++ \
+    gcc \
+    make \
+    ninja-build \
+    && rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
+
+WORKDIR /build
+COPY enclave-service/kmstool/ ./
+
+RUN grep -v '^#' sources.txt | while read -r name url sha256; do \
+      curl -fsSL "$url" -o "$name.tar.gz" \
+      && echo "${sha256}  $name.tar.gz" | sha256sum -c - \
+      && mkdir "$name" && tar -xzf "$name.tar.gz" -C "$name" --strip-components=1 \
+      || exit 1; \
+    done
+
+# Same flags as upstream; the extras are no-ops outside their library (USE_VSOCK: aws-c-io,
+# DISABLE_GO/PERL: aws-lc uses its pregenerated sources).
+RUN build() { \
+      cmake -GNinja -DCMAKE_PREFIX_PATH=/usr -DCMAKE_INSTALL_PREFIX=/usr -DBUILD_TESTING=0 \
+        -DBUILD_SHARED_LIBS=OFF -DUSE_VSOCK=1 -DDISABLE_GO=ON -DDISABLE_PERL=ON -S "$1" -B "$1/build" \
+      && cmake --build "$1/build" --parallel "$(nproc)" --target install; \
+    } \
+    && for lib in aws-lc s2n-tls aws-c-common aws-c-sdkutils aws-c-cal aws-c-io aws-c-compression \
+         aws-c-http aws-c-auth json-c; do build "$lib" || exit 1; done \
+    && cp nsm-api.Cargo.lock aws-nitro-enclaves-nsm-api/Cargo.lock \
+    && cargo build --manifest-path aws-nitro-enclaves-nsm-api/Cargo.toml --release --locked -p nsm-lib \
+    && cp aws-nitro-enclaves-nsm-api/target/release/libnsm.so /usr/lib/ \
+    && cp aws-nitro-enclaves-nsm-api/target/release/nsm.h /usr/include/ \
+    && build aws-nitro-enclaves-sdk-c
+
 # Base runtime image.
 FROM ubuntu:24.04@sha256:786a8b558f7be160c6c8c4a54f9a57274f3b4fb1491cf65146521ae77ff1dc54
 
@@ -36,6 +76,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends --no-install-su
     && apt-get purge -y --auto-remove unzip \
     && apt-get clean \
     && rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
+
+# kmstool_enclave_cli links aws-* statically; only libnsm.so (and glibc) is dynamic
+COPY --from=kmstool /usr/bin/kmstool_enclave_cli /usr/local/bin/kmstool_enclave_cli
+COPY --from=kmstool /usr/lib/libnsm.so /usr/local/lib/libnsm.so
+RUN ldconfig && ! ldd /usr/local/bin/kmstool_enclave_cli | grep 'not found'
 
 # Install Caddy (pinned + SHA-256 verified)
 ARG CADDY_VERSION=2.11.4

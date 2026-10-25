@@ -4,11 +4,10 @@ import { getLogger } from "@idos/tee-common/logger.ts";
 import { type Binary, ClientEncryption, type Db, MongoClient } from "mongodb";
 import type { BoxKeyPair } from "tweetnacl";
 import {
-  AWS_REGION,
   DB_ENCLAVE_COLLECTION,
   DB_NAME,
   FLE_KEY_ALIAS,
-  FLE_KMS_KEY_ID,
+  FLE_MASTER_KEY,
   MONGO_URI,
   SESSION_TTL_SECONDS,
 } from "../env.ts";
@@ -23,10 +22,12 @@ const client = new MongoClient(MONGO_URI, {
 const fle = createFle({
   client,
   ClientEncryption,
+  // only for the one-off rewrap of data keys still wrapped by KMS
   credentialsProvider: defaultProvider(),
   keyDb: "enclaveEncryption",
   keyAlias: FLE_KEY_ALIAS,
-  masterKey: { key: FLE_KMS_KEY_ID, region: AWS_REGION },
+  // decrypted with attestation by scripts/run.ash, see localMasterKey in tee-common/fle.ts
+  localMasterKey: Buffer.from(FLE_MASTER_KEY, "base64"),
 });
 
 export async function connectDB() {
