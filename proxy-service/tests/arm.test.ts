@@ -65,14 +65,12 @@ describe("POST /arm", () => {
     expect(res.body.details).toEqual([expect.objectContaining({ path: "auth.privateKeyPem" })]);
   });
 
-  it("rejects a base url with a path, query or hash", async () => {
-    for (const baseUrl of ["https://iron.example.com/v1", "https://iron.example.com/?a=1"]) {
-      await request(app)
-        .post("/arm")
-        .set("Authorization", `Bearer ${ARM_TOKEN}`)
-        .send(armBody({ baseUrl }))
-        .expect(400);
-    }
+  it("rejects an unknown environment", async () => {
+    await request(app)
+      .post("/arm")
+      .set("Authorization", `Bearer ${ARM_TOKEN}`)
+      .send(armBody({ environment: "https://evil.example.com" }))
+      .expect(400);
   });
 
   it("rejects an allow path that is not a valid route pattern", async () => {
@@ -83,14 +81,6 @@ describe("POST /arm", () => {
       .expect(400);
 
     expect(res.body.details).toEqual([expect.objectContaining({ path: "allow.0.path" })]);
-  });
-
-  it("rejects a non-https base url", async () => {
-    await request(app)
-      .post("/arm")
-      .set("Authorization", `Bearer ${ARM_TOKEN}`)
-      .send(armBody({ baseUrl: "http://iron.example.com" }))
-      .expect(400);
   });
 
   it("stores the armed record and returns its id", async () => {

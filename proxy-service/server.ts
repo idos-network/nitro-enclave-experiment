@@ -12,6 +12,7 @@ import { validatorMiddleware } from "./middleware/validator.ts";
 import { type Armed, deleteArmed, storeArmed } from "./providers/db.ts";
 import loggerMiddleware from "./providers/logger.ts";
 import { forward, isAllowed, resolveUpstreamUrl } from "./providers/proxy.ts";
+import { vendors } from "./providers/vendors/index.ts";
 import { type ArmRequest, ArmRequestSchema } from "./utils/dto.ts";
 import { writeLog } from "./utils/logger-context.ts";
 import { runWithRequestContext } from "./utils/request-context.ts";
@@ -62,8 +63,8 @@ app.post(
   async (_req, res: Response<any, { validatedBody: ArmRequest }>) => {
     const id = crypto.randomUUID();
     await storeArmed(id, res.locals.validatedBody);
-    const { api, baseUrl } = res.locals.validatedBody;
-    writeLog("armed", { armedId: id, api, baseUrl });
+    const { api, environment } = res.locals.validatedBody;
+    writeLog("armed", { armedId: id, api, environment });
     res.status(200).json({ id });
   },
 );
@@ -86,7 +87,7 @@ app.all(
   async (req, res: Response<any, { armed: Armed; upstreamPath: string }>) => {
     const { armed, upstreamPath } = res.locals;
 
-    const url = resolveUpstreamUrl(armed.baseUrl, upstreamPath);
+    const url = resolveUpstreamUrl(vendors[armed.api].origins[armed.environment], upstreamPath);
     if (!url || !isAllowed(armed.allow, req.method, url.pathname)) {
       writeLog("proxy_forbidden", { armedId: armed.id, method: req.method, path: upstreamPath });
       return res.status(403).json({ error: `${req.method} ${upstreamPath} is not allowed` });

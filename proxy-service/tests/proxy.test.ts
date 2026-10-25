@@ -1,27 +1,9 @@
-import { constants, createHash, createHmac, verify } from "node:crypto";
-import { jwtVerify } from "jose";
 import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
-import { app, arm, resetMocks, upstream } from "./app.ts";
-import {
-  armBody,
-  BASE_URL,
-  bodySha256,
-  HOST_KEY_PAIR,
-  hostJws,
-  KALSHI_KEY_PAIR,
-  KALSHI_PRIVATE_KEY_PEM,
-  OTHER_HOST_KEY_PAIR,
-} from "./helpers.ts";
+import { app, arm, resetMocks, upstream, upstreamJson } from "./app.ts";
+import { BASE_URL, HOST_KEY_PAIR, hostJws, OTHER_HOST_KEY_PAIR } from "./helpers.ts";
 
 const IDENT_PATH = "/api/identifications/ident-123";
-
-function upstreamJson(status: number, body: unknown) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "content-type": "application/json; charset=utf-8" },
-  });
-}
 
 describe("ANY /proxy/:id/*", () => {
   beforeEach(resetMocks);
@@ -140,6 +122,27 @@ describe("ANY /proxy/:id/*", () => {
     expect(headers.get("host")).toBeNull();
   });
 
+  it("drops expect and the headers named by Connection", async () => {
+    const id = await arm();
+    const jws = await hostJws({ method: "GET", path: IDENT_PATH });
+    upstream().mockResolvedValueOnce(upstreamJson(200, {}));
+
+    await request(app)
+      .get(`/proxy/${id}${IDENT_PATH}`)
+      .set("Authorization", `Bearer ${jws}`)
+      .set("Expect", "100-continue")
+      .set("Connection", "close, X-Hop")
+      .set("X-Hop", "1")
+      .set("X-Kept", "1")
+      .expect(200);
+
+    const [, init] = upstream().mock.calls[0] as [string, RequestInit];
+    const headers = new Headers(init.headers);
+    expect(headers.get("expect")).toBeNull();
+    expect(headers.get("x-hop")).toBeNull();
+    expect(headers.get("x-kept")).toBe("1");
+  });
+
   it("does not let the host override the vendor auth headers", async () => {
     const id = await arm();
     const jws = await hostJws({ method: "GET", path: IDENT_PATH });
@@ -176,167 +179,6 @@ describe("ANY /proxy/:id/*", () => {
     expect(init.method).toBe("POST");
     expect(Buffer.from(init.body as Uint8Array).toString()).toBe(body);
     expect(new Headers(init.headers).get("content-type")).toBe("application/json");
-  });
-
-  it("authorizes a moonpay call with x-api-key", async () => {
-    const path = "/platform/v1/customers/cus_1";
-    const id = await arm(
-      armBody({
-        api: "moonpay",
-        baseUrl: "https://api.moonpay.example.com",
-        auth: { apiKey: "moonpay-secret" },
-        allow: [{ method: "GET", path: "/platform/v1/customers/:id" }],
-      }),
-    );
-    const jws = await hostJws({ method: "GET", path });
-    upstream().mockResolvedValueOnce(upstreamJson(200, { data: { id: "cus_1" } }));
-
-    const res = await request(app)
-      .get(`/proxy/${id}${path}`)
-      .set("Authorization", `Bearer ${jws}`)
-      .expect(200);
-
-    expect(res.body).toEqual({ data: { id: "cus_1" } });
-    const [url, init] = upstream().mock.calls[0] as [string, RequestInit];
-    expect(url).toBe(`https://api.moonpay.example.com${path}`);
-    expect(new Headers(init.headers).get("x-api-key")).toBe("moonpay-secret");
-  });
-
-  it("signs a kalshi call with RSA-PSS over timestamp + method + path (no query)", async () => {
-    const path = "/trade-api/v2/isv/users/status/u1?verbose=1";
-    const id = await arm(
-      armBody({
-        api: "kalshi",
-        baseUrl: "https://api.kalshi.example.com",
-        // Literal \n as the portal stores it must work too.
-        auth: { apiKeyId: "key-1", privateKeyPem: KALSHI_PRIVATE_KEY_PEM.replace(/\n/g, "\\n") },
-        allow: [{ method: "GET", path: "/trade-api/v2/isv/users/status/:id" }],
-      }),
-    );
-    const jws = await hostJws({ method: "GET", path });
-    upstream().mockResolvedValueOnce(upstreamJson(200, { last_step: "kyc-approved" }));
-
-    await request(app).get(`/proxy/${id}${path}`).set("Authorization", `Bearer ${jws}`).expect(200);
-
-    const [, init] = upstream().mock.calls[0] as [string, RequestInit];
-    const headers = new Headers(init.headers);
-    const timestamp = headers.get("kalshi-access-timestamp") ?? "";
-    expect(headers.get("kalshi-access-key")).toBe("key-1");
-    expect(Math.abs(Number(timestamp) - Date.now())).toBeLessThan(5_000);
-
-    const preSign = `${timestamp}GET/trade-api/v2/isv/users/status/u1`;
-    const ok = verify(
-      "sha256",
-      Buffer.from(preSign),
-      {
-        key: KALSHI_KEY_PAIR.publicKey,
-        padding: constants.RSA_PKCS1_PSS_PADDING,
-        saltLength: constants.RSA_PSS_SALTLEN_DIGEST,
-      },
-      Buffer.from(headers.get("kalshi-access-signature") ?? "", "base64"),
-    );
-    expect(ok).toBe(true);
-  });
-
-  it("authorizes a persona call with a bearer api key and forwards the version headers", async () => {
-    const path = "/api/v1/inquiries/inq_1";
-    const id = await arm(
-      armBody({
-        api: "persona",
-        baseUrl: "https://api.withpersona.com",
-        auth: { apiKey: "persona-secret" },
-        allow: [{ method: "GET", path: "/api/v1/inquiries/:id" }],
-      }),
-    );
-    const jws = await hostJws({ method: "GET", path });
-    upstream().mockResolvedValueOnce(upstreamJson(200, { data: { id: "inq_1" } }));
-
-    await request(app)
-      .get(`/proxy/${id}${path}`)
-      .set("Authorization", `Bearer ${jws}`)
-      .set("Persona-Version", "2023-01-05")
-      .set("Key-Inflection", "camel")
-      .expect(200);
-
-    const [, init] = upstream().mock.calls[0] as [string, RequestInit];
-    const headers = new Headers(init.headers);
-    expect(headers.get("authorization")).toBe("Bearer persona-secret");
-    expect(headers.get("persona-version")).toBe("2023-01-05");
-    expect(headers.get("key-inflection")).toBe("camel");
-  });
-
-  it("signs a sumsub call with HMAC over ts + method + path?query + raw body", async () => {
-    const path = "/resources/applicants?levelName=basic%2B1";
-    const body = JSON.stringify({ externalUserId: "u-1", levelName: "basic+1" });
-    const id = await arm(
-      armBody({
-        api: "sumsub",
-        baseUrl: "https://api.sumsub.com",
-        auth: { appToken: "sbx:app-token", secretKey: "sumsub-secret" },
-        allow: [{ method: "POST", path: "/resources/applicants" }],
-      }),
-    );
-    const jws = await hostJws({ method: "POST", path, body });
-    upstream().mockResolvedValueOnce(upstreamJson(201, { id: "app_1" }));
-
-    await request(app)
-      .post(`/proxy/${id}${path}`)
-      .set("Authorization", `Bearer ${jws}`)
-      .set("Content-Type", "application/json")
-      .send(body)
-      .expect(201);
-
-    const [url, init] = upstream().mock.calls[0] as [string, RequestInit];
-    expect(url).toBe(`https://api.sumsub.com${path}`);
-    const headers = new Headers(init.headers);
-    const ts = headers.get("x-app-access-ts") ?? "";
-    expect(headers.get("x-app-token")).toBe("sbx:app-token");
-    expect(Math.abs(Number(ts) - Date.now() / 1000)).toBeLessThan(5);
-
-    const expected = createHmac("sha256", "sumsub-secret")
-      .update(`${ts}POST${path}`)
-      .update(body)
-      .digest("hex");
-    expect(headers.get("x-app-access-sig")).toBe(expected);
-  });
-
-  it("mock vendor answers locally after delayMs with a body hash and an HS256 JWT", async () => {
-    const path = "/load/echo?n=1";
-    const body = JSON.stringify({ hello: "world" });
-    const id = await arm(
-      armBody({
-        api: "mock",
-        baseUrl: "https://mock.invalid",
-        auth: { apiKey: "mock-secret", delayMs: 20 },
-        allow: [{ method: "POST", path: "/load/echo" }],
-      }),
-    );
-    const jws = await hostJws({ method: "POST", path, body });
-
-    const started = Date.now();
-    const res = await request(app)
-      .post(`/proxy/${id}${path}`)
-      .set("Authorization", `Bearer ${jws}`)
-      .set("Content-Type", "application/json")
-      .send(body)
-      .expect(200);
-
-    expect(Date.now() - started).toBeGreaterThanOrEqual(20);
-    expect(upstream()).not.toHaveBeenCalled();
-    expect(res.body.method).toBe("POST");
-    expect(res.body.path).toBe(path);
-    expect(res.body["X-Body-Sha256"]).toBe(bodySha256(body));
-
-    const { payload } = await jwtVerify(
-      res.body.Authorization.replace("Bearer ", ""),
-      createHash("sha256").update("mock-secret").digest(),
-      { algorithms: ["HS256"] },
-    );
-    expect(payload).toMatchObject({
-      method: "POST",
-      path: "/load/echo",
-      bodySha256: bodySha256(body),
-    });
   });
 
   it("502 when the upstream is unreachable", async () => {

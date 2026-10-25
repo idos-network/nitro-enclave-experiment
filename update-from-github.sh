@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Installs a service EIF built by GitHub Actions into $NITRO_CLI_ARTIFACTS, prints its
 # sha256 + PCRs to compare with the run's job summary, then restarts the enclave with it.
-# Usage: ./update-from-github.sh <enclave|entropy|facesign> [staging|production] [run-id]
+# Usage: ./update-from-github.sh <enclave|entropy|facesign|proxy> [staging|production] [run-id]
 #        (defaults: staging, latest successful run)
 # Needs: gh logged in with a PAT that has Actions: Read on the repo.
 set -euo pipefail
@@ -10,13 +10,13 @@ SERVICE=${1:-}
 case "$SERVICE" in
   enclave|entropy|proxy) EIF=idos-$SERVICE.eif ;;
   facesign)        EIF=idos-facetec.eif ;;   # matches facesign-service/scripts/enclave-run.ash
-  *) echo "Usage: $0 <enclave|entropy|facesign> [staging|production] [run-id]" >&2; exit 1 ;;
+  *) echo "Usage: $0 <enclave|entropy|facesign|proxy> [staging|production] [run-id]" >&2; exit 1 ;;
 esac
 
 ENV=${2:-staging}
 case "$ENV" in
   staging|production) ;;
-  *) echo "Usage: $0 <enclave|entropy|facesign> [staging|production] [run-id]" >&2; exit 1 ;;
+  *) echo "Usage: $0 <enclave|entropy|facesign|proxy> [staging|production] [run-id]" >&2; exit 1 ;;
 esac
 
 REPO=idos-network/nitro-enclave-experiment

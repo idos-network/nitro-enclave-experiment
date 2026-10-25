@@ -141,7 +141,7 @@ paths:
       - name: path
         in: path
         required: true
-        description: Vendor path (and query) relative to the armed `baseUrl`, e.g. `api/identifications/123`
+        description: Vendor path (and query) relative to the armed vendor origin, e.g. `api/identifications/123`
         schema:
           type: string
       - $ref: "#/components/parameters/XRequestId"
@@ -253,17 +253,16 @@ components:
 
     ArmCommon:
       type: object
-      required: [hostPublicKey, baseUrl, allow]
+      required: [hostPublicKey, environment, allow]
       properties:
         hostPublicKey:
           type: string
           pattern: '^[A-Za-z0-9_-]{43,44}$'
           description: Base64url-encoded 32-byte Ed25519 public key (the JWK `x`)
-        baseUrl:
+        environment:
           type: string
-          format: uri
-          description: Vendor API origin, https only, no path/query/hash
-          example: https://api.iron.example.com
+          enum: [production, sandbox]
+          description: Selects the vendor origin baked into the enclave (providers/vendors/)
         allow:
           type: array
           minItems: 1
@@ -325,7 +324,7 @@ components:
             auth:
               type: object
               required: [apiKey]
-              description: Sent as `Authorization: Bearer <apiKey>`; `Persona-Version` and `Key-Inflection` come from the host
+              description: "Sent as `Authorization: Bearer <apiKey>`; `Persona-Version` and `Key-Inflection` come from the host"
               properties:
                 apiKey:
                   type: string
@@ -389,7 +388,7 @@ components:
                 Load-testing vendor with no upstream. The proxy verifies the host JWS as usual, then
                 hashes the body, signs an HS256 JWT keyed by sha256(apiKey), waits `delayMs` and
                 answers 200 with `{ method, path, Authorization, X-Body-Sha256 }` instead of fetching
-                `baseUrl`.
+                the vendor.
               properties:
                 apiKey:
                   type: string

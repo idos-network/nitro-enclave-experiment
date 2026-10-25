@@ -4,13 +4,14 @@ import { match } from "path-to-regexp";
 import { UPSTREAM_TIMEOUT_MS } from "../env.ts";
 import type { ArmRequest } from "../utils/dto.ts";
 import type { Armed } from "./db.ts";
-import { authorize } from "./vendors.ts";
+import { authorize } from "./vendors/index.ts";
 
 // Never forwarded: hop-by-hop headers, the host's proxy credential and anything fetch derives itself.
 const DROPPED_REQUEST_HEADERS = new Set([
   "authorization",
   "connection",
   "content-length",
+  "expect", // undici refuses it; Node already answered the 100-continue itself
   "host",
   "keep-alive",
   "proxy-authorization",
@@ -22,17 +23,23 @@ const DROPPED_REQUEST_HEADERS = new Set([
   "x-request-id",
 ]);
 
+// Encoded `/`, `\` and `%`: a vendor may decode them into segments the allowlist never saw.
+const ENCODED_DELIMITER = /%(2f|5c|25)/i;
+
 /**
- * Absolute vendor URL for `path`. `baseUrl` is an origin (enforced at arm time), so the URL
- * parser does the resolving and dot-segment normalization; only the origin has to stay put.
+ * Absolute vendor URL for `path` under `origin`. The URL parser does the resolving and
+ * dot-segment normalization; only the origin has to stay put.
  */
-export function resolveUpstreamUrl(baseUrl: string, path: string): URL | null {
-  const url = new URL(path, baseUrl);
-  return url.origin === new URL(baseUrl).origin ? url : null;
+export function resolveUpstreamUrl(origin: string, path: string): URL | null {
+  const url = new URL(path, origin);
+  return url.origin === origin && !ENCODED_DELIMITER.test(url.pathname) ? url : null;
 }
 
 export function isAllowed(allow: ArmRequest["allow"], method: string, pathname: string): boolean {
-  return allow.some((entry) => entry.method === method && match(entry.path)(pathname) !== false);
+  return allow.some(
+    (entry) =>
+      entry.method === method && match(entry.path, { sensitive: true })(pathname) !== false,
+  );
 }
 
 export async function forward(
@@ -41,8 +48,15 @@ export async function forward(
   url: URL,
 ): Promise<{ status: number; contentType: string | null; body: Buffer }> {
   const headers = new Headers();
+  // Headers named by Connection are hop-by-hop too (RFC 9110 §7.6.1).
+  const nominated = new Set(
+    String(req.headers.connection ?? "")
+      .split(",")
+      .map((h) => h.trim().toLowerCase())
+      .filter(Boolean),
+  );
   for (const [name, value] of Object.entries(req.headers)) {
-    if (DROPPED_REQUEST_HEADERS.has(name) || value === undefined) continue;
+    if (DROPPED_REQUEST_HEADERS.has(name) || nominated.has(name) || value === undefined) continue;
     headers.set(name, Array.isArray(value) ? value.join(", ") : value);
   }
 

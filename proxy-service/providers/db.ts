@@ -136,7 +136,7 @@ export async function connectDB() {
 export interface ArmedRecordDocument {
   armedId: string;
   // Everything (incl. the armedId) in one authenticated FLE blob, so a Mongo
-  // writer can neither swap the host key / baseUrl nor copy a blob between records.
+  // writer can neither swap the host key / environment nor copy a blob between records.
   dataEnc: Binary;
   createdAt: Date;
 }

@@ -1,9 +1,10 @@
 import { createHash, generateKeyPairSync, type KeyObject } from "node:crypto";
 import { SignJWT } from "jose";
+import { vendors } from "../providers/vendors/index.ts";
 import type { ArmRequest } from "../utils/dto.ts";
 
 export const ARM_TOKEN = "arm-token-two";
-export const BASE_URL = "https://iron.example.com";
+export const BASE_URL = vendors.iron.origins.sandbox;
 
 export const HOST_KEY_PAIR = generateKeyPairSync("ed25519");
 export const KALSHI_KEY_PAIR = generateKeyPairSync("rsa", { modulusLength: 2048 });
@@ -22,7 +23,7 @@ export function armBody(overrides: Record<string, unknown> = {}): ArmRequest {
   return {
     api: "iron",
     hostPublicKey: publicKeyB64(HOST_KEY_PAIR),
-    baseUrl: BASE_URL,
+    environment: "sandbox",
     auth: { apiKey: "iron-secret" },
     allow: [
       { method: "GET", path: "/api/identifications/:id" },
