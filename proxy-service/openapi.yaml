@@ -4,7 +4,7 @@ info:
   description: |
     TEE proxy that holds vendor API credentials. A host is "armed" once with
     its Ed25519 public key, the vendor (`api`), that vendor's credentials
-    (`auth`), the vendor base URL and an allowlist of method + path patterns.
+    (`auth`), the `environment` (which selects the vendor origin) and an allowlist of method + path patterns.
     Afterwards the host calls the vendor through `/proxy/{id}/...`, signing
     every request with its key, and the enclave forwards only allowlisted
     calls after building the vendor authorization (static headers for Iron,
@@ -64,7 +64,7 @@ paths:
       tags: [Arm]
       summary: Arm the proxy for a host
       description: |
-        Stores the host public key, vendor, vendor credentials, base URL and
+        Stores the host public key, vendor, vendor credentials, environment and
         allowlist as one field-level encrypted blob in Mongo and returns the
         armed `id` used in `/proxy/{id}/...`.
       operationId: arm
@@ -257,7 +257,7 @@ components:
       properties:
         hostPublicKey:
           type: string
-          pattern: '^[A-Za-z0-9_-]{43,44}$'
+          pattern: '^[A-Za-z0-9_-]{43}$'
           description: Base64url-encoded 32-byte Ed25519 public key (the JWK `x`)
         environment:
           type: string

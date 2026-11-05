@@ -31,8 +31,9 @@ app.use(promBundle({ includeMethod: true }));
 app.use(helmet());
 app.use(cors());
 // Proxied bodies are forwarded byte-for-byte (and hashed for the host signature), so keep them raw.
-app.use("/proxy", express.raw({ type: () => true, limit: "32mb" }));
-app.use(express.json({ limit: "32mb" }));
+app.use("/proxy", express.raw({ type: () => true, limit: "32mb", inflate: false }));
+// Only /proxy carries big payloads; everything else (arm) is small and runs before auth.
+app.use(express.json({ limit: "100kb" }));
 
 app.get("/", (_req, res) => {
   res.status(200).json({ message: "Proxy Service is running" });
