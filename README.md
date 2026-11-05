@@ -46,6 +46,18 @@ terminates any running enclave and starts the new one via the service's
 `scripts/enclave-run.ash` (console attached, like the manual flow).
 `enclave-build.ash` is not needed on the host.
 
+## Proxy service
+
+`proxy-service` keeps vendor API credentials inside the TEE so the main app only holds what it
+is allowed to call. `POST /arm` (one of the `ARM_TOKENS` from `config.env` as bearer) stores a host
+Ed25519 public key, the vendor (`api: "iron" | "moonpay" | "persona" | "sumsub" | "kalshi"`) with its credentials (`auth`), the
+vendor `environment` (`production` | `sandbox`, mapped to a vendor origin baked into the image) and an
+allowlist of `{ method, path }` (Express route syntax) as one FLE blob, and returns
+an `id`; `DELETE /arm/{id}` disarms. The host then calls `ANY /proxy/{id}/<vendor path>` with
+`Authorization: Bearer <EdDSA JWS>` over `{ method, path, bodySha256, iat, exp }`; the enclave
+checks the allowlist, builds the vendor authorization (`proxy-service/providers/vendors/`) and
+passes the vendor response through. Call examples: [`proxy-service/README.md`](proxy-service/README.md).
+
 ## Setting up facesign service
 
 1. Follow up [FaceTec SDK](./facetec-sdk/README.md)
