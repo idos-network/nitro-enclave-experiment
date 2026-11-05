@@ -6,7 +6,7 @@ import { compiles } from "./compiles.ts";
 export const ALLOWED_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
 
 const CommonArmSchema = z.object({
-  hostPublicKey: z.base64url().min(43).max(44), // base64url-encoded 32-byte Ed25519 public key (JWK `x`)
+  hostPublicKey: z.base64url().length(43), // base64url-encoded 32-byte Ed25519 public key (JWK `x`)
   // Picks the vendor origin from its adapter; the host never supplies a URL.
   environment: z.enum(ENVIRONMENTS),
   allow: z
