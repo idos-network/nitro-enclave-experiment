@@ -17,13 +17,15 @@ picked up by every service immediately. Docker images are built with the repo ro
 
 ## Enclave EIF from GitHub Actions
 
-[`enclave-eif-staging.yml`](.github/workflows/enclave-eif-staging.yml) builds the
-`enclave-service` EIF with the custom kernel from `aws-nitro-kernel/blobs` on every
-push to `deploy_to_staging` (or manually via *Run workflow*). It uses
+`.github/workflows/<service>-eif-<env>.yml` builds the EIF of `enclave-service`,
+`entropy-service` or `proxy-service` with the custom kernel from `aws-nitro-kernel/blobs`:
+the `staging` workflows on every push to `deploy_to_staging`, the `production` ones on every
+push to `master` (or manually via *Run workflow*). `facesign-service` has no workflow and is
+built on the host. They use
 [idos-network/nitro-enclaves-eif-build-action](https://github.com/idos-network/nitro-enclaves-eif-build-action).
 
-Each run uploads `idos-enclave.eif` + `idos-enclave-info.json` as the artifact
-`idos-enclave-eif-<commit sha>` and prints the EIF sha256 and PCR0-2 in the job summary.
+Each run uploads `idos-<service>.eif` + `idos-<service>-info.json` as the artifact
+`idos-<service>-eif-<commit sha>` and prints the EIF sha256 and PCR0-2 in the job summary.
 The PCRs belong to that exact file, so deploy the file, don't rebuild on the host.
 
 ### Download to the EC2 host
@@ -44,7 +46,7 @@ Then, on the host (the `sync_*.sh` scripts copy it to `~/`):
 ./update-from-github.sh enclave staging 123456789     # a specific run id from the run URL
 ```
 
-The first argument is `enclave`, `entropy` or `facesign`, the second `staging` (default)
+The first argument is `enclave`, `entropy` or `proxy`, the second `staging` (default)
 or `production`; together they pick the workflow `.github/workflows/<service>-eif-<env>.yml`
 and the EIF name the service's `enclave-run.ash` expects. The script downloads the artifact, checks that `describe-eif`
 of the downloaded file gives the same PCRs as the info JSON from GHA, installs both into

@@ -18,8 +18,8 @@ case "$ENV" in
   staging|production) ;;
   *) echo "Usage: $0 <enclave|entropy|facesign|proxy> [staging|production] [run-id]" >&2; exit 1 ;;
 esac
-if [[ "$SERVICE" == proxy && "$ENV" != staging ]]; then
-  echo "No production workflow exists for proxy yet; use staging" >&2; exit 1
+if [[ "$SERVICE" == facesign ]]; then
+  echo "No EIF workflow exists for facesign; build it on the host with enclave-build.ash" >&2; exit 1
 fi
 
 REPO=idos-network/nitro-enclave-experiment
