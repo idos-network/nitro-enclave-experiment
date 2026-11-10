@@ -136,6 +136,7 @@ export async function createSession(): Promise<CreateSessionResponse> {
 
   const res = await request(app)
     .post("/session")
+    .set("Authorization", "Bearer session-token-one")
     .send({
       sessionClientPublicKey: Buffer.from(sessionClientKeyPair.publicKey).toString("base64url"),
       allowedAudienceRoots: [AUDIENCE_ROOT],

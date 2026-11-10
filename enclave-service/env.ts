@@ -12,3 +12,8 @@ export const SIGNING_KEY_KMS_KEY_ID = SIGNING_KEY_KMS_KEY_ARN.split("/")[1]; // 
 export const BASE_URL = process.env.BASE_URL!;
 // TEMPORARY (staging only): trust the audience JWT without verifying its signature.
 export const SKIP_AUDIENCE_VERIFICATION = process.env.SKIP_AUDIENCE_VERIFICATION === "true";
+// Bearer tokens allowed to call POST /session (comma separated in config.env).
+export const SESSION_TOKENS = (process.env.SESSION_TOKENS ?? "")
+  .split(",")
+  .map((token) => token.trim())
+  .filter(Boolean);
