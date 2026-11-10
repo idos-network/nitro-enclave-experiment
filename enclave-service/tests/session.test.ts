@@ -5,6 +5,11 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { app, createSession, resetMocks, sessions, sign, storeSession } from "./app.ts";
 import { AUDIENCE_ROOT, b64, SIGNING_KEY_PAIR, SIGNING_KID } from "./helpers.ts";
 
+const validBody = () => ({
+  sessionClientPublicKey: b64(nacl.box.keyPair().publicKey),
+  allowedAudienceRoots: [AUDIENCE_ROOT],
+});
+
 describe("POST /session", () => {
   beforeEach(resetMocks);
 
@@ -49,9 +54,32 @@ describe("POST /session", () => {
     });
   });
 
+  it("rejects a missing session token", async () => {
+    await request(app).post("/session").send(validBody()).expect(401);
+    expect(storeSession()).not.toHaveBeenCalled();
+  });
+
+  it("rejects an unknown session token", async () => {
+    await request(app)
+      .post("/session")
+      .set("Authorization", "Bearer not-a-session-token")
+      .send(validBody())
+      .expect(401);
+    expect(storeSession()).not.toHaveBeenCalled();
+  });
+
+  it("accepts any token from SESSION_TOKENS", async () => {
+    await request(app)
+      .post("/session")
+      .set("Authorization", "Bearer session-token-two")
+      .send(validBody())
+      .expect(200);
+  });
+
   it("rejects more than 10 audience roots", async () => {
     await request(app)
       .post("/session")
+      .set("Authorization", "Bearer session-token-one")
       .send({
         sessionClientPublicKey: b64(nacl.box.keyPair().publicKey),
         allowedAudienceRoots: Array(11).fill(AUDIENCE_ROOT),

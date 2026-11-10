@@ -7,6 +7,7 @@ import swaggerUi from "swagger-ui-express";
 import YAML from "yaml";
 
 import { sessionKeyMiddleware } from "./middleware/session-key.ts";
+import { sessionTokenMiddleware } from "./middleware/session-token.ts";
 import { validatorMiddleware } from "./middleware/validator.ts";
 import { deleteSession, getSession } from "./providers/db.ts";
 import { decrypt, encrypt } from "./providers/encryption.ts";
@@ -76,6 +77,7 @@ app.get("/.well-known/jwks.json", async (_req, res) => {
 
 app.post(
   "/session",
+  sessionTokenMiddleware(),
   validatorMiddleware(CreateSessionRequestSchema),
   async (_req, res: Response<any, { validatedBody: CreateSessionRequest }>) => {
     const session = await createSession(res.locals.validatedBody);

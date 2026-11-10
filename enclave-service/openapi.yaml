@@ -84,6 +84,8 @@ paths:
         `allowedAudienceRoots`. Returns the session server public key
         (X25519 JWK) and a compact JWS chain over that key (RFC 7515).
       operationId: createSession
+      security:
+        - sessionToken: []
       requestBody:
         required: true
         content:
@@ -102,6 +104,12 @@ paths:
                 $ref: "#/components/schemas/CreateSessionResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
+        "401":
+          description: Missing or unknown session token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
   /session/revoke:
     post:
@@ -239,6 +247,12 @@ paths:
           $ref: "#/components/responses/AudienceJwksUnavailable"
 
 components:
+  securitySchemes:
+    sessionToken:
+      type: http
+      scheme: bearer
+      description: One of the `SESSION_TOKENS` configured in the enclave `config.env`.
+
   parameters:
     XRequestId:
       name: x-request-id
