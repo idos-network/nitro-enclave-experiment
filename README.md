@@ -111,8 +111,13 @@ What decrypts this way (`kms_decrypt` in `shared/kms.ash`, which runs `kms-decry
 - Session-signing key, `enclave/signing_key.enc` (`providers/signing.ts`). KMS `Sign` can't
   carry a Recipient, so with a KMS signing key the host role could mint session JWS chains.
   Instead an Ed25519 key (PKCS#8 PEM) is generated once the same way as the FLE master key,
+  but KMS-encrypted with its own symmetric key (`AWS_KMS_SIGNING_WRAP_ARN` in `config.env`),
   decrypted at boot into `/run/secrets/signing_key` and passed to express as `SIGNING_KEY`.
-  Signing happens in-process; `AWS_KMS_SIGNING_KEY_ARN` is no longer read. The JWKS `kid` is
+  The FLE key has to allow a plain decrypt for the data-key rewrap below; a separate key
+  gets its PCR condition independently of that migration and keeps the two secrets under
+  separate policies.
+  Signing happens in-process; `AWS_KMS_SIGNING_KEY_ARN`, the asymmetric KMS signing key, is
+  no longer read. The JWKS `kid` is
   the key's RFC 7638 thumbprint, so it changes with the key; verifiers resolve keys through
   `jku`, and jose fetches the JWKS again on an unknown `kid`. There is no rotation: one key,
   kept for as long as `signing_key.enc` exists.
@@ -140,15 +145,41 @@ with. Attestation requires the NSM: outside an enclave the endpoint answers 500.
 rate limited to 100 requests per client address in 15 minutes (429 beyond that), the same
 window the other services use.
 
+### Trust assumption: who writes the generate-once secrets
+
+Attestation gates only the decrypt. The encrypted files in S3 are not authenticated: whoever can
+call `kms:Encrypt` on the key and write `enclave/*.enc` chooses the secret the enclave boots
+with. Today that is the instance role, which the host holds too. A host operator can delete
+`signing_key.enc` or `fle_master_key.enc`, upload the ciphertext of a key they know, and the
+next boot decrypts it under a valid attestation. With the signing key they can then forge
+session `jwtChain`s that verify against the JWKS key the attestation binds to the PCRs.
+`If-None-Match: *` only protects an object that still exists.
+
+So until infra closes this, the PCR condition keeps the secrets confidential from the host
+but doesn't prove where they came from. To close it (`lib/enclave-tee`):
+
+- Deny the instance role `s3:DeleteObject` on `enclave/*.enc` and every `s3:PutObject` that
+  isn't a conditional create, and turn on bucket versioning or Object Lock, so an existing
+  ciphertext can't be replaced.
+- Drop `kms:Encrypt` from the instance role once the secrets exist, and grant it again only
+  for a planned regeneration.
+- The first write stays trust on first use: nothing distinguishes the enclave's first boot
+  from the host writing the object before it.
+
 ### Rollout
 
-0. Infra: let the instance role read and write `enclave/fle_master_key.enc` (below) and
-   apply. Without this the new EIF fails at boot.
+0. Infra: create the KMS key that wraps the signing key, put its ARN into `config.env` as
+   `AWS_KMS_SIGNING_WRAP_ARN`, let the instance role read and write
+   `enclave/fle_master_key.enc` and `enclave/signing_key.enc` (below) and apply. Without
+   this the new EIF fails at boot.
 1. Deploy the new EIF with `enclave_measurements` still empty (no PCR condition). The boot
    log should show `fle_master_key` and `signing_key` fetched or generated, and the express
    log `FLE data keys rewrapped from aws to local` with `rewrapped: 1`. Check that sessions
    created before the deploy still decrypt, that `/.well-known/jwks.json` serves the new
    `kid` and that `/attestation` returns a document whose `public_key` matches it.
+   Those older sessions keep the `jwtChain` the KMS key signed, and the JWKS no longer
+   serves that key: a verifier rejects them until they expire, within the one hour session
+   TTL. Deploy when that is acceptable, or have clients create a new session.
 2. Switch `enclave-service/scripts/enclave-run.ash` to a non-debug run (drop
    `--attach-console`, read logs through Loki/vector), redeploy, and check that boot still
    works. Then add that EIF's PCR0/1/2 from the GHA job summary to `enclave_measurements` in
@@ -161,9 +192,14 @@ window the other services use.
 `lib/enclave-tee/iam.tf`, `aws_iam_role_policy.enclave_s3_access`: add
 `"${var.secrets_bucket_arn}/enclave/fle_master_key.enc"` and
 `"${var.secrets_bucket_arn}/enclave/signing_key.enc"` to `ReadConfigAndSecrets`
-(`s3:GetObject`) and `WriteGenerateOnceSecrets` (`s3:PutObject`). The key policy needs nothing
-new: `kms:Encrypt` (generate-once) and `kms:Decrypt` (attested, plus the one-off rewrap
-before PCRs) are already granted to the instance role. The KMS Ed25519 signing key and its
+(`s3:GetObject`) and `WriteGenerateOnceSecrets` (`s3:PutObject`). The FLE key policy needs
+nothing new: `kms:Encrypt` (generate-once) and `kms:Decrypt` (attested, plus the one-off
+rewrap before PCRs) are already granted to the instance role.
+
+`lib/enclave-tee/kms.tf`: a new symmetric key (`ENCRYPT_DECRYPT`) for the signing key, with
+`kms:Encrypt` and `kms:Decrypt` for the instance role and the same `enclave_measurements`
+PCR condition on `kms:Decrypt`. Its ARN goes into `enclave/config.env` as
+`AWS_KMS_SIGNING_WRAP_ARN`. The KMS Ed25519 signing key (`AWS_KMS_SIGNING_KEY_ARN`) and its
 `kms:Sign`/`kms:GetPublicKey` grant can go once no verifier still trusts the old `kid`.
 
 ### Open decisions

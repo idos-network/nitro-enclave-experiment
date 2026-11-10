@@ -511,7 +511,8 @@ components:
         jwtChain:
           type: string
           description: |
-            Compact JWS (`protected.payload.signature`) signed with KMS EdDSA.
+            Compact JWS (`protected.payload.signature`) signed with the enclave's
+            Ed25519 key (EdDSA), published at `/.well-known/jwks.json`.
             The decoded payload contains
             `{ sessionServerPublicKeyX: sessionServerPublicKey.x, nonce }`.
         sessionServerPublicKey:

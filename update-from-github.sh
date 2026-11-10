@@ -50,9 +50,10 @@ if [[ "$EXPECTED" != "$ACTUAL" ]]; then
   exit 1
 fi
 
-# run-enclave without --enclave-name names the enclave after the EIF file.
-echo "Terminating ${EIF%.eif} enclave"
-sudo nitro-cli terminate-enclave --enclave-name "${EIF%.eif}" >/dev/null || true   # fails when it is not running
+# Every service's enclave-run.ash uses CID 16 and restarts the allocator, so a host runs one
+# enclave at a time: another service's enclave left running would block this launch.
+echo "Terminating running enclaves"
+sudo nitro-cli terminate-enclave --all >/dev/null || true   # fails when nothing is running
 
 sudo install -m 0644 "$SRC/$EIF" "$SRC/$INFO" "$DEST/"
 
