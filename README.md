@@ -77,27 +77,28 @@ that, enclave-service decrypts with an attestation document, and the KMS key pol
 
 ### How the enclave gets and uses its attestation
 
-- `kmstool_enclave_cli` + `libnsm.so` ([aws-nitro-enclaves-sdk-c](https://github.com/aws/aws-nitro-enclaves-sdk-c),
-  the official `containers/Dockerfile.al2` build published as `ghcr.io/idos-network/nitro-sdk-builder`
-  by `.github/workflows/nitro-sdk-builder.yml`, which `enclave-service/Dockerfile` copies
-  from; the EIF workflows log in to GHCR, a host build needs `docker login ghcr.io` unless the
-  package is public) ask the Nitro Secure Module (`/dev/nsm`, from the `nsm.ko` our
-  kernel blobs load) for an attestation document. The hypervisor signs it, and it contains
-  PCR0-2 of the running EIF plus a fresh RSA public key generated inside the enclave.
+- `@idos/nitro-nsm` (`packages/nitro-nsm`) asks the Nitro Secure Module (`/dev/nsm`, from
+  the `nsm.ko` our kernel blobs load) for an attestation document. Node has no ioctl, so that
+  one call is a Rust addon (`src/lib.rs`, a napi wrapper around AWS's
+  [aws-nitro-enclaves-nsm-api](https://github.com/aws/aws-nitro-enclaves-nsm-api) crate,
+  trimmed from [aws-nitro-enclaves-nsm-node](https://github.com/PrivadoID/aws-nitro-enclaves-nsm-node)).
+  The `nsm` stage of `enclave-service/Dockerfile` builds it with `cargo build --locked`;
+  `Cargo.lock` pins every crate with its checksum. The hypervisor signs the document, and it
+  contains PCR0-2 of the running EIF plus a fresh RSA public key generated inside the enclave.
 - That document goes into `kms:Decrypt` as `Recipient`. KMS checks the signature, evaluates
   `kms:RecipientAttestation:PCR0/1/2` from the key policy and returns no plaintext, only
-  `CiphertextForRecipient` encrypted to that RSA key, which kmstool opens inside the enclave.
-- The host credentials still authenticate the call (`aws configure export-credentials` in
-  `shared/kms.ash`). Once the policy requires PCRs, they're useless without an attestation
-  from our EIF.
-- kmstool dials the host's KMS proxy over vsock itself (CID 3, the `kms.*` entry in
-  `vsock.json`, port 6004), not the in-enclave socat on 127.0.0.5. The host side only
-  forwards TCP; TLS to `kms.<region>.amazonaws.com` terminates inside the enclave.
+  `CiphertextForRecipient` (a CMS envelope) encrypted to that RSA key, which
+  `packages/nitro-nsm/kms-decrypt.ts` opens inside the enclave with `openssl cms`.
+- The host credentials still authenticate the call (the AWS SDK's default provider chain).
+  Once the policy requires PCRs, they're useless without an attestation from our EIF.
+- The call takes the same route as every other AWS call from the enclave: the in-enclave
+  socat to the host's vsock proxy. The host side only forwards TCP; TLS to
+  `kms.<region>.amazonaws.com` terminates inside the enclave.
 - An enclave in **debug mode** (`nitro-cli run-enclave --debug-mode`, which
   `--attach-console` implies) gets attestations with all-zero PCRs. A PCR-restricted key
   therefore only decrypts for a non-debug enclave, see the rollout below.
 
-What decrypts this way (`kms_decrypt` in `shared/kms.ash`):
+What decrypts this way (`kms_decrypt` in `shared/kms.ash`, which runs `kms-decrypt.ts`):
 
 - LUKS password, `enclave/luks_entropy_password.enc` (`shared/nbd.ash`). The key file gets the
   same bytes as before, so existing volumes keep opening.
@@ -118,24 +119,24 @@ What decrypts this way (`kms_decrypt` in `shared/kms.ash`):
   current one and restart the enclave. Boot generates a fresh key and, if
   `signing_key.previous.enc` exists, decrypts it into `SIGNING_KEY_PREVIOUS`; the JWKS then
   lists the current key first and the previous one after it, so sessions signed before the
-  rotation keep verifying. Rotate at most once per session TTL (24h).
-- Images without kmstool (entropy-service, facesign-service) keep the plain host-role
+  rotation keep verifying. Rotate at most once per session TTL (1h).
+- Images without the addon (entropy-service, facesign-service, proxy-service) keep the plain host-role
   `aws kms decrypt` in `kms_decrypt`. Their keys live in other infra modules
   (`lib/entropy-tee`, `lib/facesign-tee`) and aren't PCR-restricted.
 
-On boot, `providers/db.ts` checks the data key (`enclave-enclave-key`). If it's still wrapped
+On boot, `createFle` (`packages/tee-common/fle.ts`, `localMasterKey`) checks the data key
+(`enclave-enclave-key`). If it's still wrapped
 by `aws`, it calls `rewrapManyDataKey({"masterKey.provider": "aws"}, {provider: "local"})`
 once. That needs the old plain decrypt, so it must run before the PCR condition exists. The
 key `_id` stays the same, so existing encrypted session fields keep decrypting. After the
 rewrap, an older EIF (with only the `aws` provider) can't read the data keys anymore.
-Sessions expire within 24h, so the impact is limited, but plan rollbacks accordingly. Losing
+Sessions expire within an hour, so the impact is limited, but plan rollbacks accordingly. Losing
 `fle_master_key.enc` (or the FLE KMS key) makes all stored sessions unreadable.
 
 ### Attestation endpoint
 
 `GET /attestation?nonce=<base64url, up to 64 bytes>` returns `{ "attestation": <base64> }`,
-the COSE_Sign1 document from `/dev/nsm` (`nsm-attest`, a few lines of C over `libnsm.so` in
-`enclave-service/kmstool/nsm-attest.c`). It carries the EIF's `pcrs`, the caller's `nonce`
+the COSE_Sign1 document from `/dev/nsm` (`getAttestationDocument` of `@idos/nitro-nsm`). It carries the EIF's `pcrs`, the caller's `nonce`
 and, as `public_key`, the signing key from `/.well-known/jwks.json` (SubjectPublicKeyInfo
 DER). A verifier checks the certificate chain up to the AWS Nitro root, the PCRs against the
 GHA job summary, the nonce, and that `public_key` matches the JWK it verifies `jwtChain`
@@ -172,8 +173,8 @@ before PCRs) are already granted to the instance role. The KMS Ed25519 signing k
 ### Open decisions
 
 - **entropy-service** has the same `aws` FLE provider and host-callable keys
-  (`lib/entropy-tee`). It's untouched here. Hardening it means the same three steps: kmstool
-  in its image, the `local` provider with rewrap, and PCR conditions in its key policy.
+  (`lib/entropy-tee`). It's untouched here. Hardening it means the same three steps: the `nsm`
+  stage and `@idos/nitro-nsm` in its image, the `local` provider with rewrap, and PCR conditions in its key policy.
 
 ## Setting up facesign service
 

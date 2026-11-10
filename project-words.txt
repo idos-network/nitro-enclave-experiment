@@ -6,6 +6,7 @@ blkid
 buildx
 Caddyfile
 CBOR
+cdylib
 ciphertext
 cooldown
 COSE
@@ -41,7 +42,6 @@ keygen
 keyid
 keypair
 keyrings
-kmstool
 letsencrypt
 libavcodec
 libavutil
@@ -49,12 +49,12 @@ libgomp
 libmongocrypt
 libnacl
 libnbd
-libnsm
 libsodium
 LOGDIR
 luks
 Multibase
 nacl
+napi
 nbdkit
 nocrypt
 nodesource
@@ -73,11 +73,13 @@ rdparty
 redoc
 redocly
 respawn
+RSAES
 RSASSA
 SCANDIR
 scure
 sdkutils
 secp
+serde
 servercore
 sessionless
 shellcheck

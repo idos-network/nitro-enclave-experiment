@@ -1,3 +1,4 @@
+import { getAttestationDocument } from "@idos/nitro-nsm/index.ts";
 import { loggerMiddleware } from "@idos/tee-common/logger.ts";
 import { mountOpenApi } from "@idos/tee-common/openapi.ts";
 import { requestContextMiddleware } from "@idos/tee-common/request-context.ts";
@@ -8,12 +9,11 @@ import helmet from "helmet";
 import { sessionKeyMiddleware } from "./middleware/session-key.ts";
 import { sessionTokenMiddleware } from "./middleware/session-token.ts";
 import { validatorMiddleware } from "./middleware/validator.ts";
-import { getAttestationDocument } from "./providers/attestation.ts";
 import { deleteSession, getSession } from "./providers/db.ts";
 import { decrypt, encrypt } from "./providers/encryption.ts";
 import { getEncryptionKeyPair } from "./providers/keys.ts";
 import { createSession } from "./providers/session.ts";
-import { SIGNING_JWKS } from "./providers/signing.ts";
+import { SIGNING_JWKS, SIGNING_PUBLIC_KEY_DER } from "./providers/signing.ts";
 import {
   AttestationQuerySchema,
   type CommonRequest,
@@ -58,14 +58,16 @@ app.get("/.well-known/jwks.json", (_req, res) => {
 });
 
 // Binds the JWKS key to the EIF's PCRs: the document's `public_key` is the signing key.
-app.get("/attestation", async (req, res) => {
+app.get("/attestation", (req, res) => {
   const parsed = AttestationQuerySchema.safeParse(req.query);
   if (!parsed.success) {
     return res.status(400).json({ error: "Invalid nonce" });
   }
 
-  const nonce = Buffer.from(parsed.data.nonce ?? "", "base64url");
-  const attestation = await getAttestationDocument(nonce);
+  const attestation = getAttestationDocument({
+    nonce: Buffer.from(parsed.data.nonce ?? "", "base64url"),
+    publicKey: SIGNING_PUBLIC_KEY_DER,
+  });
   return res.status(200).json({ attestation: attestation.toString("base64") });
 });
 

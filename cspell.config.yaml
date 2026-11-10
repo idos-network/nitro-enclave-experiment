@@ -20,4 +20,7 @@ ignorePaths:
   - "**/scripts/logrotate.config"
   - "**/Dockerfile"
   - "**/pnpm-lock.yaml"
+  - "**/Cargo.lock"
+  - "**/LICENSE"
+  - "**/target/**"
   - "**/coverage/**"

@@ -9,6 +9,8 @@
 !facetec-sdk/main.patch
 
 **/node_modules
+**/target
+**/*.node
 **/coverage
 **/.env
 **/config.env

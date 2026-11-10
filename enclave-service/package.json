@@ -16,6 +16,7 @@
     "format:ci": "npx @biomejs/biome ci"
   },
   "dependencies": {
+    "@idos/nitro-nsm": "workspace:*",
     "@idos/tee-common": "workspace:*",
     "@aws-sdk/credential-provider-node": "3.972.50",
     "@aws-sdk/credential-providers": "^3.1119.0",

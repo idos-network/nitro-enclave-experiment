@@ -16,9 +16,6 @@ aws s3 cp "s3://$S3_SECRETS_BUCKET/enclave/vsock.json" ./vsock.json --region "$S
 source "$SCRIPT_DIR/shared/vsock.ash"
 setup_vsock_networking "./vsock.json"
 
-# kmstool_enclave_cli (shared/kms.ash) dials the host's KMS vsock proxy directly
-KMS_PROXY_PORT=$(jq -er '.outgoing[] | select(.host | startswith("kms.")) | .vsock' ./vsock.json)
-
 # Get config.env and source it
 aws s3 cp "s3://$S3_SECRETS_BUCKET/enclave/config.env" ./config.env --region "$S3_SECRETS_REGION"
 
