@@ -10,8 +10,6 @@ export const FLE_MASTER_KEY = process.env.FLE_MASTER_KEY!;
 export const AWS_REGION = process.env.AWS_REGION!;
 // base64 PKCS#8 PEM, Ed25519: session-signing key, see scripts/run.ash
 export const SIGNING_KEY = process.env.SIGNING_KEY!;
-// Same shape, the key before the last rotation; empty when there was none
-export const SIGNING_KEY_PREVIOUS = process.env.SIGNING_KEY_PREVIOUS || undefined;
 export const BASE_URL = process.env.BASE_URL!;
 // TEMPORARY (staging only): trust the audience JWT without verifying its signature.
 export const SKIP_AUDIENCE_VERIFICATION = process.env.SKIP_AUDIENCE_VERIFICATION === "true";

@@ -114,12 +114,8 @@ What decrypts this way (`kms_decrypt` in `shared/kms.ash`, which runs `kms-decry
   decrypted at boot into `/run/secrets/signing_key` and passed to express as `SIGNING_KEY`.
   Signing happens in-process; `AWS_KMS_SIGNING_KEY_ARN` is no longer read. The JWKS `kid` is
   the key's RFC 7638 thumbprint, so it changes with the key; verifiers resolve keys through
-  `jku`, and jose fetches the JWKS again on an unknown `kid`. Rotation keeps one previous key:
-  `aws s3 cp` `enclave/signing_key.enc` to `enclave/signing_key.previous.enc`, `aws s3 rm` the
-  current one and restart the enclave. Boot generates a fresh key and, if
-  `signing_key.previous.enc` exists, decrypts it into `SIGNING_KEY_PREVIOUS`; the JWKS then
-  lists the current key first and the previous one after it, so sessions signed before the
-  rotation keep verifying. Rotate at most once per session TTL (1h).
+  `jku`, and jose fetches the JWKS again on an unknown `kid`. There is no rotation: one key,
+  kept for as long as `signing_key.enc` exists.
 - Images without the addon (entropy-service, facesign-service, proxy-service) keep the plain host-role
   `aws kms decrypt` in `kms_decrypt`. Their keys live in other infra modules
   (`lib/entropy-tee`, `lib/facesign-tee`) and aren't PCR-restricted.
@@ -163,9 +159,7 @@ with. Attestation requires the NSM: outside an enclave the endpoint answers 500.
 `lib/enclave-tee/iam.tf`, `aws_iam_role_policy.enclave_s3_access`: add
 `"${var.secrets_bucket_arn}/enclave/fle_master_key.enc"` and
 `"${var.secrets_bucket_arn}/enclave/signing_key.enc"` to `ReadConfigAndSecrets`
-(`s3:GetObject`) and `WriteGenerateOnceSecrets` (`s3:PutObject`), plus
-`"${var.secrets_bucket_arn}/enclave/signing_key.previous.enc"` to `ReadConfigAndSecrets` only
-(rotation writes it from the operator's credentials, not the instance role). The key policy needs nothing
+(`s3:GetObject`) and `WriteGenerateOnceSecrets` (`s3:PutObject`). The key policy needs nothing
 new: `kms:Encrypt` (generate-once) and `kms:Decrypt` (attested, plus the one-off rewrap
 before PCRs) are already granted to the instance role. The KMS Ed25519 signing key and its
 `kms:Sign`/`kms:GetPublicKey` grant can go once no verifier still trusts the old `kid`.

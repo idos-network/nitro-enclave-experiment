@@ -13,7 +13,7 @@ import { deleteSession, getSession } from "./providers/db.ts";
 import { decrypt, encrypt } from "./providers/encryption.ts";
 import { getEncryptionKeyPair } from "./providers/keys.ts";
 import { createSession } from "./providers/session.ts";
-import { SIGNING_JWKS, SIGNING_PUBLIC_KEY_DER } from "./providers/signing.ts";
+import { SIGNING_PUBLIC_KEY_DER, SIGNING_PUBLIC_KEY_JWK } from "./providers/signing.ts";
 import {
   AttestationQuerySchema,
   type CommonRequest,
@@ -54,7 +54,7 @@ app.get("/health", async (_req, res) => {
 mountOpenApi(app);
 
 app.get("/.well-known/jwks.json", (_req, res) => {
-  res.status(200).json({ keys: SIGNING_JWKS });
+  res.status(200).json({ keys: [SIGNING_PUBLIC_KEY_JWK] });
 });
 
 // Binds the JWKS key to the EIF's PCRs: the document's `public_key` is the signing key.

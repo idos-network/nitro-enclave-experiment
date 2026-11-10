@@ -61,11 +61,6 @@ generate_once fle_master_key "openssl rand -base64 96 | tr -d '\\n'"
 # Ed25519 session-signing key (providers/signing.ts), PKCS#8 PEM. KMS Sign can't require an
 # attestation, so a KMS key would be usable by the host role; this one never leaves the enclave.
 generate_once signing_key "openssl genpkey -algorithm ed25519 | base64 | tr -d '\\n'"
-# Rotation (README): copy signing_key.enc to signing_key.previous.enc, delete signing_key.enc,
-# restart. The previous key stays in the JWKS, so sessions signed before the rotation verify.
-if aws s3 cp "s3://$S3_SECRETS_BUCKET/enclave/signing_key.previous.enc" signing_key.previous.enc --region "$S3_SECRETS_REGION"; then
-  kms_decrypt "$(cat signing_key.previous.enc)" > /run/secrets/signing_key_previous
-fi
 
 echo "Fetching Caddyfile from S3"
 CADDYFILE=Caddyfile
@@ -83,7 +78,7 @@ export HOME=/app
 
 # node directly, not `npm start`: s6-supervise signals its direct child, and an
 # npm wrapper would leak the node process on restart and keep holding the port.
-s6_service express 'cd /app/enclave-service && export NODE_ENV=production && export FLE_MASTER_KEY="$(cat /run/secrets/fle_master_key)" SIGNING_KEY="$(cat /run/secrets/signing_key)" SIGNING_KEY_PREVIOUS="$(cat /run/secrets/signing_key_previous 2>/dev/null || true)" && exec node index.ts'
+s6_service express 'cd /app/enclave-service && export NODE_ENV=production && export FLE_MASTER_KEY="$(cat /run/secrets/fle_master_key)" SIGNING_KEY="$(cat /run/secrets/signing_key)" && exec node index.ts'
 s6_service caddy   'cd /app && exec caddy run --config /app/Caddyfile --adapter caddyfile'
 s6_service node    'exec node_exporter --no-collector.kernel_hung'
 s6_service vector  'exec vector --config /etc/vector/vector.yaml'
