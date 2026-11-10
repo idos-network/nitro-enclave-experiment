@@ -32,6 +32,18 @@ describe("POST /encrypt", () => {
     expect(recovered).toBe(plaintext);
   });
 
+  it("accepts payloads above the default 16kb body limit", async () => {
+    await request(app)
+      .post("/encrypt")
+      .send({
+        arguments: {
+          payload: b64(Buffer.alloc(64 * 1024, 1)),
+          publicKey: b64(nacl.box.keyPair().publicKey),
+        },
+      })
+      .expect(200);
+  });
+
   it("returns 400 for invalid body", async () => {
     const res = await request(app).post("/encrypt").send({ sessionId: "not-a-uuid" }).expect(400);
 

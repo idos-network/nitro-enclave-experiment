@@ -1,7 +1,9 @@
 import { importJWK, jwtVerify } from "jose";
+import request from "supertest";
+import nacl from "tweetnacl";
 import { beforeEach, describe, expect, it } from "vitest";
-import { createSession, resetMocks, sessions, sign, storeSession } from "./app.ts";
-import { SIGNING_KEY_PAIR, SIGNING_KID } from "./helpers.ts";
+import { app, createSession, resetMocks, sessions, sign, storeSession } from "./app.ts";
+import { AUDIENCE_ROOT, b64, SIGNING_KEY_PAIR, SIGNING_KID } from "./helpers.ts";
 
 describe("POST /session", () => {
   beforeEach(resetMocks);
@@ -45,6 +47,25 @@ describe("POST /session", () => {
       iss: "https://test.root.com",
       jku: "https://test.root.com/.well-known/jwks.json",
     });
+  });
+
+  it("rejects more than 10 audience roots", async () => {
+    await request(app)
+      .post("/session")
+      .send({
+        sessionClientPublicKey: b64(nacl.box.keyPair().publicKey),
+        allowedAudienceRoots: Array(11).fill(AUDIENCE_ROOT),
+      })
+      .expect(400);
+    expect(storeSession()).not.toHaveBeenCalled();
+  });
+
+  it("rejects bodies above 16kb with 413", async () => {
+    await request(app)
+      .post("/session")
+      .send({ sessionClientPublicKey: "x".repeat(17 * 1024), allowedAudienceRoots: [] })
+      .expect(413);
+    expect(storeSession()).not.toHaveBeenCalled();
   });
 
   it("returns a unique session each call", async () => {

@@ -43,7 +43,9 @@ app.set("trust proxy", "loopback");
 app.use(promBundle({ includeMethod: true }));
 app.use(helmet());
 app.use(cors());
-app.use(express.json({ limit: "32mb" }));
+// Only encrypt/decrypt carry payloads; every other route gets a small body so it can't be used to exhaust enclave memory.
+app.use(["/encrypt", "/session/decrypt"], express.json({ limit: "32mb" }));
+app.use(express.json({ limit: "16kb" }));
 
 app.get("/", (_req, res) => {
   res.status(200).json({ message: "Enclave Service is running" });
@@ -174,10 +176,21 @@ app.post(
   },
 );
 
-app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-  // Log everything, but never leak internals (AWS/KMS/Mongo messages) to the client.
-  writeLog("error", { error: err instanceof Error ? err.message : String(err) });
-  return res.status(500).json({ error: "Internal server error" });
-});
+app.use(
+  (
+    err: Error & { status?: number; expose?: boolean },
+    _req: Request,
+    res: Response,
+    _next: NextFunction,
+  ) => {
+    // Log everything, but never leak internals (AWS/KMS/Mongo messages) to the client.
+    writeLog("error", { error: err instanceof Error ? err.message : String(err) });
+    // body-parser client errors (413 too large, 400 bad JSON) are marked safe to expose.
+    if (err.expose && err.status) {
+      return res.status(err.status).json({ error: err.message });
+    }
+    return res.status(500).json({ error: "Internal server error" });
+  },
+);
 
 export default app;

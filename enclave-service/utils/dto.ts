@@ -41,16 +41,18 @@ export type DecryptRequest = z.infer<typeof DecryptRequestSchema>;
 
 export const CreateSessionRequestSchema = z.object({
   sessionClientPublicKey: z.base64url().min(43).max(44), // base64url-encoded 32-byte NaCl box public key
-  allowedAudienceRoots: z.array(
-    // TEMPORARY (staging only): roots are never checked when audience verification is skipped.
-    SKIP_AUDIENCE_VERIFICATION
-      ? z.string()
-      : z.enum([
-          "relay.idos.network",
-          "relay.staging.idos.network",
-          "relay.playground.idos.network",
-        ]),
-  ), // array of allowed audience roots
+  allowedAudienceRoots: z
+    .array(
+      // TEMPORARY (staging only): roots are never checked when audience verification is skipped.
+      SKIP_AUDIENCE_VERIFICATION
+        ? z.string().max(253) // max DNS hostname length
+        : z.enum([
+            "relay.idos.network",
+            "relay.staging.idos.network",
+            "relay.playground.idos.network",
+          ]),
+    )
+    .max(10), // array of allowed audience roots; bounded so a session record stays small
 });
 
 export type CreateSessionRequest = z.infer<typeof CreateSessionRequestSchema>;
