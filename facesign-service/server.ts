@@ -1,5 +1,7 @@
 import crypto from "node:crypto";
 import { readFileSync } from "node:fs";
+import { loggerMiddleware } from "@idos/tee-common/logger.ts";
+import { runWithRequestContext } from "@idos/tee-common/request-context.ts";
 import cors from "cors";
 import express, {
   type Express,
@@ -15,7 +17,6 @@ import helmet from "helmet";
 import cron from "node-cron";
 import swaggerUi from "swagger-ui-express";
 import YAML from "yaml";
-
 // Configurations and providers
 import { HOST, KEY_1_MULTIBASE_PUBLIC_PATH } from "./env.ts";
 import { relayJwtAuthMiddleware } from "./middleware/relay-jwt-auth.ts";
@@ -29,7 +30,6 @@ import {
   InternalServerError,
   SessionStartError,
 } from "./providers/errors.ts";
-import loggerMiddleware from "./providers/logger.ts";
 // FaceSign Routes
 import { confirmation as faceSignConfirmation, login as faceSignLogin } from "./routes/facesign.ts";
 // idOS Relay Routes
@@ -39,7 +39,6 @@ import matchIdDoc from "./routes/match-id-doc.ts";
 import selfie from "./routes/selfie.ts";
 import uniqueness from "./routes/uniqueness.ts";
 import { writeLog } from "./utils/logger-context.ts";
-import { runWithRequestContext } from "./utils/request-context.ts";
 
 const app: Express = express();
 

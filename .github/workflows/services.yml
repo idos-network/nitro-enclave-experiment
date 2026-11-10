@@ -5,10 +5,18 @@ on:
     branches: [master, main]
     paths:
       - "*-service/**"
+      - "packages/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
       - ".github/workflows/services.yml"
   pull_request:
     paths:
       - "*-service/**"
+      - "packages/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
       - ".github/workflows/services.yml"
   workflow_dispatch:
 
@@ -45,8 +53,7 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v6
         with:
-          package_json_file: ${{ matrix.service.dir }}/package.json
-          cache_dependency_path: ${{ matrix.service.dir }}/pnpm-lock.yaml
+          cache_dependency_path: pnpm-lock.yaml
           cache: true
 
       - name: Setup Node
@@ -54,10 +61,10 @@ jobs:
         with:
           node-version-file: ${{ matrix.service.dir }}/.node-version
           cache: pnpm
-          cache-dependency-path: ${{ matrix.service.dir }}/pnpm-lock.yaml
+          cache-dependency-path: pnpm-lock.yaml
 
+      # pnpm workspace: one lockfile at the repo root
       - name: Install packages
-        working-directory: ${{ matrix.service.dir }}
         run: pnpm install --frozen-lockfile
 
       - name: Run type check

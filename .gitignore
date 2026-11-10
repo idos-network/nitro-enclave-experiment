@@ -1,8 +1,5 @@
 facetec-sdk/FaceTec-Server-Webservice/
 facetec-sdk/FaceTec-Usage-Log-Server/
-facesign-service/node_modules/
-entropy-service/node_modules/
-enclave-service/node_modules/
+node_modules/
 coverage/
 brag-output/
-proxy-service/node_modules/
