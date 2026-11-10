@@ -5,8 +5,10 @@ biomejs
 blkid
 buildx
 Caddyfile
+CBOR
 ciphertext
 cooldown
+COSE
 cryptsetup
 CSFLE
 Dartifact
@@ -81,8 +83,8 @@ sessionless
 shellcheck
 socat
 spellcheck
-sumsub
 startswith
+sumsub
 svscan
 timberio
 topk

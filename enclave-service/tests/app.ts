@@ -1,15 +1,8 @@
-import { sign as cryptoSign } from "node:crypto";
 import type { NextFunction, Request, Response } from "express";
 import request from "supertest";
 import nacl from "tweetnacl";
-import type { Mock } from "vitest";
 import { vi } from "vitest";
-import {
-  AUDIENCE_ROOT,
-  AUDIENCE_SIGNING_PUBLIC_KEY_JWK,
-  SIGNING_KEY_PAIR,
-  SIGNING_PUBLIC_KEY_JWK,
-} from "./helpers.ts";
+import { AUDIENCE_ROOT, AUDIENCE_SIGNING_PUBLIC_KEY_JWK } from "./helpers.ts";
 
 function mockAudienceJwks() {
   vi.stubGlobal(
@@ -75,29 +68,14 @@ const mocks = vi.hoisted(() => {
     deleteSession: vi.fn(async (sessionId: string) => {
       sessions.delete(sessionId);
     }),
-    sign: vi.fn(),
-    getPublicKeyJWK: vi.fn(),
   };
 });
-
-mocks.sign.mockImplementation(async (payload: Uint8Array) =>
-  // Mirrors KMS ED25519_SHA_512 with MessageType RAW.
-  cryptoSign(null, Buffer.from(payload), SIGNING_KEY_PAIR.privateKey),
-);
-mocks.getPublicKeyJWK.mockImplementation(async () => ({
-  ...SIGNING_PUBLIC_KEY_JWK,
-}));
 
 vi.mock("../providers/db.ts", () => ({
   storeSession: mocks.storeSession,
   getSession: mocks.getSession,
   deleteSession: mocks.deleteSession,
   connectDB: vi.fn(),
-}));
-
-vi.mock("../providers/kms.ts", () => ({
-  sign: mocks.sign,
-  getPublicKeyJWK: mocks.getPublicKeyJWK,
 }));
 
 const { default: app } = await import("../server.ts");
@@ -164,6 +142,3 @@ export const storeSession = () => mocks.storeSession;
 export const getSession = () => mocks.getSession;
 export const deleteSession = () => mocks.deleteSession;
 export const sessions = () => mocks.sessions;
-export const sign = (): Mock<(payload: Uint8Array) => Promise<Buffer>> => mocks.sign;
-export const getPublicKeyJWK = (): Mock<() => Promise<typeof SIGNING_PUBLIC_KEY_JWK>> =>
-  mocks.getPublicKeyJWK;

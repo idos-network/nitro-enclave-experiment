@@ -1,6 +1,7 @@
 import { generateKeyPairSync } from "node:crypto";
 import { SignJWT } from "jose";
 import nacl from "tweetnacl";
+import { SIGNING_PUBLIC_KEY_JWK } from "../providers/signing.ts";
 import type { DecryptRequest } from "../utils/dto.ts";
 import type { CreateSessionResponse } from "./app.ts";
 
@@ -11,14 +12,7 @@ export function b64(bytes: Uint8Array): string {
 /*
  * Signing helpers
  */
-export const SIGNING_KID = "arn:aws:kms:eu-central-1:000000000000:key/signing-test";
-export const SIGNING_KEY_PAIR = generateKeyPairSync("ed25519");
-export const SIGNING_PUBLIC_KEY_JWK = {
-  ...SIGNING_KEY_PAIR.publicKey.export({ format: "jwk" }),
-  kid: SIGNING_KID,
-  use: "sig",
-  alg: "EdDSA",
-} as const;
+export { SIGNING_PUBLIC_KEY_JWK };
 
 /*
  * Audience helpers

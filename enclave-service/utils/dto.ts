@@ -22,6 +22,9 @@ export const CommonRequestSchema = z.object({
 
 export type CommonRequest = z.infer<typeof CommonRequestSchema>;
 
+// NSM accepts up to 512 nonce bytes; 64 is plenty for a freshness challenge (86 base64url chars)
+export const AttestationQuerySchema = z.object({ nonce: z.base64url().max(86).optional() });
+
 // Revocation proves possession of the session client private key via `session` alone.
 export const RevokeSessionRequestSchema = CommonRequestSchema.pick({ session: true });
 export type RevokeSessionRequest = z.infer<typeof RevokeSessionRequestSchema>;
