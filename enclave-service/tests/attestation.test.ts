@@ -50,4 +50,21 @@ describe("GET /attestation", () => {
 
     await request(app).get("/attestation").expect(500);
   });
+
+  // Last: it exhausts the window of this file's client address
+  it("answers 429 past 100 requests per client and stops calling the NSM", async () => {
+    getAttestationDocument.mockReturnValue(Buffer.alloc(1));
+
+    const statuses: number[] = [];
+    for (let i = 0; i < 101; i++) {
+      statuses.push((await request(app).get("/attestation")).status);
+    }
+
+    expect(statuses.at(-1)).toBe(429);
+    expect(getAttestationDocument).toHaveBeenCalledTimes(statuses.indexOf(429));
+    expect(statuses.indexOf(429)).toBeLessThanOrEqual(100);
+
+    // other routes are not limited
+    await request(app).get("/.well-known/jwks.json").expect(200);
+  });
 });

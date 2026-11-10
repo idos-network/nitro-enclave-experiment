@@ -5,6 +5,7 @@ import { requestContextMiddleware } from "@idos/tee-common/request-context.ts";
 import cors from "cors";
 import express, { type Express, type NextFunction, type Request, type Response } from "express";
 import promBundle from "express-prom-bundle";
+import { rateLimit } from "express-rate-limit";
 import helmet from "helmet";
 import { sessionKeyMiddleware } from "./middleware/session-key.ts";
 import { sessionTokenMiddleware } from "./middleware/session-token.ts";
@@ -57,8 +58,18 @@ app.get("/.well-known/jwks.json", (_req, res) => {
   res.status(200).json({ keys: [SIGNING_PUBLIC_KEY_JWK] });
 });
 
+// Every document is a synchronous NSM call signed by the hypervisor, open to anyone:
+// keep one client from holding the event loop with it.
+const attestationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minute
+  limit: 100, // Limit each IP to 100 requests per `window` (here, per 15 minute).
+  legacyHeaders: false,
+  standardHeaders: false,
+  ipv6Subnet: 56,
+});
+
 // Binds the JWKS key to the EIF's PCRs: the document's `public_key` is the signing key.
-app.get("/attestation", (req, res) => {
+app.get("/attestation", attestationLimiter, (req, res) => {
   const parsed = AttestationQuerySchema.safeParse(req.query);
   if (!parsed.success) {
     return res.status(400).json({ error: "Invalid nonce" });

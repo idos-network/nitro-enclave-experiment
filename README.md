@@ -136,7 +136,9 @@ the COSE_Sign1 document from `/dev/nsm` (`getAttestationDocument` of `@idos/nitr
 and, as `public_key`, the signing key from `/.well-known/jwks.json` (SubjectPublicKeyInfo
 DER). A verifier checks the certificate chain up to the AWS Nitro root, the PCRs against the
 GHA job summary, the nonce, and that `public_key` matches the JWK it verifies `jwtChain`
-with. Attestation requires the NSM: outside an enclave the endpoint answers 500.
+with. Attestation requires the NSM: outside an enclave the endpoint answers 500. The route is
+rate limited to 100 requests per client address in 15 minutes (429 beyond that), the same
+window the other services use.
 
 ### Rollout
 
