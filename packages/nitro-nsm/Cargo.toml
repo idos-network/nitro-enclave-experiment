@@ -9,7 +9,7 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
-aws-nitro-enclaves-nsm-api = "0.4.0"
+aws-nitro-enclaves-nsm-api = "0.5.2"
 napi = { version = "2.16.17", default-features = false, features = ["napi4"] }
 napi-derive = "2.16.13"
 serde_bytes = "0.11.17"
