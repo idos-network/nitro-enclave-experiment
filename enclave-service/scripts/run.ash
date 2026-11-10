@@ -37,30 +37,12 @@ echo "127.0.0.1 $(echo "$MONGO_HOST" | sed 's#-cluster.cluster-#-cluster.#')" | 
 source "$SCRIPT_DIR/shared/nbd.ash"
 setup_nbd "enclave"
 
-# generate_once <name> <command printing the base64 plaintext>: like the LUKS password, the
-# secret is generated on first boot, KMS-encrypted into S3 as enclave/<name>.enc and decrypted
-# with attestation (kms_decrypt) into /run/secrets/<name>, which like all but /mnt/encrypted
-# is enclave RAM. The plaintext only ever exists inside an attested enclave.
-generate_once() {
-  local ENC_FILE="$1.enc"
-  echo "-> Fetching $1 from S3"
-  if ! aws s3 cp "s3://$S3_SECRETS_BUCKET/enclave/$ENC_FILE" "$ENC_FILE" --region "$S3_SECRETS_REGION"; then
-    echo "-> Couldn't download $ENC_FILE from S3, generating a new one"
-    aws kms encrypt --key-id "$AWS_KMS_FLE_ARN" --plaintext "$(eval "$2")" \
-      --cli-binary-format base64 --output text --query CiphertextBlob --region "$AWS_REGION" > "$ENC_FILE"
-    # A failed download isn't proof the key is missing: never overwrite an existing one
-    aws s3api put-object --bucket "$S3_SECRETS_BUCKET" --key "enclave/$ENC_FILE" \
-      --body "$ENC_FILE" --if-none-match '*' --region "$S3_SECRETS_REGION"
-  fi
-  kms_decrypt "$(cat "$ENC_FILE")" > "/run/secrets/$1"
-}
-mkdir -p -m 700 /run/secrets
-
+# Generate-once secrets (shared/kms.ash), decrypted with attestation into /run/secrets.
 # Master key of the mongodb `local` KMS provider (FLE, providers/db.ts): 96 random bytes
-generate_once fle_master_key "openssl rand -base64 96 | tr -d '\\n'"
+generate_once enclave fle_master_key "$AWS_KMS_FLE_ARN" "openssl rand -base64 96 | tr -d '\\n'"
 # Ed25519 session-signing key (providers/signing.ts), PKCS#8 PEM. KMS Sign can't require an
 # attestation, so a KMS key would be usable by the host role; this one never leaves the enclave.
-generate_once signing_key "openssl genpkey -algorithm ed25519 | base64 | tr -d '\\n'"
+generate_once enclave signing_key "$AWS_KMS_FLE_ARN" "openssl genpkey -algorithm ed25519 | base64 | tr -d '\\n'"
 
 echo "Fetching Caddyfile from S3"
 CADDYFILE=Caddyfile
