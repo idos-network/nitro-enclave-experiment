@@ -27,7 +27,7 @@ docker build \
     --build-arg S3_SECRETS_BUCKET="$S3_SECRETS_BUCKET" \
     --build-arg S3_SECRETS_REGION="$S3_SECRETS_REGION" \
     -f ~ec2-user/proxy-service/Dockerfile \
-    ~ec2-user/proxy-service/ \
+    ~ec2-user/ \
 ;
 
 # Free up memory for build-enclave

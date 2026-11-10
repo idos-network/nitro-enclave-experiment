@@ -1,21 +1,20 @@
 import fs from "node:fs";
+import { loggerMiddleware } from "@idos/tee-common/logger.ts";
+import { runWithRequestContext } from "@idos/tee-common/request-context.ts";
 import cors from "cors";
 import express, { type Express, type NextFunction, type Request, type Response } from "express";
 import promBundle from "express-prom-bundle";
 import helmet from "helmet";
 import swaggerUi from "swagger-ui-express";
 import YAML from "yaml";
-
 import { armTokenMiddleware } from "./middleware/arm-token.ts";
 import { hostAuthMiddleware } from "./middleware/host-auth.ts";
 import { validatorMiddleware } from "./middleware/validator.ts";
 import { type Armed, deleteArmed, storeArmed } from "./providers/db.ts";
-import loggerMiddleware from "./providers/logger.ts";
 import { forward, isAllowed, resolveUpstreamUrl } from "./providers/proxy.ts";
 import { vendors } from "./providers/vendors/index.ts";
 import { type ArmRequest, ArmRequestSchema } from "./utils/dto.ts";
 import { writeLog } from "./utils/logger-context.ts";
-import { runWithRequestContext } from "./utils/request-context.ts";
 
 const app: Express = express();
 

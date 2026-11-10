@@ -1,0 +1,17 @@
+# Build context is the repo root (pnpm workspace). Allow only what the service Dockerfiles COPY.
+*
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!packages
+!shared
+!*-service
+!facetec-sdk/main.patch
+
+**/node_modules
+**/coverage
+**/.env
+**/config.env
+**/*.md
+**/test
+**/tests

@@ -8,6 +8,13 @@ bash scripts/install-git-hooks.sh
 
 Pre-commit runs `pnpm types`, `pnpm format`, and `pnpm test` in each `*-service`, then `npx cspell`.
 
+## Shared TypeScript
+
+The repo is a pnpm workspace: run `pnpm install` once at the root (one `pnpm-lock.yaml`).
+Code used by more than one service lives in [`packages/tee-common`](packages/tee-common) and is
+imported as `@idos/tee-common/<file>.ts`. It is plain `.ts` with no build step, so an edit is
+picked up by every service immediately. Docker images are built with the repo root as context.
+
 ## Enclave EIF from GitHub Actions
 
 [`enclave-eif-staging.yml`](.github/workflows/enclave-eif-staging.yml) builds the

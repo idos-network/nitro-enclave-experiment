@@ -1,4 +1,5 @@
 import { defaultProvider } from "@aws-sdk/credential-provider-node";
+import { getLogger } from "@idos/tee-common/logger.ts";
 import { type Binary, ClientEncryption, type Db, MongoClient, type UUID } from "mongodb";
 import type { BoxKeyPair } from "tweetnacl";
 import {
@@ -10,7 +11,6 @@ import {
   MONGO_URI,
   SESSION_TTL_SECONDS,
 } from "../env.ts";
-import { getLogger } from "../utils/logger-context.ts";
 
 let db: Db | null = null;
 

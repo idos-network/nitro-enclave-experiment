@@ -53,7 +53,7 @@ RUN aws s3 cp s3://$FACETEC_SDK_BUCKET/FaceTec-Server-Webservice/FaceTec-Server-
 RUN aws s3 cp s3://$FACETEC_SDK_BUCKET/FaceTec-Server-Webservice/FaceTec-Server-Webservice-$FACETEC_SDK_VERSION/config.yaml /home/FaceTec_Custom_Server/deploy/config.yaml
 
 # Patch FaceTec server for field level encryption support
-COPY ./scripts/main.patch /tmp/main.patch
+COPY facetec-sdk/main.patch /tmp/main.patch
 WORKDIR /home/FaceTec_Custom_Server
 RUN patch -p1 < /tmp/main.patch
 
@@ -143,7 +143,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends --no-install-su
 ENV HOME_FACETEC_CUSTOM_SERVER=/home/FaceTec_Custom_Server
 ENV HOME_FACETEC_SERVER_CORE=/home/FaceTec_Server_Core
 ENV HOME_FACETEC_USAGE_LOGS=/home/FaceTec_Usage_Logs_Server
-ENV HOME_FACESIGN_SERVICE=/home/FaceSign_Service
+# pnpm workspace root; the service itself lives in its facesign-service subdirectory
+ENV HOME_FACESIGN_WORKSPACE=/home/FaceSign_Service
+ENV HOME_FACESIGN_SERVICE=$HOME_FACESIGN_WORKSPACE/facesign-service
 
 # Don't copy server core, ocr or urc templates they will be fetched from S3 at runtime
 COPY --from=builder /home/FaceTec_Custom_Server $HOME_FACETEC_CUSTOM_SERVER
@@ -189,12 +191,17 @@ RUN aws s3 sync s3://$FACETEC_SDK_BUCKET/FaceTec-Usage-Log-Server/ ./
 RUN sed -i 's#usageLogsDirectory: ""#usageLogsDirectory: "/mnt/encrypted/usage-logs"#' ./config.yml
 
 # Setup FaceSign Service
-WORKDIR $HOME_FACESIGN_SERVICE
-COPY . .
+# Build context is the repo root. node_modules/@idos/tee-common links to packages/tee-common:
+# Node only strips types from .ts files outside node_modules.
+WORKDIR $HOME_FACESIGN_WORKSPACE
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY packages ./packages
+COPY facesign-service ./facesign-service
 # copy, not hardlink: nitro-cli's linuxkit turns tar hardlinks into symlinks, so a .js that
 # pnpm deduplicated with an identical .d.ts can end up as a symlink to the .d.ts and Node refuses it
-RUN pnpm install --prod --frozen-lockfile --package-import-method=copy \
-    && rm -rf "$(pnpm store path)"
+# The lockfile covers every service; drop it so another service's bump doesn't change this image
+RUN pnpm install --prod --frozen-lockfile --filter "facesign-service..." --package-import-method=copy \
+    && rm -rf "$(pnpm store path)" pnpm-lock.yaml
 
 # Download or copy all required secrets and setup environment
 WORKDIR /home/deploy
@@ -222,12 +229,12 @@ RUN curl -fsSL "https://github.com/prometheus/node_exporter/releases/download/v$
     && rm -rf /tmp/node_exporter-${NODE_EXPORTER_VERSION}.linux-amd64
 
 # Support boot.ash scripts
-COPY ./scripts/run.ash ./
-COPY ./scripts/shared ./shared/
+COPY facesign-service/scripts/run.ash ./
+COPY shared ./shared/
 
 # Copy vector binary & config
 COPY --from=vector /usr/local/bin/vector /usr/bin/vector
-COPY ./scripts/vector.yaml /etc/vector/vector.yaml
+COPY facesign-service/scripts/vector.yaml /etc/vector/vector.yaml
 
 # S3 buckets contains configurations and aws keys arn
 # Passed via --build-arg from scripts/enclave-build.ash

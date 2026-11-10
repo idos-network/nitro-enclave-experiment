@@ -53,7 +53,7 @@ export HOME=/app
 
 # node directly, not `npm start`: s6-supervise signals its direct child, and an
 # npm wrapper would leak the node process on restart and keep holding the port.
-s6_service express 'cd /app && export NODE_ENV=production && exec node index.ts'
+s6_service express 'cd /app/proxy-service && export NODE_ENV=production && exec node index.ts'
 s6_service caddy   'cd /app && exec caddy run --config /app/Caddyfile --adapter caddyfile'
 s6_service node    'exec node_exporter --no-collector.kernel_hung'
 s6_service vector  'exec vector --config /etc/vector/vector.yaml'

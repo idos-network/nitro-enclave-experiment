@@ -1,4 +1,6 @@
 import { readFileSync } from "node:fs";
+import { loggerMiddleware } from "@idos/tee-common/logger.ts";
+import { runWithRequestContext } from "@idos/tee-common/request-context.ts";
 import cors from "cors";
 import express, { type Express } from "express";
 import promBundle from "express-prom-bundle";
@@ -9,9 +11,7 @@ import swaggerUi from "swagger-ui-express";
 import YAML from "yaml";
 import { JWT_PUBLIC_KEY } from "./env.ts";
 import { consumeTokenId, fetchOrCreateFaceSignEntropy, releaseTokenId } from "./providers/db.ts";
-import loggerMiddleware from "./providers/logger.ts";
 import { writeLog } from "./utils/logger-context.ts";
-import { runWithRequestContext } from "./utils/request-context.ts";
 
 const app: Express = express();
 

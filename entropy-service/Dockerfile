@@ -61,17 +61,22 @@ RUN corepack enable
 
 WORKDIR /app
 
-# Copy project files
-COPY . .
+# Build context is the repo root. /app is the pnpm workspace root and the service lives in
+# /app/entropy-service, so node_modules/@idos/tee-common links to /app/packages/tee-common:
+# Node only strips types from .ts files outside node_modules.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY packages ./packages
+COPY entropy-service ./entropy-service
 
 # Install dependencies
 # copy, not hardlink: nitro-cli's linuxkit turns tar hardlinks into symlinks, so a .js that
 # pnpm deduplicated with an identical .d.ts can end up as a symlink to the .d.ts and Node refuses it
-RUN pnpm install --prod --frozen-lockfile --package-import-method=copy \
-    && rm -rf "$(pnpm store path)"
+# The lockfile covers every service; drop it so another service's bump doesn't change this image
+RUN pnpm install --prod --frozen-lockfile --filter "entropy-service..." --package-import-method=copy \
+    && rm -rf "$(pnpm store path)" pnpm-lock.yaml
 
-# Copy source files & scripts
-COPY scripts/shared ./scripts/
+# Shared boot scripts sourced by scripts/run.ash
+COPY shared ./entropy-service/scripts/shared
 
 # DocumentDB's TLS cert is signed by the Amazon RDS CA, not a public one.
 # MONGO_URI points at it with tlsCAFile=/etc/ssl/rds-global-bundle.pem
@@ -93,7 +98,7 @@ RUN curl -fsSL "https://github.com/prometheus/node_exporter/releases/download/v$
 
 # Copy vector binary & config
 COPY --from=vector /usr/local/bin/vector /usr/bin/vector
-COPY scripts/vector.yaml /etc/vector/vector.yaml
+COPY entropy-service/scripts/vector.yaml /etc/vector/vector.yaml
 
 # S3 buckets contains configurations and aws keys arn
 # Passed via --build-arg from scripts/enclave-build.ash
@@ -105,4 +110,4 @@ ENV S3_SECRETS_BUCKET=$S3_SECRETS_BUCKET S3_SECRETS_REGION=$S3_SECRETS_REGION
 EXPOSE 8000
 
 # Run the application
-CMD ["/bin/bash", "/app/scripts/run.ash"]
+CMD ["/bin/bash", "/app/entropy-service/scripts/run.ash"]

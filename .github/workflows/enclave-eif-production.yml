@@ -6,6 +6,11 @@ on:
     paths:
       - "enclave-service/**"
       - "shared/**"
+      - "packages/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - ".dockerignore"
       - "aws-nitro-kernel/blobs/**"
       - ".github/workflows/enclave-eif-production.yml"
   workflow_dispatch:
@@ -27,17 +32,13 @@ jobs:
         with:
           persist-credentials: false
 
-      # Dockerfile does COPY scripts/shared; sync_enclave.sh does the same on the host
-      - name: Copy shared scripts into build context
-        run: cp -a shared enclave-service/scripts/
-
       - name: Build EIF with custom kernel
         id: eif
         # ponytail: pin to a tag once the buildx branch is merged in the action repo
         uses: idos-network/nitro-enclaves-eif-build-action@buildx
         with:
-          context: enclave-service/
-          dockerfile: Dockerfile
+          context: .
+          dockerfile: enclave-service/Dockerfile
           kernel-blobs: aws-nitro-kernel/blobs/
           eif-name: idos-enclave.eif
           build-args: |

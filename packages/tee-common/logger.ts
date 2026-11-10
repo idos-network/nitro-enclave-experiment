@@ -1,7 +1,20 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import type { NextFunction, Request, Response } from "express";
+import type { Logger } from "pino";
+import pino from "pino";
 import { pinoHttp } from "pino-http";
-import { loggerStorage } from "../utils/logger-context.ts";
-import { getRequestId } from "../utils/request-context.ts";
+import { getRequestId } from "./request-context.ts";
+
+const loggerStorage = new AsyncLocalStorage<Logger>();
+
+// Fallback logger for places outside of HTTP requests (e.g. startup, cron jobs)
+const fallbackLogger = pino({
+  formatters: { level: (label) => ({ level: label }) },
+});
+
+export const getLogger = (): Logger => {
+  return loggerStorage.getStore() ?? fallbackLogger;
+};
 
 const sensitiveHeaders = [
   "authorization",
@@ -41,7 +54,7 @@ const logger = pinoHttp({
   },
 });
 
-export default function loggerMiddleware(req: Request, res: Response, next: NextFunction) {
+export function loggerMiddleware(req: Request, res: Response, next: NextFunction) {
   logger(req, res, () => {
     loggerStorage.run(req.log, next);
   });
