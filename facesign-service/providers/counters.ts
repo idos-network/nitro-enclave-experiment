@@ -1,5 +1,4 @@
 import promClient from "@prometheus-io/client";
-import { ACTION_TYPES } from "../utils/actions.ts";
 
 export const sessionStarts = new promClient.Counter({
   name: "session_starts_total",
@@ -29,5 +28,5 @@ export const generalErrors = new promClient.Counter({
 export const actions = new promClient.Counter({
   name: "actions_total",
   help: "Total number of actions",
-  labelNames: ACTION_TYPES,
+  labelNames: ["action"] as const,
 });

@@ -59,3 +59,20 @@ export function loggerMiddleware(req: Request, res: Response, next: NextFunction
     loggerStorage.run(req.log, next);
   });
 }
+
+/**
+ * Builds a service's writeLog: counts the event and logs it with the request logger.
+ * The counter comes from the service so it lands in the registry its /metrics exposes.
+ */
+export function createWriteLog<Action extends string>(counter: {
+  inc(labels: { action: Action }): void;
+}) {
+  return (eventType: Action, data: Record<string, unknown> = {}) => {
+    counter.inc({ action: eventType });
+
+    getLogger().info({
+      eventType,
+      ...data,
+    });
+  };
+}
