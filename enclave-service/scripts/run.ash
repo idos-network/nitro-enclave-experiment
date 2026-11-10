@@ -42,7 +42,9 @@ setup_nbd "enclave"
 generate_once enclave fle_master_key "$AWS_KMS_FLE_ARN" "openssl rand -base64 96 | tr -d '\\n'"
 # Ed25519 session-signing key (providers/signing.ts), PKCS#8 PEM. KMS Sign can't require an
 # attestation, so a KMS key would be usable by the host role; this one never leaves the enclave.
-generate_once enclave signing_key "$AWS_KMS_FLE_ARN" "openssl genpkey -algorithm ed25519 | base64 | tr -d '\\n'"
+# Wrapped by its own symmetric KMS key, not the FLE one: the FLE key has to allow a plain
+# Decrypt for the data-key rewrap, this one gets its PCR condition independently of that.
+generate_once enclave signing_key "$AWS_KMS_SIGNING_WRAP_ARN" "openssl genpkey -algorithm ed25519 | base64 | tr -d '\\n'"
 
 echo "Fetching Caddyfile from S3"
 CADDYFILE=Caddyfile
