@@ -1,0 +1,16 @@
+{
+  "name": "@idos/nitro-nsm",
+  "version": "1.0.0",
+  "description": "Nitro Secure Module for the TEE services: attestation document (Rust addon, built by the service Dockerfile) and KMS Decrypt with attestation. Source only, like @idos/tee-common",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*": "./*"
+  },
+  "dependencies": {
+    "@aws-sdk/client-kms": "^3.1107.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.5"
+  }
+}

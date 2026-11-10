@@ -1,15 +1,15 @@
 # Copy Vector from a pinned image.
 FROM timberio/vector@sha256:32fd554fdd6dc3c17b5ec8e983e9889f37b0c87fa3c8cc28aa318d69cf34d392 AS vector
 
-# kmstool_enclave_cli + libnsm.so + nsm.h from the official aws-nitro-enclaves-sdk-c build
-# (containers/Dockerfile.al2 --target builder, published by .github/workflows/nitro-sdk-builder.yml).
-# kmstool does KMS Decrypt with this enclave's attestation document as Recipient (shared/kms.ash);
-# nsm-attest (kmstool/nsm-attest.c) serves the same document on GET /attestation.
-# shortcut: tag instead of a digest, pin @sha256 from the first nitro-sdk-builder run's job summary
-FROM ghcr.io/idos-network/nitro-sdk-builder:v0.4.5 AS kmstool
+# NSM addon of @idos/nitro-nsm (packages/nitro-nsm/src/lib.rs): the attestation document from
+# /dev/nsm, for KMS Decrypt with a Recipient (shared/kms.ash) and GET /attestation.
+# Crates are pinned with checksums by Cargo.lock.
+FROM rust:1.92-slim-bookworm@sha256:f1f73538ebe623fd3673a35aff3df358ae1084c64c55646516e5b17b321b6c9b AS nsm
 
-COPY enclave-service/kmstool/nsm-attest.c /build/
-RUN gcc -O2 -Wall -Werror -o /usr/bin/nsm-attest /build/nsm-attest.c -lnsm
+WORKDIR /build
+COPY packages/nitro-nsm/Cargo.toml packages/nitro-nsm/Cargo.lock ./
+COPY packages/nitro-nsm/src ./src
+RUN cargo build --release --locked
 
 # Base runtime image.
 FROM ubuntu:24.04@sha256:786a8b558f7be160c6c8c4a54f9a57274f3b4fb1491cf65146521ae77ff1dc54
@@ -47,12 +47,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends --no-install-su
     && apt-get clean \
     && rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
 
-# kmstool_enclave_cli links aws-* statically; only libnsm.so (and glibc) is dynamic.
-# nsm-attest (GET /attestation) shares libnsm.so.
-COPY --from=kmstool /usr/bin/kmstool_enclave_cli /usr/bin/nsm-attest /usr/local/bin/
-COPY --from=kmstool /usr/lib64/libnsm.so /usr/local/lib/libnsm.so
-RUN ldconfig && ! ldd /usr/local/bin/kmstool_enclave_cli /usr/local/bin/nsm-attest | grep 'not found'
-
 # Install Caddy (pinned + SHA-256 verified)
 ARG CADDY_VERSION=2.11.4
 ARG CADDY_SHA256=c41708ffb4af9bc6d19f7d22a7a034804352a21ecc62e1d3dfe3d58e30b38a3e
@@ -81,6 +75,7 @@ WORKDIR /app
 # Node only strips types from .ts files outside node_modules.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages ./packages
+COPY --from=nsm /build/target/release/libnitro_nsm.so ./packages/nitro-nsm/nitro-nsm.node
 COPY enclave-service ./enclave-service
 
 # Install dependencies

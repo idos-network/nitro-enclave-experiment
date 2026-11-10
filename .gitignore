@@ -3,3 +3,7 @@ facetec-sdk/FaceTec-Usage-Log-Server/
 node_modules/
 coverage/
 brag-output/
+
+# @idos/nitro-nsm addon build
+target/
+*.node
