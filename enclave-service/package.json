@@ -17,9 +17,9 @@
   },
   "dependencies": {
     "@idos/tee-common": "workspace:*",
-    "@aws-sdk/client-kms": "^3.1107.0",
     "@aws-sdk/credential-provider-node": "3.972.50",
     "@aws-sdk/credential-providers": "^3.1119.0",
+    "@prometheus-io/client": "^0.16.1",
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "express-prom-bundle": "^8.0.0",
@@ -29,7 +29,6 @@
     "mongodb-client-encryption": "^7.2.1",
     "pino": "^10.3.1",
     "pino-http": "^11.0.0",
-    "@prometheus-io/client": "^0.16.1",
     "prom-client": "npm:@prometheus-io/client@^0.16.1",
     "tweetnacl": "^1.0.3",
     "zod": "^4.6.6"

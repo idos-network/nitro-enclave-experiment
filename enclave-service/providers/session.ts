@@ -1,8 +1,8 @@
 import tweetnacl from "tweetnacl";
-import { BASE_URL, SIGNING_KEY_KMS_KEY_ID } from "../env.ts";
+import { BASE_URL } from "../env.ts";
 import type { CreateSessionRequest } from "../utils/dto.ts";
 import { storeSession } from "./db.ts";
-import { sign } from "./kms.ts";
+import { SIGNING_KID, sign } from "./signing.ts";
 
 export async function createSession(data: CreateSessionRequest) {
   // 1. Generate unique Session ID
@@ -19,7 +19,7 @@ export async function createSession(data: CreateSessionRequest) {
   // 3. JWS protected header (RFC 7515)
   const protectedBase64Url = Buffer.from(
     JSON.stringify({
-      kid: SIGNING_KEY_KMS_KEY_ID,
+      kid: SIGNING_KID,
       alg: "EdDSA",
       iss: BASE_URL,
       jku: `${BASE_URL}/.well-known/jwks.json`,
@@ -37,8 +37,8 @@ export async function createSession(data: CreateSessionRequest) {
   // 5. Signing input: base64url(header) + "." + base64url(payload)
   const signingInputBuffer = Buffer.from(`${protectedBase64Url}.${payloadBase64Url}`, "utf-8");
 
-  // 6. Sign via KMS
-  const rawSignature = await sign(signingInputBuffer);
+  // 6. Sign with the enclave's Ed25519 key
+  const rawSignature = sign(signingInputBuffer);
   const signatureBase64Url = Buffer.from(rawSignature).toString("base64url");
   const jwtChain = `${protectedBase64Url}.${payloadBase64Url}.${signatureBase64Url}`;
 

@@ -8,12 +8,14 @@ import helmet from "helmet";
 import { sessionKeyMiddleware } from "./middleware/session-key.ts";
 import { sessionTokenMiddleware } from "./middleware/session-token.ts";
 import { validatorMiddleware } from "./middleware/validator.ts";
+import { getAttestationDocument } from "./providers/attestation.ts";
 import { deleteSession, getSession } from "./providers/db.ts";
 import { decrypt, encrypt } from "./providers/encryption.ts";
 import { getEncryptionKeyPair } from "./providers/keys.ts";
-import { getPublicKeyJWK } from "./providers/kms.ts";
 import { createSession } from "./providers/session.ts";
+import { SIGNING_JWKS } from "./providers/signing.ts";
 import {
+  AttestationQuerySchema,
   type CommonRequest,
   CommonRequestSchema,
   type CreateSessionRequest,
@@ -51,9 +53,20 @@ app.get("/health", async (_req, res) => {
 
 mountOpenApi(app);
 
-app.get("/.well-known/jwks.json", async (_req, res) => {
-  const key = await getPublicKeyJWK();
-  res.status(200).json({ keys: [key] });
+app.get("/.well-known/jwks.json", (_req, res) => {
+  res.status(200).json({ keys: SIGNING_JWKS });
+});
+
+// Binds the JWKS key to the EIF's PCRs: the document's `public_key` is the signing key.
+app.get("/attestation", async (req, res) => {
+  const parsed = AttestationQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Invalid nonce" });
+  }
+
+  const nonce = Buffer.from(parsed.data.nonce ?? "", "base64url");
+  const attestation = await getAttestationDocument(nonce);
+  return res.status(200).json({ attestation: attestation.toString("base64") });
 });
 
 app.post(

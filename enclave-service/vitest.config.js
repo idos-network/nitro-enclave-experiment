@@ -9,7 +9,6 @@ export default defineConfig({
       MONGO_URI: "mongodb://localhost:27017",
       AWS_REGION: "eu-central-1",
       FLE_MASTER_KEY: Buffer.alloc(96).toString("base64"),
-      AWS_KMS_SIGNING_KEY_ARN: "arn:aws:kms:eu-central-1:000000000000:key/signing-test",
       SESSION_TOKENS: "session-token-one, session-token-two",
     },
     coverage: {

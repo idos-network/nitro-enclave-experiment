@@ -1,7 +1,15 @@
+import { generateKeyPairSync } from "node:crypto";
+
 process.env.NODE_ENV ??= "test";
 process.env.MONGO_URI ??= "mongodb://localhost:27017";
 process.env.AWS_REGION ??= "eu-central-1";
 process.env.FLE_MASTER_KEY ??= Buffer.alloc(96).toString("base64");
-process.env.AWS_KMS_SIGNING_KEY_ARN ??= "arn:aws:kms:eu-central-1:000000000000:key/signing-test";
+// Fresh Ed25519 keys per run, the base64 PKCS#8 PEM shape scripts/run.ash hands over
+const pem = () =>
+  Buffer.from(
+    generateKeyPairSync("ed25519").privateKey.export({ type: "pkcs8", format: "pem" }),
+  ).toString("base64");
+process.env.SIGNING_KEY ??= pem();
+process.env.SIGNING_KEY_PREVIOUS ??= pem();
 process.env.BASE_URL = "https://test.root.com";
 process.env.SESSION_TOKENS ??= "session-token-one, session-token-two";

@@ -78,8 +78,10 @@ that, enclave-service decrypts with an attestation document, and the KMS key pol
 ### How the enclave gets and uses its attestation
 
 - `kmstool_enclave_cli` + `libnsm.so` ([aws-nitro-enclaves-sdk-c](https://github.com/aws/aws-nitro-enclaves-sdk-c),
-  built in the `kmstool` stage of `enclave-service/Dockerfile`, sources pinned with SHA-256 in
-  `enclave-service/kmstool/`) ask the Nitro Secure Module (`/dev/nsm`, from the `nsm.ko` our
+  the official `containers/Dockerfile.al2` build published as `ghcr.io/idos-network/nitro-sdk-builder`
+  by `.github/workflows/nitro-sdk-builder.yml`, which `enclave-service/Dockerfile` copies
+  from; the EIF workflows log in to GHCR, a host build needs `docker login ghcr.io` unless the
+  package is public) ask the Nitro Secure Module (`/dev/nsm`, from the `nsm.ko` our
   kernel blobs load) for an attestation document. The hypervisor signs it, and it contains
   PCR0-2 of the running EIF plus a fresh RSA public key generated inside the enclave.
 - That document goes into `kms:Decrypt` as `Recipient`. KMS checks the signature, evaluates
@@ -105,6 +107,18 @@ What decrypts this way (`kms_decrypt` in `shared/kms.ash`):
   (`AWS_KMS_FLE_ARN`), stored in S3 with `If-None-Match: *` (a failed download never
   overwrites it), decrypted at boot into `/run/secrets` (enclave RAM, not the NBD disk), and
   passed only to the express service as `FLE_MASTER_KEY`.
+- Session-signing key, `enclave/signing_key.enc` (`providers/signing.ts`). KMS `Sign` can't
+  carry a Recipient, so with a KMS signing key the host role could mint session JWS chains.
+  Instead an Ed25519 key (PKCS#8 PEM) is generated once the same way as the FLE master key,
+  decrypted at boot into `/run/secrets/signing_key` and passed to express as `SIGNING_KEY`.
+  Signing happens in-process; `AWS_KMS_SIGNING_KEY_ARN` is no longer read. The JWKS `kid` is
+  the key's RFC 7638 thumbprint, so it changes with the key; verifiers resolve keys through
+  `jku`, and jose fetches the JWKS again on an unknown `kid`. Rotation keeps one previous key:
+  `aws s3 cp` `enclave/signing_key.enc` to `enclave/signing_key.previous.enc`, `aws s3 rm` the
+  current one and restart the enclave. Boot generates a fresh key and, if
+  `signing_key.previous.enc` exists, decrypts it into `SIGNING_KEY_PREVIOUS`; the JWKS then
+  lists the current key first and the previous one after it, so sessions signed before the
+  rotation keep verifying. Rotate at most once per session TTL (24h).
 - Images without kmstool (entropy-service, facesign-service) keep the plain host-role
   `aws kms decrypt` in `kms_decrypt`. Their keys live in other infra modules
   (`lib/entropy-tee`, `lib/facesign-tee`) and aren't PCR-restricted.
@@ -117,14 +131,25 @@ rewrap, an older EIF (with only the `aws` provider) can't read the data keys any
 Sessions expire within 24h, so the impact is limited, but plan rollbacks accordingly. Losing
 `fle_master_key.enc` (or the FLE KMS key) makes all stored sessions unreadable.
 
+### Attestation endpoint
+
+`GET /attestation?nonce=<base64url, up to 64 bytes>` returns `{ "attestation": <base64> }`,
+the COSE_Sign1 document from `/dev/nsm` (`nsm-attest`, a few lines of C over `libnsm.so` in
+`enclave-service/kmstool/nsm-attest.c`). It carries the EIF's `pcrs`, the caller's `nonce`
+and, as `public_key`, the signing key from `/.well-known/jwks.json` (SubjectPublicKeyInfo
+DER). A verifier checks the certificate chain up to the AWS Nitro root, the PCRs against the
+GHA job summary, the nonce, and that `public_key` matches the JWK it verifies `jwtChain`
+with. Attestation requires the NSM: outside an enclave the endpoint answers 500.
+
 ### Rollout
 
 0. Infra: let the instance role read and write `enclave/fle_master_key.enc` (below) and
    apply. Without this the new EIF fails at boot.
 1. Deploy the new EIF with `enclave_measurements` still empty (no PCR condition). The boot
-   log should show `FLE master key` fetched or generated, and the express log
-   `FLE data keys rewrapped from aws to local` with `rewrapped: 1`. Check that sessions
-   created before the deploy still decrypt.
+   log should show `fle_master_key` and `signing_key` fetched or generated, and the express
+   log `FLE data keys rewrapped from aws to local` with `rewrapped: 1`. Check that sessions
+   created before the deploy still decrypt, that `/.well-known/jwks.json` serves the new
+   `kid` and that `/attestation` returns a document whose `public_key` matches it.
 2. Switch `enclave-service/scripts/enclave-run.ash` to a non-debug run (drop
    `--attach-console`, read logs through Loki/vector), redeploy, and check that boot still
    works. Then add that EIF's PCR0/1/2 from the GHA job summary to `enclave_measurements` in
@@ -135,17 +160,17 @@ Sessions expire within 24h, so the impact is limited, but plan rollbacks accordi
 ### Infra changes this needs
 
 `lib/enclave-tee/iam.tf`, `aws_iam_role_policy.enclave_s3_access`: add
-`"${var.secrets_bucket_arn}/enclave/fle_master_key.enc"` to `ReadConfigAndSecrets`
-(`s3:GetObject`) and `WriteGenerateOnceSecrets` (`s3:PutObject`). The key policy needs nothing
+`"${var.secrets_bucket_arn}/enclave/fle_master_key.enc"` and
+`"${var.secrets_bucket_arn}/enclave/signing_key.enc"` to `ReadConfigAndSecrets`
+(`s3:GetObject`) and `WriteGenerateOnceSecrets` (`s3:PutObject`), plus
+`"${var.secrets_bucket_arn}/enclave/signing_key.previous.enc"` to `ReadConfigAndSecrets` only
+(rotation writes it from the operator's credentials, not the instance role). The key policy needs nothing
 new: `kms:Encrypt` (generate-once) and `kms:Decrypt` (attested, plus the one-off rewrap
-before PCRs) are already granted to the instance role.
+before PCRs) are already granted to the instance role. The KMS Ed25519 signing key and its
+`kms:Sign`/`kms:GetPublicKey` grant can go once no verifier still trusts the old `kid`.
 
 ### Open decisions
 
-- **Signing key (`AWS_KMS_SIGNING_KEY_ARN`, KMS `Sign`)**: `Sign` doesn't accept an
-  attestation, so the host role can still sign with it. Fixing that means moving the Ed25519
-  key into the enclave (generated or unwrapped there like the FLE master key), which changes
-  the `kid`/JWKS that verifiers trust.
 - **entropy-service** has the same `aws` FLE provider and host-callable keys
   (`lib/entropy-tee`). It's untouched here. Hardening it means the same three steps: kmstool
   in its image, the `local` provider with rewrap, and PCR conditions in its key policy.

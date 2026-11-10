@@ -64,8 +64,9 @@ paths:
       tags: [Keys]
       summary: JWKS for session signature verification
       description: |
-        Returns the KMS signing public key as a JWK set. Used to verify
-        `jwtChain` on session creation responses (EdDSA / Ed25519).
+        Returns the enclave's signing public key as a JWK set. Used to verify
+        `jwtChain` on session creation responses (EdDSA / Ed25519). The key is
+        generated inside the enclave; `kid` is its RFC 7638 thumbprint.
       operationId: getJwks
       responses:
         "200":
@@ -74,6 +75,44 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Jwks"
+
+  /attestation:
+    get:
+      tags: [Keys]
+      summary: Nitro attestation document
+      description: |
+        Returns the attestation document of the running enclave, signed by the
+        AWS Nitro hypervisor. Its `pcrs` identify the EIF, `nonce` echoes the
+        query parameter and `public_key` is the signing key from
+        `/.well-known/jwks.json` as SubjectPublicKeyInfo DER, so a verifier can
+        tie session signatures to a known enclave image.
+      operationId: getAttestation
+      parameters:
+        - name: nonce
+          in: query
+          required: false
+          description: Base64url-encoded freshness challenge, up to 64 bytes
+          schema:
+            type: string
+            pattern: '^[A-Za-z0-9_-]{0,86}$'
+      responses:
+        "200":
+          description: Attestation document
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [attestation]
+                properties:
+                  attestation:
+                    type: string
+                    description: Base64-encoded COSE_Sign1 (CBOR) attestation document
+        "400":
+          description: Invalid nonce
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
 
   /session:
     post:
@@ -547,7 +586,7 @@ components:
 
     Jwk:
       type: object
-      description: JSON Web Key (Ed25519 signing key from KMS)
+      description: JSON Web Key (Ed25519 signing key generated inside the enclave)
       required: [kty, crv, x, kid, use, alg]
       properties:
         kty:
