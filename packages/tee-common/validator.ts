@@ -11,14 +11,17 @@ export interface Schema {
 
 /**
  * Returns a middleware factory: parse the body with the given schema, put the result in
- * res.locals.validatedBody, and answer 400 on a bad body after reporting it to `onInvalid`.
+ * res.locals.validatedBody, and answer 400 on a bad body after logging "request_invalid_body".
+ * Takes the service's writeLog because the action counter lives in the service.
  */
-export function createValidatorMiddleware(onInvalid: (error: unknown) => void) {
+export function createValidatorMiddleware(
+  writeLog: (eventType: "request_invalid_body", data: { error: unknown }) => void,
+) {
   return (schema: Schema): RequestHandler => {
     return async (req, res, next) => {
       const parsed = schema.safeParse(req.body);
       if (!parsed.success) {
-        onInvalid(parsed.error);
+        writeLog("request_invalid_body", { error: parsed.error });
 
         const issues = parsed.error.issues.map(({ path, code }) => ({
           path: path.join("."),
