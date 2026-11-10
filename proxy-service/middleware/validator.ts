@@ -4,6 +4,4 @@ import { writeLog } from "../utils/logger-context.ts";
 /**
  * Parse RequestSchema and return 400 on bad body
  */
-export const validatorMiddleware = createValidatorMiddleware((error) =>
-  writeLog("request_invalid_body", { error }),
-);
+export const validatorMiddleware = createValidatorMiddleware(writeLog);
