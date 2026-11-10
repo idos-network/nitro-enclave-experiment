@@ -1,7 +1,7 @@
-import crypto from "node:crypto";
 import { readFileSync } from "node:fs";
 import { loggerMiddleware } from "@idos/tee-common/logger.ts";
-import { runWithRequestContext } from "@idos/tee-common/request-context.ts";
+import { mountOpenApi } from "@idos/tee-common/openapi.ts";
+import { requestContextMiddleware } from "@idos/tee-common/request-context.ts";
 import cors from "cors";
 import express, {
   type Express,
@@ -15,8 +15,6 @@ import promBundle from "express-prom-bundle";
 import { rateLimit } from "express-rate-limit";
 import helmet from "helmet";
 import cron from "node-cron";
-import swaggerUi from "swagger-ui-express";
-import YAML from "yaml";
 // Configurations and providers
 import { HOST, KEY_1_MULTIBASE_PUBLIC_PATH } from "./env.ts";
 import { relayJwtAuthMiddleware } from "./middleware/relay-jwt-auth.ts";
@@ -42,11 +40,7 @@ import { writeLog } from "./utils/logger-context.ts";
 
 const app: Express = express();
 
-app.use((req, res, next) => {
-  const requestId = req.header("x-request-id") || crypto.randomUUID();
-  res.setHeader("x-request-id", requestId);
-  runWithRequestContext({ requestId, ...(req.ip !== undefined ? { remoteIp: req.ip } : {}) }, next);
-});
+app.use(requestContextMiddleware);
 app.use(loggerMiddleware);
 app.set("trust proxy", "loopback");
 app.use(promBundle({ includeMethod: true }));
@@ -76,19 +70,7 @@ app.get("/health", async (_req, res) => {
   res.status(200).json({ status: "ok", version: status.serverInfo.facetecServerWebserviceVersion });
 });
 
-if (process.env.NODE_ENV !== "test") {
-  const file = readFileSync("./openapi.yaml", "utf8");
-  const swaggerDocument = YAML.parse(file);
-
-  app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
-  app.get("/openapi.json", (_req, res) => {
-    res.json(swaggerDocument);
-  });
-  app.get("/openapi.yaml", (_req, res) => {
-    res.type("text/yaml");
-    res.send(file);
-  });
-}
+mountOpenApi(app);
 
 export const asyncHandler = (
   // biome-ignore lint/suspicious/noExplicitAny: any is needed here

@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import type { NextFunction, Request, Response } from "express";
 
 export type RequestContext = {
   requestId: string;
@@ -21,4 +22,11 @@ export function getRequestId() {
 
 export function getRemoteIp() {
   return getRequestContext()?.remoteIp;
+}
+
+/** Tags the request with an id (x-request-id, or a fresh one) and runs the rest of it in that context. */
+export function requestContextMiddleware(req: Request, res: Response, next: NextFunction) {
+  const requestId = req.header("x-request-id") || crypto.randomUUID();
+  res.setHeader("x-request-id", requestId);
+  runWithRequestContext({ requestId, ...(req.ip !== undefined ? { remoteIp: req.ip } : {}) }, next);
 }

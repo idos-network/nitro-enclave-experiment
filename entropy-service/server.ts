@@ -1,25 +1,20 @@
 import { readFileSync } from "node:fs";
 import { loggerMiddleware } from "@idos/tee-common/logger.ts";
-import { runWithRequestContext } from "@idos/tee-common/request-context.ts";
+import { mountOpenApi } from "@idos/tee-common/openapi.ts";
+import { requestContextMiddleware } from "@idos/tee-common/request-context.ts";
 import cors from "cors";
 import express, { type Express } from "express";
 import promBundle from "express-prom-bundle";
 import { rateLimit } from "express-rate-limit";
 import helmet from "helmet";
 import jwt from "jsonwebtoken";
-import swaggerUi from "swagger-ui-express";
-import YAML from "yaml";
 import { JWT_PUBLIC_KEY } from "./env.ts";
 import { consumeTokenId, fetchOrCreateFaceSignEntropy, releaseTokenId } from "./providers/db.ts";
 import { writeLog } from "./utils/logger-context.ts";
 
 const app: Express = express();
 
-app.use((req, res, next) => {
-  const requestId = req.header("x-request-id") || crypto.randomUUID();
-  res.setHeader("x-request-id", requestId);
-  runWithRequestContext({ requestId, ...(req.ip !== undefined ? { remoteIp: req.ip } : {}) }, next);
-});
+app.use(requestContextMiddleware);
 app.use(loggerMiddleware);
 app.set("trust proxy", "loopback");
 app.use(promBundle({ includeMethod: true }));
@@ -45,19 +40,7 @@ app.get("/health", async (_req, res) => {
   res.status(200).json({ status: "ok" });
 });
 
-if (process.env.NODE_ENV !== "test") {
-  const file = readFileSync("./openapi.yaml", "utf8");
-  const swaggerDocument = YAML.parse(file);
-
-  app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
-  app.get("/openapi.json", (_req, res) => {
-    res.json(swaggerDocument);
-  });
-  app.get("/openapi.yaml", (_req, res) => {
-    res.type("text/yaml");
-    res.send(file);
-  });
-}
+mountOpenApi(app);
 
 app.post("/facesign/entropy", async (req, res) => {
   // Validate token from body

@@ -65,15 +65,9 @@ importers:
       prom-client:
         specifier: npm:@prometheus-io/client@^0.16.1
         version: '@prometheus-io/client@0.16.1'
-      swagger-ui-express:
-        specifier: ^5.0.1
-        version: 5.0.1(express@5.2.1)
       tweetnacl:
         specifier: ^1.0.3
         version: 1.0.3
-      yaml:
-        specifier: ^2.9.0
-        version: 2.9.0
       zod:
         specifier: ^4.6.6
         version: 4.6.7
@@ -93,9 +87,6 @@ importers:
       '@types/supertest':
         specifier: ^7.2.1
         version: 7.2.1
-      '@types/swagger-ui-express':
-        specifier: ^4.1.8
-        version: 4.1.8
       '@vitest/coverage-v8':
         specifier: 4.1.8
         version: 4.1.8(vitest@4.1.10)
@@ -162,12 +153,6 @@ importers:
       prom-client:
         specifier: npm:@prometheus-io/client@^0.16.1
         version: '@prometheus-io/client@0.16.1'
-      swagger-ui-express:
-        specifier: ^5.0.1
-        version: 5.0.1(express@5.2.1)
-      yaml:
-        specifier: ^2.9.0
-        version: 2.9.0
     devDependencies:
       '@biomejs/biome':
         specifier: 2.5.7
@@ -190,9 +175,6 @@ importers:
       '@types/supertest':
         specifier: ^7.2.1
         version: 7.2.1
-      '@types/swagger-ui-express':
-        specifier: ^4.1.8
-        version: 4.1.8
       '@vitest/coverage-v8':
         specifier: ^4.1.10
         version: 4.1.10(vitest@4.1.10)
@@ -259,12 +241,6 @@ importers:
       prom-client:
         specifier: npm:@prometheus-io/client@^0.16.1
         version: '@prometheus-io/client@0.16.1'
-      swagger-ui-express:
-        specifier: ^5.0.1
-        version: 5.0.1(express@5.2.1)
-      yaml:
-        specifier: ^2.9.0
-        version: 2.9.0
     devDependencies:
       '@biomejs/biome':
         specifier: 2.5.7
@@ -287,9 +263,6 @@ importers:
       '@types/supertest':
         specifier: ^7.2.1
         version: 7.2.1
-      '@types/swagger-ui-express':
-        specifier: ^4.1.8
-        version: 4.1.8
       '@vitest/coverage-v8':
         specifier: ^4.1.10
         version: 4.1.10(vitest@4.1.10)
@@ -311,12 +284,21 @@ importers:
 
   packages/tee-common:
     dependencies:
+      express:
+        specifier: ^5.2.1
+        version: 5.2.1
       pino:
         specifier: ^10.3.1
         version: 10.3.1
       pino-http:
         specifier: ^11.0.0
         version: 11.0.0
+      swagger-ui-express:
+        specifier: ^5.0.1
+        version: 5.0.1(express@5.2.1)
+      yaml:
+        specifier: ^2.9.0
+        version: 2.9.0
     devDependencies:
       '@types/express':
         specifier: ^5.0.6
@@ -324,6 +306,9 @@ importers:
       '@types/node':
         specifier: ^25.9.5
         version: 25.9.5
+      '@types/swagger-ui-express':
+        specifier: ^4.1.8
+        version: 4.1.8
 
   proxy-service:
     dependencies:
@@ -372,12 +357,6 @@ importers:
       prom-client:
         specifier: npm:@prometheus-io/client@^0.16.1
         version: '@prometheus-io/client@0.16.1'
-      swagger-ui-express:
-        specifier: ^5.0.1
-        version: 5.0.1(express@5.2.1)
-      yaml:
-        specifier: ^2.9.0
-        version: 2.9.0
       zod:
         specifier: ^4.6.6
         version: 4.6.7
@@ -397,9 +376,6 @@ importers:
       '@types/supertest':
         specifier: ^7.2.1
         version: 7.2.1
-      '@types/swagger-ui-express':
-        specifier: ^4.1.8
-        version: 4.1.8
       '@vitest/coverage-v8':
         specifier: 4.1.10
         version: 4.1.10(vitest@4.1.10)
