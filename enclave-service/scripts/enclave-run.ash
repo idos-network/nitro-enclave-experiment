@@ -16,6 +16,5 @@ sudo nitro-cli run-enclave \
     --enclave-cid 16 \
     --cpu-count 2 \
     --memory 8192 \
-    --eif-path "$NITRO_CLI_ARTIFACTS/$TARGET_DOCKER_IMAGE.eif" \
-    --attach-console \
+    --eif-path "$NITRO_CLI_ARTIFACTS/$TARGET_DOCKER_IMAGE.eif"
 ;
