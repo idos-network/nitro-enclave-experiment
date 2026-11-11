@@ -5,6 +5,10 @@ set -ueo pipefail
 set -u
 set -e
 
+# The images ship no `less`. With stdout on the enclave console (a TTY) AWS CLI v2 pipes
+# every printed result through a pager and fails without one, e.g. s3api put-object.
+export AWS_PAGER=""
+
 # Configure minimal networking
 configure_basic_networking() {
   echo "⚙️ Configuring basic networking and S3 access for $1"
