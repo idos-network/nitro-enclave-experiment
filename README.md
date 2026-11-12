@@ -101,7 +101,9 @@ that, enclave-service decrypts with an attestation document, and the KMS key pol
 What decrypts this way (`kms_decrypt` in `shared/kms.ash`, which runs `kms-decrypt.ts`):
 
 - LUKS password, `enclave/luks_entropy_password.enc` (`shared/nbd.ash`). The key file gets the
-  same bytes as before, so existing volumes keep opening.
+  same bytes as before, so existing volumes keep opening. Like the generate-once secrets it
+  is uploaded with `If-None-Match: *`, so a failed download can't replace the password of an
+  existing disk and the bucket policy can require the header on every `PutObject`.
 - FLE master key, `enclave/fle_master_key.enc` (`enclave-service/scripts/run.ash`). libmongocrypt's
   `aws` provider can't send a Recipient, so field-level encryption now uses the `local` KMS
   provider. Its 96-byte master key is generated once, KMS-encrypted with the FLE key
