@@ -8,6 +8,11 @@ export function startServer(app: Express) {
     console.log(`Server started and listening on port ${PORT}`);
   });
 
+  // Caddy keeps idle upstream connections for 2m (reverse_proxy default); Node's 5s default
+  // closed them first, so Caddy reused a dead socket and answered 502 "broken pipe".
+  // Node must be the side that outlives the proxy's idle timeout.
+  server.keepAliveTimeout = 130_000;
+
   server.on("error", (err) => {
     if ("code" in err && err.code === "EADDRINUSE") {
       console.error(
