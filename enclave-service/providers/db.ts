@@ -1,6 +1,7 @@
 import { defaultProvider } from "@aws-sdk/credential-provider-node";
 import { createFle } from "@idos/tee-common/fle.ts";
 import { getLogger } from "@idos/tee-common/logger.ts";
+import { withSpan } from "@idos/tee-common/telemetry.ts";
 import { type Binary, ClientEncryption, type Db, MongoClient } from "mongodb";
 import type { BoxKeyPair } from "tweetnacl";
 import {
@@ -65,7 +66,7 @@ export interface SessionRecordDocument {
   createdAt: Date;
 }
 
-export async function storeSession(
+async function storeSessionUntraced(
   sessionId: string,
   sessionServerKeyPair: BoxKeyPair,
   sessionClientPublicKeyB64: string,
@@ -94,7 +95,7 @@ export async function storeSession(
   await db.collection(DB_ENCLAVE_COLLECTION).insertOne(record);
 }
 
-export async function deleteSession(sessionId: string) {
+async function deleteSessionUntraced(sessionId: string) {
   const { db } = await connectDB();
   await db.collection(DB_ENCLAVE_COLLECTION).deleteOne({ sessionId });
 }
@@ -108,7 +109,7 @@ export interface Session {
   sessionServerJwtChain: string;
 }
 
-export async function getSession(sessionId: string): Promise<Session | null> {
+async function getSessionUntraced(sessionId: string): Promise<Session | null> {
   const { db, decrypt } = await connectDB();
 
   const session = await db
@@ -136,3 +137,10 @@ export async function getSession(sessionId: string): Promise<Session | null> {
     sessionServerJwtChain,
   };
 }
+
+export const storeSession = (...args: Parameters<typeof storeSessionUntraced>) =>
+  withSpan("db.storeSession", () => storeSessionUntraced(...args));
+export const deleteSession = (sessionId: string) =>
+  withSpan("db.deleteSession", () => deleteSessionUntraced(sessionId));
+export const getSession = (sessionId: string) =>
+  withSpan("db.getSession", () => getSessionUntraced(sessionId));

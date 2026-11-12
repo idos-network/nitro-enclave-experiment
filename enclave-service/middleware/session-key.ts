@@ -1,3 +1,4 @@
+import { withSpan } from "@idos/tee-common/telemetry.ts";
 import type { RequestHandler } from "express";
 import nacl from "tweetnacl";
 import { SKIP_AUDIENCE_VERIFICATION } from "../env.ts";
@@ -45,7 +46,9 @@ export function sessionKeyMiddleware(): RequestHandler {
     try {
       audiencePublicKey = SKIP_AUDIENCE_VERIFICATION
         ? extractAudience(sessionRequest.audience.jwtChain)
-        : await verifyAudience(session.allowedAudienceRoots, sessionRequest.audience.jwtChain);
+        : await withSpan("audience.verify", () =>
+            verifyAudience(session.allowedAudienceRoots, sessionRequest.audience.jwtChain),
+          );
     } catch (error) {
       if (!(error instanceof AudienceError)) throw error;
 

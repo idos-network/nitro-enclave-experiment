@@ -2,6 +2,7 @@ import { getAttestationDocument } from "@idos/nitro-nsm/index.ts";
 import { loggerMiddleware } from "@idos/tee-common/logger.ts";
 import { mountOpenApi } from "@idos/tee-common/openapi.ts";
 import { requestContextMiddleware } from "@idos/tee-common/request-context.ts";
+import { tracingMiddleware, withSpan } from "@idos/tee-common/telemetry.ts";
 import cors from "cors";
 import express, { type Express, type NextFunction, type Request, type Response } from "express";
 import promBundle from "express-prom-bundle";
@@ -34,6 +35,7 @@ import { splitPayload } from "./utils/payload.ts";
 const app: Express = express();
 
 app.use(requestContextMiddleware);
+app.use(tracingMiddleware);
 
 app.use(loggerMiddleware);
 app.set("trust proxy", "loopback");
@@ -75,10 +77,12 @@ app.get("/attestation", attestationLimiter, (req, res) => {
     return res.status(400).json({ error: "Invalid nonce" });
   }
 
-  const attestation = getAttestationDocument({
-    nonce: Buffer.from(parsed.data.nonce ?? "", "base64url"),
-    publicKey: SIGNING_PUBLIC_KEY_DER,
-  });
+  const attestation = withSpan("nsm.attestation", () =>
+    getAttestationDocument({
+      nonce: Buffer.from(parsed.data.nonce ?? "", "base64url"),
+      publicKey: SIGNING_PUBLIC_KEY_DER,
+    }),
+  );
   return res.status(200).json({ attestation: attestation.toString("base64") });
 });
 
@@ -87,7 +91,7 @@ app.post(
   sessionTokenMiddleware(),
   validatorMiddleware(CreateSessionRequestSchema),
   async (_req, res: Response<any, { validatedBody: CreateSessionRequest }>) => {
-    const session = await createSession(res.locals.validatedBody);
+    const session = await withSpan("session.create", () => createSession(res.locals.validatedBody));
     writeLog("session_created", { sessionId: session.id });
     res.status(200).json(session);
   },
@@ -148,7 +152,9 @@ app.post(
 
     writeLog("encrypt_request");
 
-    const data = await encrypt(validatedBody.arguments.payload, validatedBody.arguments.publicKey);
+    const data = withSpan("box.encrypt", () =>
+      encrypt(validatedBody.arguments.payload, validatedBody.arguments.publicKey),
+    );
 
     return res.json(data);
   },
@@ -174,11 +180,8 @@ app.post(
       validatedBody.arguments.nonce,
     );
 
-    const data = await decrypt(
-      payload,
-      nonce,
-      validatedBody.arguments.publicKey,
-      encryptionKeyPair.secretKey,
+    const data = withSpan("box.decrypt", () =>
+      decrypt(payload, nonce, validatedBody.arguments.publicKey, encryptionKeyPair.secretKey),
     );
 
     return res.json({ data });

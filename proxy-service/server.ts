@@ -1,6 +1,7 @@
 import { loggerMiddleware } from "@idos/tee-common/logger.ts";
 import { mountOpenApi } from "@idos/tee-common/openapi.ts";
 import { requestContextMiddleware } from "@idos/tee-common/request-context.ts";
+import { tracingMiddleware, withSpan } from "@idos/tee-common/telemetry.ts";
 import cors from "cors";
 import express, { type Express, type NextFunction, type Request, type Response } from "express";
 import promBundle from "express-prom-bundle";
@@ -17,6 +18,7 @@ import { writeLog } from "./utils/logger-context.ts";
 const app: Express = express();
 
 app.use(requestContextMiddleware);
+app.use(tracingMiddleware);
 
 app.use(loggerMiddleware);
 app.set("trust proxy", "loopback");
@@ -44,7 +46,7 @@ app.post(
   validatorMiddleware(ArmRequestSchema),
   async (_req, res: Response<any, { validatedBody: ArmRequest }>) => {
     const id = crypto.randomUUID();
-    await storeArmed(id, res.locals.validatedBody);
+    await withSpan("db.storeArmed", () => storeArmed(id, res.locals.validatedBody));
     const { api, environment } = res.locals.validatedBody;
     writeLog("armed", { armedId: id, api, environment });
     res.status(200).json({ id });
@@ -53,7 +55,7 @@ app.post(
 
 app.delete("/arm/:id", armTokenMiddleware(), async (req, res) => {
   const armedId = String(req.params.id);
-  const deleted = await deleteArmed(armedId);
+  const deleted = await withSpan("db.deleteArmed", () => deleteArmed(armedId));
 
   if (!deleted) {
     return res.status(404).json({ error: "Armed id not found" });
@@ -79,7 +81,8 @@ app.all(
 
     let upstream: Awaited<ReturnType<typeof forward>>;
     try {
-      upstream = await forward(armed, req, url);
+      // the vendor never sees our trace context: nothing injects traceparent into forward()
+      upstream = await withSpan("upstream.forward", () => forward(armed, req, url));
     } catch (error) {
       writeLog("proxy_upstream_failed", {
         armedId: armed.id,
