@@ -2,14 +2,7 @@ import { defaultProvider } from "@aws-sdk/credential-provider-node";
 import { createFle } from "@idos/tee-common/fle.ts";
 import { traced } from "@idos/tee-common/telemetry.ts";
 import { type Binary, ClientEncryption, type Db, MongoClient } from "mongodb";
-import {
-  AWS_REGION,
-  DB_ARMED_COLLECTION,
-  DB_NAME,
-  FLE_KEY_ALIAS,
-  FLE_KMS_KEY_ID,
-  MONGO_URI,
-} from "../env.ts";
+import { DB_ARMED_COLLECTION, DB_NAME, FLE_KEY_ALIAS, FLE_MASTER_KEY, MONGO_URI } from "../env.ts";
 import type { ArmRequest } from "../utils/dto.ts";
 
 let db: Db | null = null;
@@ -22,10 +15,12 @@ const client = new MongoClient(MONGO_URI, {
 const fle = createFle({
   client,
   ClientEncryption,
+  // unused: the vault only ever holds `local` data keys, nothing to rewrap from `aws`
   credentialsProvider: defaultProvider(),
   keyDb: "proxyEncryption",
   keyAlias: FLE_KEY_ALIAS,
-  masterKey: { key: FLE_KMS_KEY_ID, region: AWS_REGION },
+  // decrypted with attestation by scripts/run.ash, see localMasterKey in tee-common/fle.ts
+  localMasterKey: Buffer.from(FLE_MASTER_KEY, "base64"),
 });
 
 export async function connectDB() {
