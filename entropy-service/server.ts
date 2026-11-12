@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { loggerMiddleware } from "@idos/tee-common/logger.ts";
 import { mountOpenApi } from "@idos/tee-common/openapi.ts";
 import { requestContextMiddleware } from "@idos/tee-common/request-context.ts";
+import { tracingMiddleware, withSpan } from "@idos/tee-common/telemetry.ts";
 import cors from "cors";
 import express, { type Express } from "express";
 import promBundle from "express-prom-bundle";
@@ -15,6 +16,7 @@ import { writeLog } from "./utils/logger-context.ts";
 const app: Express = express();
 
 app.use(requestContextMiddleware);
+app.use(tracingMiddleware);
 app.use(loggerMiddleware);
 app.set("trust proxy", "loopback");
 app.use(promBundle({ includeMethod: true }));
@@ -85,7 +87,8 @@ app.post("/facesign/entropy", async (req, res) => {
   }
 
   // Single use: a leaked token can't be replayed within its 60s window
-  if (!(await consumeTokenId(result.jti))) {
+  const jti = result.jti;
+  if (!(await withSpan("db.consumeTokenId", () => consumeTokenId(jti)))) {
     writeLog("entropy_error_token_reused", { userId: result.sub, ip: req.ip });
     return res.status(400).json({ error: "Token already used" });
   }
@@ -93,10 +96,12 @@ app.post("/facesign/entropy", async (req, res) => {
   let insert: boolean;
   let entropy: string;
   try {
-    ({ insert, entropy } = await fetchOrCreateFaceSignEntropy(result.sub as string));
+    ({ insert, entropy } = await withSpan("db.fetchOrCreateFaceSignEntropy", () =>
+      fetchOrCreateFaceSignEntropy(result.sub as string),
+    ));
   } catch (error) {
     // Nothing was handed out, so the token is still unspent - let it retry.
-    await releaseTokenId(result.jti);
+    await withSpan("db.releaseTokenId", () => releaseTokenId(jti));
     throw error;
   }
 

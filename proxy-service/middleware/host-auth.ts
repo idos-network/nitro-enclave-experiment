@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { bearerToken } from "@idos/tee-common/bearer-token.ts";
+import { withSpan } from "@idos/tee-common/telemetry.ts";
 import type { RequestHandler } from "express";
 import { errors, importJWK, jwtVerify } from "jose";
 import { HOST_JWS_CLOCK_TOLERANCE, HOST_JWS_MAX_AGE } from "../env.ts";
@@ -19,7 +20,7 @@ export function upstreamPath(url: string, armedId: string): string {
 export function hostAuthMiddleware(): RequestHandler {
   return async (req, res, next) => {
     const armedId = String(req.params.id);
-    const armed = await getArmed(armedId);
+    const armed = await withSpan("db.getArmed", () => getArmed(armedId));
 
     if (!armed) {
       writeLog("proxy_armed_not_found", { armedId });
@@ -34,7 +35,9 @@ export function hostAuthMiddleware(): RequestHandler {
 
     const path = upstreamPath(req.url, armedId);
     const body = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
-    const error = await verifyHostJws(armed, jws, req.method, path, body);
+    const error = await withSpan("host.verify", () =>
+      verifyHostJws(armed, jws, req.method, path, body),
+    );
 
     if (error) {
       writeLog("proxy_unauthorized", { armedId, error });

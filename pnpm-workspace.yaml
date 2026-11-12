@@ -5,6 +5,8 @@ packages:
 allowBuilds:
   # install-time telemetry, not needed in a TEE image
   '@scarf/scarf': false
+  # profiler addon for @pyroscope/nodejs: ships prebuilds, its install script is `exit 0`
+  '@datadog/pprof': false
   mongodb-client-encryption: true
   msw: true
 
