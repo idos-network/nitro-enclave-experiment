@@ -12,7 +12,7 @@ COPY packages/nitro-nsm/src ./src
 RUN cargo build --release --locked
 
 # Base runtime image.
-FROM ubuntu:24.04@sha256:786a8b558f7be160c6c8c4a54f9a57274f3b4fb1491cf65146521ae77ff1dc54
+FROM ubuntu:24.04@sha256:2198e4c65076e9cb0b3d695219df667c0e3b0072da64ca3c2648aca17dcecaf5
 
 ENV DEBIAN_FRONTEND=noninteractive
 
