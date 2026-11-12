@@ -8,7 +8,7 @@ export default defineConfig({
       NODE_ENV: "test",
       MONGO_URI: "mongodb://localhost:27017",
       AWS_REGION: "eu-central-1",
-      AWS_KMS_FLE_ARN: "arn:aws:kms:eu-central-1:000000000000:key/fle-test",
+      FLE_MASTER_KEY: Buffer.alloc(96).toString("base64"),
       ARM_TOKENS: "arm-token-one, arm-token-two",
     },
     coverage: {

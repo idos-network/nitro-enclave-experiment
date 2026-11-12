@@ -37,6 +37,10 @@ echo "127.0.0.1 $(echo "$MONGO_HOST" | sed 's#-cluster.cluster-#-cluster.#')" | 
 source "$SCRIPT_DIR/shared/nbd.ash"
 setup_nbd "proxy"
 
+# Generate-once secret (shared/kms.ash), decrypted with attestation into /run/secrets.
+# Master key of the mongodb `local` KMS provider (FLE, providers/db.ts): 96 random bytes
+generate_once proxy fle_master_key "$AWS_KMS_FLE_ARN" "openssl rand -base64 96 | tr -d '\\n'"
+
 echo "Fetching Caddyfile from S3"
 CADDYFILE=Caddyfile
 aws s3 cp "s3://$S3_SECRETS_BUCKET/proxy/$CADDYFILE" "./$CADDYFILE" --region "$S3_SECRETS_REGION"
@@ -55,7 +59,7 @@ export HOME=/app
 
 # node directly, not `npm start`: s6-supervise signals its direct child, and an
 # npm wrapper would leak the node process on restart and keep holding the port.
-s6_service express 'cd /app/proxy-service && export NODE_ENV=production && exec node index.ts'
+s6_service express 'cd /app/proxy-service && export NODE_ENV=production && export FLE_MASTER_KEY="$(cat /run/secrets/fle_master_key)" && exec node index.ts'
 s6_service caddy   'cd /app && exec caddy run --config /app/Caddyfile --adapter caddyfile'
 s6_service node    'exec node_exporter --no-collector.kernel_hung'
 s6_service vector  'exec vector --config /etc/vector/vector.yaml'
