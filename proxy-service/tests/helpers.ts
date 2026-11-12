@@ -43,6 +43,7 @@ export async function hostJws(
   claims: { method: string; path: string; body?: string | Buffer },
   keyPair: { privateKey: KeyObject } = HOST_KEY_PAIR,
   expiresIn = "2m",
+  issuedAt?: number,
 ): Promise<string> {
   return new SignJWT({
     method: claims.method,
@@ -50,7 +51,7 @@ export async function hostJws(
     bodySha256: bodySha256(claims.body),
   })
     .setProtectedHeader({ alg: "EdDSA" })
-    .setIssuedAt()
+    .setIssuedAt(issuedAt)
     .setExpirationTime(expiresIn)
     .sign(keyPair.privateKey);
 }

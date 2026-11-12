@@ -56,6 +56,8 @@ fi
 mkdir -p /mnt/encrypted/vector
 
 source "$SCRIPT_DIR/shared/s6.ash"
+source "$SCRIPT_DIR/shared/clock.ash"
+setup_clock_sync
 
 export HOME=/app
 # node directly, not `npm start`: s6-supervise signals its direct child, and an
