@@ -67,7 +67,7 @@ an `id`; `DELETE /arm/{id}` disarms. The host then calls `ANY /proxy/{id}/<vendo
 checks the allowlist, builds the vendor authorization (`proxy-service/providers/vendors/`) and
 passes the vendor response through. Call examples: [`proxy-service/README.md`](proxy-service/README.md).
 
-## KMS decrypt with Nitro attestation (enclave-service)
+## KMS decrypt with Nitro attestation (enclave-service, proxy-service)
 
 The enclave has no AWS identity of its own: it borrows the host's instance role over the
 IMDS vsock proxy. A plain `kms:Decrypt` with those credentials works from the host just as
@@ -123,7 +123,11 @@ What decrypts this way (`kms_decrypt` in `shared/kms.ash`, which runs `kms-decry
   the key's RFC 7638 thumbprint, so it changes with the key; verifiers resolve keys through
   `jku`, and jose fetches the JWKS again on an unknown `kid`. There is no rotation: one key,
   kept for as long as `signing_key.enc` exists.
-- Images without the addon (entropy-service, facesign-service, proxy-service) keep the plain host-role
+- proxy-service does the same for its LUKS password (`proxy/luks_entropy_password.enc`) and FLE
+  master key (`proxy/fle_master_key.enc`, `proxy-service/scripts/run.ash`), wrapped by its own
+  `AWS_KMS_FLE_ARN` from `proxy/config.env`. It was never deployed with the `aws` provider, so its
+  vault starts with a `local` data key and there is nothing to rewrap. It has no signing key.
+- Images without the addon (entropy-service, facesign-service) keep the plain host-role
   `aws kms decrypt` in `kms_decrypt`. Their keys live in other infra modules
   (`lib/entropy-tee`, `lib/facesign-tee`) and aren't PCR-restricted.
 
@@ -146,6 +150,9 @@ GHA job summary, the nonce, and that `public_key` matches the JWK it verifies `j
 with. Attestation requires the NSM: outside an enclave the endpoint answers 500. The route is
 rate limited to 100 requests per client address in 15 minutes (429 beyond that), the same
 window the other services use.
+
+proxy-service serves the same route without `public_key` (it has no key of its own): the
+document proves which EIF answered on that TLS connection, nothing more.
 
 ### Trust assumption: who writes the generate-once secrets
 
@@ -203,6 +210,16 @@ rewrap before PCRs) are already granted to the instance role.
 PCR condition on `kms:Decrypt`. Its ARN goes into `enclave/config.env` as
 `AWS_KMS_SIGNING_WRAP_ARN`. The KMS Ed25519 signing key (`AWS_KMS_SIGNING_KEY_ARN`) and its
 `kms:Sign`/`kms:GetPublicKey` grant can go once no verifier still trusts the old `kid`.
+
+### Infra for proxy-service (`lib/proxy-tee` or wherever its keys live)
+
+Before the first deploy: let the instance role `s3:GetObject` and conditional `s3:PutObject`
+`proxy/fle_master_key.enc` (next to `proxy/luks_entropy_password.enc`), and give it
+`kms:Encrypt` + `kms:Decrypt` on `AWS_KMS_FLE_ARN` and `AWS_KMS_LUKS_ARN` from `proxy/config.env`.
+No rewrap means the FLE key never needs a plain decrypt, so both keys can get the PCR condition on
+`kms:Decrypt` as soon as there is a non-debug EIF to measure (`proxy-service/scripts/enclave-run.ash`
+still runs with `--attach-console`, i.e. debug mode with all-zero PCRs). The trust assumption above
+applies to `proxy/*.enc` the same way.
 
 ### Open decisions
 

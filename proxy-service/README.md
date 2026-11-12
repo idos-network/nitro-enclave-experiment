@@ -151,7 +151,7 @@ Rotate a vendor key by arming again and disarming the old id.
 
 ```bash
 pnpm install
-MONGO_URI=… AWS_REGION=… AWS_KMS_FLE_ARN=… ARM_TOKENS=dev-token pnpm start
+MONGO_URI=… AWS_REGION=… FLE_MASTER_KEY=$(openssl rand -base64 96 | tr -d "\n") ARM_TOKENS=dev-token pnpm start
 ```
 
 `pnpm test` runs without Mongo or KMS (both mocked).

@@ -1,6 +1,16 @@
 # Copy Vector from a pinned image.
 FROM timberio/vector@sha256:32fd554fdd6dc3c17b5ec8e983e9889f37b0c87fa3c8cc28aa318d69cf34d392 AS vector
 
+# NSM addon of @idos/nitro-nsm (packages/nitro-nsm/src/lib.rs): the attestation document from
+# /dev/nsm, for KMS Decrypt with a Recipient (shared/kms.ash) and GET /attestation.
+# Crates are pinned with checksums by Cargo.lock.
+FROM rust:1.92-slim-bookworm@sha256:f1f73538ebe623fd3673a35aff3df358ae1084c64c55646516e5b17b321b6c9b AS nsm
+
+WORKDIR /build
+COPY packages/nitro-nsm/Cargo.toml packages/nitro-nsm/Cargo.lock ./
+COPY packages/nitro-nsm/src ./src
+RUN cargo build --release --locked
+
 # Base runtime image.
 FROM ubuntu:24.04@sha256:2198e4c65076e9cb0b3d695219df667c0e3b0072da64ca3c2648aca17dcecaf5
 
@@ -66,6 +76,7 @@ WORKDIR /app
 # Node only strips types from .ts files outside node_modules.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages ./packages
+COPY --from=nsm /build/target/release/libnitro_nsm.so ./packages/nitro-nsm/nitro-nsm.node
 COPY proxy-service ./proxy-service
 
 # Install dependencies

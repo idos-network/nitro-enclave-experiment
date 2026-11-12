@@ -331,6 +331,9 @@ importers:
       '@aws-sdk/credential-providers':
         specifier: ^3.1119.0
         version: 3.1119.0
+      '@idos/nitro-nsm':
+        specifier: workspace:*
+        version: link:../packages/nitro-nsm
       '@idos/tee-common':
         specifier: workspace:*
         version: link:../packages/tee-common
@@ -346,6 +349,9 @@ importers:
       express-prom-bundle:
         specifier: ^8.0.0
         version: 8.0.0(@prometheus-io/client@0.16.1)
+      express-rate-limit:
+        specifier: ^8.6.2
+        version: 8.6.2(express@5.2.1)
       helmet:
         specifier: ^8.3.0
         version: 8.3.0

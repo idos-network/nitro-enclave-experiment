@@ -36,3 +36,5 @@ export const ArmRequestSchema = z.discriminatedUnion("api", [
 ]);
 
 export type ArmRequest = z.infer<typeof ArmRequestSchema>;
+
+export const AttestationQuerySchema = z.object({ nonce: z.base64url().max(86).optional() });

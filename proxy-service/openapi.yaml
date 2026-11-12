@@ -59,6 +59,44 @@ paths:
                     type: string
                     example: ok
 
+  /attestation:
+    get:
+      tags: [Health]
+      summary: Nitro attestation document
+      description: |
+        Returns the attestation document of the running enclave, signed by the
+        AWS Nitro hypervisor. Its `pcrs` identify the EIF and `nonce` echoes the
+        query parameter. It carries no `public_key`.
+      operationId: getAttestation
+      parameters:
+        - name: nonce
+          in: query
+          required: false
+          description: Base64url-encoded freshness challenge, up to 64 bytes
+          schema:
+            type: string
+            pattern: '^[A-Za-z0-9_-]{0,86}$'
+      responses:
+        "200":
+          description: Attestation document
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [attestation]
+                properties:
+                  attestation:
+                    type: string
+                    description: Base64-encoded COSE_Sign1 (CBOR) attestation document
+        "400":
+          description: Invalid nonce
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+        "429":
+          description: More than 100 requests from one client address in 15 minutes
+
   /arm:
     post:
       tags: [Arm]
