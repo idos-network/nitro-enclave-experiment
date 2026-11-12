@@ -5,7 +5,9 @@
 # boot and drifts (faster under load). Even ~100ms behind a client makes jose
 # reject a fresh JWS whose whole-second iat is "in the future" (proxy 401s).
 # Discipline it from the hypervisor's clock via the KVM virtual PTP device
-# (CONFIG_PTP_1588_CLOCK_KVM=y in our kernel), as AWS recommends for enclaves.
+# (CONFIG_PTP_1588_CLOCK_KVM=y in our kernel). Unverified on Nitro until staging
+# shows "Syncing clock to /dev/ptpN"; see
+# https://evervault.com/blog/how-we-built-enclaves-resolving-clock-drift-in-nitro-enclaves
 CHRONY_CONF=${CHRONY_CONF:-/etc/chrony/chrony.conf}
 
 # kvm_ptp_device - prints /dev/ptpN of the KVM virtual PTP clock (number is not fixed, no udev here)
