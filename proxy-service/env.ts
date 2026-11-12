@@ -13,4 +13,6 @@ export const ARM_TOKENS = (process.env.ARM_TOKENS ?? "")
   .filter(Boolean);
 // How long a host JWS stays valid after its iat.
 export const HOST_JWS_MAX_AGE = "5 minutes";
+// The enclave has no NTP, so its clock drifts from the host's; iat is whole seconds.
+export const HOST_JWS_CLOCK_TOLERANCE = "30 seconds";
 export const UPSTREAM_TIMEOUT_MS = 30_000;

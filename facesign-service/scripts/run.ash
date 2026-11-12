@@ -137,6 +137,8 @@ aws kms decrypt --ciphertext-blob "$(cat $JWT_TOKEN_SECRET_FILE)" --output text 
 mkdir -p /mnt/encrypted/vector
 
 source "$SCRIPT_DIR/shared/s6.ash"
+source "$SCRIPT_DIR/shared/clock.ash"
+setup_clock_sync
 
 export HOME=/home/deploy
 # node directly, not `npm start`: s6-supervise signals its direct child, and an

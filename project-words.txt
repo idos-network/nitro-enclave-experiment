@@ -7,7 +7,11 @@ buildx
 Caddyfile
 CBOR
 cdylib
+chrony
+chronyc
+chronyd
 ciphertext
+cmdport
 cooldown
 COSE
 cryptsetup
@@ -52,6 +56,7 @@ libnbd
 libsodium
 LOGDIR
 luks
+makestep
 Multibase
 nacl
 napi
@@ -72,6 +77,7 @@ pubout
 rdparty
 redoc
 redocly
+refclock
 respawn
 RSAES
 RSASSA

@@ -79,6 +79,29 @@ describe("ANY /proxy/:id/*", () => {
       .expect(401);
   });
 
+  it("accepts an iat a few seconds ahead of the enclave clock (host clock drift)", async () => {
+    const id = await arm();
+    const now = Math.floor(Date.now() / 1000);
+    const jws = await hostJws({ method: "GET", path: IDENT_PATH }, undefined, "2m", now + 2);
+    upstream().mockResolvedValueOnce(upstreamJson(200, {}));
+
+    await request(app)
+      .get(`/proxy/${id}${IDENT_PATH}`)
+      .set("Authorization", `Bearer ${jws}`)
+      .expect(200);
+  });
+
+  it("401 when iat is beyond the clock tolerance", async () => {
+    const id = await arm();
+    const now = Math.floor(Date.now() / 1000);
+    const jws = await hostJws({ method: "GET", path: IDENT_PATH }, undefined, "5m", now + 60);
+
+    await request(app)
+      .get(`/proxy/${id}${IDENT_PATH}`)
+      .set("Authorization", `Bearer ${jws}`)
+      .expect(401);
+  });
+
   it("403 when method + path are not in the allowlist", async () => {
     const id = await arm();
     const path = "/api/identifications/ident-123/archive";

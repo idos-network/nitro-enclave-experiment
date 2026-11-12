@@ -73,6 +73,7 @@ ENV FACETEC_SDK_VERSION=$FACETEC_SDK_VERSION FACETEC_SDK_BUCKET=$FACETEC_SDK_BUC
 # Install dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends --no-install-suggests \
     ca-certificates \
+    chrony \
     cryptsetup \
     e2fsprogs \
     curl \

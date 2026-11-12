@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { bearerToken } from "@idos/tee-common/bearer-token.ts";
 import type { RequestHandler } from "express";
 import { errors, importJWK, jwtVerify } from "jose";
-import { HOST_JWS_MAX_AGE } from "../env.ts";
+import { HOST_JWS_CLOCK_TOLERANCE, HOST_JWS_MAX_AGE } from "../env.ts";
 import { type Armed, getArmed } from "../providers/db.ts";
 import { writeLog } from "../utils/logger-context.ts";
 
@@ -61,6 +61,7 @@ async function verifyHostJws(
     const { payload } = await jwtVerify(jws, key, {
       algorithms: ["EdDSA"],
       maxTokenAge: HOST_JWS_MAX_AGE,
+      clockTolerance: HOST_JWS_CLOCK_TOLERANCE,
       requiredClaims: ["iat", "exp", "method", "path", "bodySha256"],
     });
 
