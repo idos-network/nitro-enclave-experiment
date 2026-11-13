@@ -39,7 +39,8 @@ app.use(tracingMiddleware);
 
 app.use(loggerMiddleware);
 app.set("trust proxy", "loopback");
-app.use(promBundle({ includeMethod: true }));
+// default metrics: event loop lag and utilization, GC, heap
+app.use(promBundle({ includeMethod: true, promClient: { collectDefaultMetrics: {} } }));
 app.use(helmet());
 app.use(cors());
 // Only encrypt/decrypt carry payloads; every other route gets a small body so it can't be used to exhaust enclave memory.
