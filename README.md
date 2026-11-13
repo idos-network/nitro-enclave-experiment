@@ -98,7 +98,7 @@ that, enclave-service decrypts with an attestation document, and the KMS key pol
   `--attach-console` implies) gets attestations with all-zero PCRs. A PCR-restricted key
   therefore only decrypts for a non-debug enclave, see the rollout below.
 
-What decrypts this way (`kms_decrypt` in `shared/kms.ash`, which runs `kms-decrypt.ts`):
+What decrypts this way (`kms_decrypt` in `shared/aws.ash`, which runs `packages/nitro-nsm/aws.ts`):
 
 - LUKS password, `enclave/luks_entropy_password.enc` (`shared/nbd.ash`). The key file gets the
   same bytes as before, so existing volumes keep opening. Like the generate-once secrets it

@@ -25,20 +25,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends --no-install-su
     && update-ca-certificates \
     && rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
 
-# Install AWS CLI v2 (pinned + SHA-256 verified)
-ARG AWS_CLI_VERSION=2.36.20
-ARG AWS_CLI_SHA256=59bdfab4035b0251a0c8de801abe01928861a89e27433bb80fc3fcf6dfe32352
-RUN apt-get update && apt-get install -y --no-install-recommends --no-install-suggests \
-    unzip \
-    && curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64-${AWS_CLI_VERSION}.zip" -o "/tmp/awscliv2.zip" \
-    && echo "${AWS_CLI_SHA256}  /tmp/awscliv2.zip" | sha256sum -c - \
-    && unzip /tmp/awscliv2.zip -d /tmp \
-    && /tmp/aws/install \
-    && rm -rf /tmp/aws /tmp/awscliv2.zip \
-    && apt-get purge -y --auto-remove unzip \
-    && apt-get clean \
-    && rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
-
 # Install Caddy (pinned + SHA-256 verified)
 ARG CADDY_VERSION=2.11.4
 ARG CADDY_SHA256=c41708ffb4af9bc6d19f7d22a7a034804352a21ecc62e1d3dfe3d58e30b38a3e

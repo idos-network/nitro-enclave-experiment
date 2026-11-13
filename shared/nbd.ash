@@ -1,7 +1,7 @@
 #!/bin/bash
 # shellcheck shell=dash
 
-source "$(dirname "${BASH_SOURCE[0]}")/kms.ash"
+source "$(dirname "${BASH_SOURCE[0]}")/aws.ash"
 
 setup_nbd() {
   local SERVICE_NAME=$1
@@ -22,15 +22,15 @@ setup_nbd() {
   ENC_FILE=luks_entropy_password.enc
   PLAIN_FILE=luks_entropy_password.txt
 
-  aws s3 cp "s3://$S3_SECRETS_BUCKET/$SERVICE_NAME/$ENC_FILE" "$ENC_FILE" --region "$S3_SECRETS_REGION" 2>aws_s3_cp_error.log || true
+  s3_get "$SERVICE_NAME/$ENC_FILE" "$ENC_FILE" 2>aws_s3_cp_error.log || true
 
   if [ ! -f "$ENC_FILE" ]; then
     echo "-> Couldn't download luks_entropy_password.enc from S3, generating a new one"
-    aws kms encrypt --key-id "$AWS_KMS_LUKS_ARN" --plaintext "$(openssl rand -hex 64)" --output text --query CiphertextBlob --region "$AWS_REGION" > "$ENC_FILE"
+    # kms_encrypt takes base64 and the hex is valid base64, so the password stays the hex string
+    kms_encrypt "$AWS_KMS_LUKS_ARN" "$(openssl rand -hex 64)" > "$ENC_FILE"
     # A failed download isn't proof the password is missing: never overwrite an existing one,
     # that would lock the disk for good. The bucket policy also denies a PutObject without it.
-    aws s3api put-object --bucket "$S3_SECRETS_BUCKET" --key "$SERVICE_NAME/$ENC_FILE" \
-      --body "$ENC_FILE" --if-none-match '*' --region "$S3_SECRETS_REGION"
+    s3_put_new "$SERVICE_NAME/$ENC_FILE" "$ENC_FILE"
   fi
 
   echo "-> Decrypting AWS luks password key"
