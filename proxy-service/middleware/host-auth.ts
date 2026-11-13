@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { bearerToken } from "@idos/tee-common/bearer-token.ts";
-import { withSpan } from "@idos/tee-common/telemetry.ts";
+import { traced } from "@idos/tee-common/telemetry.ts";
 import type { RequestHandler } from "express";
 import { errors, importJWK, jwtVerify } from "jose";
 import { HOST_JWS_CLOCK_TOLERANCE, HOST_JWS_MAX_AGE } from "../env.ts";
@@ -20,7 +20,7 @@ export function upstreamPath(url: string, armedId: string): string {
 export function hostAuthMiddleware(): RequestHandler {
   return async (req, res, next) => {
     const armedId = String(req.params.id);
-    const armed = await withSpan("db.getArmed", () => getArmed(armedId));
+    const armed = await getArmed(armedId);
 
     if (!armed) {
       writeLog("proxy_armed_not_found", { armedId });
@@ -35,9 +35,7 @@ export function hostAuthMiddleware(): RequestHandler {
 
     const path = upstreamPath(req.url, armedId);
     const body = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
-    const error = await withSpan("host.verify", () =>
-      verifyHostJws(armed, jws, req.method, path, body),
-    );
+    const error = await verifyHostJws(armed, jws, req.method, path, body);
 
     if (error) {
       writeLog("proxy_unauthorized", { armedId, error });
@@ -51,32 +49,35 @@ export function hostAuthMiddleware(): RequestHandler {
 }
 
 /** Returns a reason string when the JWS is not valid for this exact request, null when it is. */
-async function verifyHostJws(
-  armed: Armed,
-  jws: string,
-  method: string,
-  path: string,
-  body: Buffer,
-): Promise<string | null> {
-  const key = await importJWK({ kty: "OKP", crv: "Ed25519", x: armed.hostPublicKey }, "EdDSA");
+const verifyHostJws = traced(
+  "host.verify",
+  async (
+    armed: Armed,
+    jws: string,
+    method: string,
+    path: string,
+    body: Buffer,
+  ): Promise<string | null> => {
+    const key = await importJWK({ kty: "OKP", crv: "Ed25519", x: armed.hostPublicKey }, "EdDSA");
 
-  try {
-    const { payload } = await jwtVerify(jws, key, {
-      algorithms: ["EdDSA"],
-      maxTokenAge: HOST_JWS_MAX_AGE,
-      clockTolerance: HOST_JWS_CLOCK_TOLERANCE,
-      requiredClaims: ["iat", "exp", "method", "path", "bodySha256"],
-    });
+    try {
+      const { payload } = await jwtVerify(jws, key, {
+        algorithms: ["EdDSA"],
+        maxTokenAge: HOST_JWS_MAX_AGE,
+        clockTolerance: HOST_JWS_CLOCK_TOLERANCE,
+        requiredClaims: ["iat", "exp", "method", "path", "bodySha256"],
+      });
 
-    if (payload.method !== method) return "method mismatch";
-    if (payload.path !== path) return "path mismatch";
-    if (payload.bodySha256 !== createHash("sha256").update(body).digest("base64url")) {
-      return "body hash mismatch";
+      if (payload.method !== method) return "method mismatch";
+      if (payload.path !== path) return "path mismatch";
+      if (payload.bodySha256 !== createHash("sha256").update(body).digest("base64url")) {
+        return "body hash mismatch";
+      }
+
+      return null;
+    } catch (error) {
+      if (error instanceof errors.JOSEError) return error.code;
+      throw error;
     }
-
-    return null;
-  } catch (error) {
-    if (error instanceof errors.JOSEError) return error.code;
-    throw error;
-  }
-}
+  },
+);

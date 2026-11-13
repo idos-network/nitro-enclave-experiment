@@ -1,7 +1,7 @@
 import { defaultProvider } from "@aws-sdk/credential-provider-node";
 import { createFle } from "@idos/tee-common/fle.ts";
 import { getLogger } from "@idos/tee-common/logger.ts";
-import { withSpan } from "@idos/tee-common/telemetry.ts";
+import { traced } from "@idos/tee-common/telemetry.ts";
 import { type Binary, ClientEncryption, type Db, MongoClient } from "mongodb";
 import type { BoxKeyPair } from "tweetnacl";
 import {
@@ -66,39 +66,42 @@ export interface SessionRecordDocument {
   createdAt: Date;
 }
 
-async function storeSessionUntraced(
-  sessionId: string,
-  sessionServerKeyPair: BoxKeyPair,
-  sessionClientPublicKeyB64: string,
-  sessionServerJwtChain: string,
-  allowedAudienceRoots: string[],
-) {
-  const { db, encrypt } = await connectDB();
+export const storeSession = traced(
+  "db.storeSession",
+  async (
+    sessionId: string,
+    sessionServerKeyPair: BoxKeyPair,
+    sessionClientPublicKeyB64: string,
+    sessionServerJwtChain: string,
+    allowedAudienceRoots: string[],
+  ) => {
+    const { db, encrypt } = await connectDB();
 
-  const [sessionServerPrivateKeyEnc, sessionServerJwtChainEnc, allowedAudienceRootsEnc] =
-    await Promise.all([
-      encrypt(sessionServerKeyPair.secretKey),
-      encrypt(sessionServerJwtChain),
-      encrypt(JSON.stringify(allowedAudienceRoots)),
-    ]);
+    const [sessionServerPrivateKeyEnc, sessionServerJwtChainEnc, allowedAudienceRootsEnc] =
+      await Promise.all([
+        encrypt(sessionServerKeyPair.secretKey),
+        encrypt(sessionServerJwtChain),
+        encrypt(JSON.stringify(allowedAudienceRoots)),
+      ]);
 
-  const record: SessionRecordDocument = {
-    sessionId,
-    sessionServerPrivateKeyEnc,
-    sessionServerPublicKeyB64: Buffer.from(sessionServerKeyPair.publicKey).toString("base64url"),
-    sessionClientPublicKeyB64,
-    sessionServerJwtChainEnc,
-    allowedAudienceRootsEnc,
-    createdAt: new Date(),
-  };
+    const record: SessionRecordDocument = {
+      sessionId,
+      sessionServerPrivateKeyEnc,
+      sessionServerPublicKeyB64: Buffer.from(sessionServerKeyPair.publicKey).toString("base64url"),
+      sessionClientPublicKeyB64,
+      sessionServerJwtChainEnc,
+      allowedAudienceRootsEnc,
+      createdAt: new Date(),
+    };
 
-  await db.collection(DB_ENCLAVE_COLLECTION).insertOne(record);
-}
+    await db.collection(DB_ENCLAVE_COLLECTION).insertOne(record);
+  },
+);
 
-async function deleteSessionUntraced(sessionId: string) {
+export const deleteSession = traced("db.deleteSession", async (sessionId: string) => {
   const { db } = await connectDB();
   await db.collection(DB_ENCLAVE_COLLECTION).deleteOne({ sessionId });
-}
+});
 
 export interface Session {
   id: string;
@@ -109,38 +112,35 @@ export interface Session {
   sessionServerJwtChain: string;
 }
 
-async function getSessionUntraced(sessionId: string): Promise<Session | null> {
-  const { db, decrypt } = await connectDB();
+export const getSession = traced(
+  "db.getSession",
+  async (sessionId: string): Promise<Session | null> => {
+    const { db, decrypt } = await connectDB();
 
-  const session = await db
-    .collection<SessionRecordDocument>(DB_ENCLAVE_COLLECTION)
-    .findOne({ sessionId });
+    const session = await db
+      .collection<SessionRecordDocument>(DB_ENCLAVE_COLLECTION)
+      .findOne({ sessionId });
 
-  // The TTL monitor runs ~every 60s, so also reject expired records (and legacy ones without createdAt).
-  const expiresAt = (session?.createdAt?.getTime() ?? 0) + SESSION_TTL_SECONDS * 1000;
-  if (!session || expiresAt < Date.now()) {
-    return null;
-  }
+    // The TTL monitor runs ~every 60s, so also reject expired records (and legacy ones without createdAt).
+    const expiresAt = (session?.createdAt?.getTime() ?? 0) + SESSION_TTL_SECONDS * 1000;
+    if (!session || expiresAt < Date.now()) {
+      return null;
+    }
 
-  const [sessionServerPrivateKey, allowedAudienceRoots, sessionServerJwtChain] = await Promise.all([
-    decrypt<Binary>(session.sessionServerPrivateKeyEnc),
-    decrypt<string>(session.allowedAudienceRootsEnc),
-    decrypt<string>(session.sessionServerJwtChainEnc),
-  ]);
+    const [sessionServerPrivateKey, allowedAudienceRoots, sessionServerJwtChain] =
+      await Promise.all([
+        decrypt<Binary>(session.sessionServerPrivateKeyEnc),
+        decrypt<string>(session.allowedAudienceRootsEnc),
+        decrypt<string>(session.sessionServerJwtChainEnc),
+      ]);
 
-  return {
-    id: sessionId,
-    allowedAudienceRoots: JSON.parse(allowedAudienceRoots),
-    sessionClientPublicKey: Buffer.from(session.sessionClientPublicKeyB64, "base64url"),
-    sessionServerPrivateKey: sessionServerPrivateKey.buffer,
-    sessionServerPublicKey: Buffer.from(session.sessionServerPublicKeyB64, "base64url"),
-    sessionServerJwtChain,
-  };
-}
-
-export const storeSession = (...args: Parameters<typeof storeSessionUntraced>) =>
-  withSpan("db.storeSession", () => storeSessionUntraced(...args));
-export const deleteSession = (sessionId: string) =>
-  withSpan("db.deleteSession", () => deleteSessionUntraced(sessionId));
-export const getSession = (sessionId: string) =>
-  withSpan("db.getSession", () => getSessionUntraced(sessionId));
+    return {
+      id: sessionId,
+      allowedAudienceRoots: JSON.parse(allowedAudienceRoots),
+      sessionClientPublicKey: Buffer.from(session.sessionClientPublicKeyB64, "base64url"),
+      sessionServerPrivateKey: sessionServerPrivateKey.buffer,
+      sessionServerPublicKey: Buffer.from(session.sessionServerPublicKeyB64, "base64url"),
+      sessionServerJwtChain,
+    };
+  },
+);

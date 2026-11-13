@@ -77,6 +77,7 @@ app.get("/attestation", attestationLimiter, (req, res) => {
     return res.status(400).json({ error: "Invalid nonce" });
   }
 
+  // wrapped here, not at the definition: @idos/nitro-nsm stays free of OTel
   const attestation = withSpan("nsm.attestation", () =>
     getAttestationDocument({
       nonce: Buffer.from(parsed.data.nonce ?? "", "base64url"),
@@ -91,7 +92,7 @@ app.post(
   sessionTokenMiddleware(),
   validatorMiddleware(CreateSessionRequestSchema),
   async (_req, res: Response<any, { validatedBody: CreateSessionRequest }>) => {
-    const session = await withSpan("session.create", () => createSession(res.locals.validatedBody));
+    const session = await createSession(res.locals.validatedBody);
     writeLog("session_created", { sessionId: session.id });
     res.status(200).json(session);
   },
@@ -152,9 +153,7 @@ app.post(
 
     writeLog("encrypt_request");
 
-    const data = withSpan("box.encrypt", () =>
-      encrypt(validatedBody.arguments.payload, validatedBody.arguments.publicKey),
-    );
+    const data = await encrypt(validatedBody.arguments.payload, validatedBody.arguments.publicKey);
 
     return res.json(data);
   },
@@ -180,8 +179,11 @@ app.post(
       validatedBody.arguments.nonce,
     );
 
-    const data = withSpan("box.decrypt", () =>
-      decrypt(payload, nonce, validatedBody.arguments.publicKey, encryptionKeyPair.secretKey),
+    const data = await decrypt(
+      payload,
+      nonce,
+      validatedBody.arguments.publicKey,
+      encryptionKeyPair.secretKey,
     );
 
     return res.json({ data });
