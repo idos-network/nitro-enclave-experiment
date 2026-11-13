@@ -6,7 +6,6 @@ import {
   isUsablePublicKey,
   keyPair,
   keyPairFromSecretKey,
-  sharedKey,
 } from "../providers/box.ts";
 
 // Clients still use tweetnacl, so the native X25519 must agree with it byte for byte.
@@ -25,11 +24,8 @@ describe("native box", () => {
     }
   });
 
-  it("derives the same shared key and ciphertext as tweetnacl", () => {
+  it("produces the same ciphertext as tweetnacl", () => {
     for (const { mine, theirs, nonce, message } of cases) {
-      expect(sharedKey(theirs.publicKey, mine.secretKey)).toEqual(
-        nacl.box.before(theirs.publicKey, mine.secretKey),
-      );
       expect(box(message, nonce, theirs.publicKey, mine.secretKey)).toEqual(
         nacl.box(message, nonce, theirs.publicKey, mine.secretKey),
       );
@@ -52,13 +48,15 @@ describe("native box", () => {
     sealed[0] = (sealed[0] ?? 0) ^ 1;
     expect(boxOpen(sealed, nonce, mine.publicKey, theirs.secretKey)).toBeNull();
 
-    expect(() => sharedKey(new Uint8Array(31), mine.secretKey)).toThrow(/public key size/);
+    expect(() => box(message, nonce, new Uint8Array(31), mine.secretKey)).toThrow(
+      /public key size/,
+    );
     expect(() => keyPairFromSecretKey(new Uint8Array(31))).toThrow(/secret key size/);
 
     const lowOrder = [new Uint8Array(32), Uint8Array.of(1, ...new Uint8Array(31))];
     for (const key of lowOrder) {
       expect(isUsablePublicKey(key)).toBe(false);
-      expect(() => sharedKey(key, mine.secretKey)).toThrow();
+      expect(() => box(message, nonce, key, mine.secretKey)).toThrow();
     }
     expect(isUsablePublicKey(theirs.publicKey)).toBe(true);
     expect(isUsablePublicKey(new Uint8Array(31))).toBe(false);
