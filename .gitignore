@@ -7,3 +7,6 @@ brag-output/
 # @idos/nitro-nsm addon build
 target/
 *.node
+
+# local FLE master key (proxy-service/README.md)
+.fle_master_key

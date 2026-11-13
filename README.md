@@ -152,7 +152,8 @@ rate limited to 100 requests per client address in 15 minutes (429 beyond that),
 window the other services use.
 
 proxy-service serves the same route without `public_key` (it has no key of its own): the
-document proves which EIF answered on that TLS connection, nothing more.
+document proves that an enclave running the measured EIF produced it for this nonce, nothing
+more. Nothing from the TLS session goes into it, so it doesn't bind the enclave to the TLS peer.
 
 ### Trust assumption: who writes the generate-once secrets
 
