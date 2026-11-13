@@ -1,4 +1,11 @@
-import { context, propagation, SpanKind, SpanStatusCode, trace } from "@opentelemetry/api";
+import {
+  type Attributes,
+  context,
+  propagation,
+  SpanKind,
+  SpanStatusCode,
+  trace,
+} from "@opentelemetry/api";
 import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
 import { W3CTraceContextPropagator } from "@opentelemetry/core";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
@@ -123,4 +130,9 @@ export function withSpan<T>(name: string, fn: () => T): T {
 /** fn with every call in a span named name; wrap at the definition so all callers are traced. */
 export function traced<A extends unknown[], R>(name: string, fn: (...args: A) => R) {
   return (...args: A): R => withSpan(name, () => fn(...args));
+}
+
+/** Adds attributes to the current span (no-op untraced). Only fixed, non-user values. */
+export function annotateSpan(attributes: Attributes) {
+  trace.getActiveSpan()?.setAttributes(attributes);
 }
