@@ -1,5 +1,5 @@
 import { setTimeout as sleep } from "node:timers/promises";
-import { traced } from "@idos/tee-common/telemetry.ts";
+import { annotateSpan, traced } from "@idos/tee-common/telemetry.ts";
 import type { Request } from "express";
 import { match } from "path-to-regexp";
 import { UPSTREAM_TIMEOUT_MS } from "../env.ts";
@@ -49,6 +49,8 @@ type Upstream = { status: number; contentType: string | null; body: Buffer };
 export const forward: (armed: Armed, req: Request, url: URL) => Promise<Upstream> = traced(
   "upstream.forward",
   async (armed: Armed, req: Request, url: URL): Promise<Upstream> => {
+    // vendor and environment come from the arm allowlist, never from the request
+    annotateSpan({ "proxy.api": armed.api, "proxy.environment": armed.environment });
     const headers = new Headers();
     // Headers named by Connection are hop-by-hop too (RFC 9110 §7.6.1).
     const nominated = new Set(
@@ -88,6 +90,7 @@ export const forward: (armed: Armed, req: Request, url: URL) => Promise<Upstream
       signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
     });
 
+    annotateSpan({ "http.response.status_code": response.status });
     return {
       status: response.status,
       contentType: response.headers.get("content-type"),
