@@ -1,3 +1,4 @@
+import { getAttestationDocument } from "@idos/nitro-nsm/index.ts";
 import { loggerMiddleware } from "@idos/tee-common/logger.ts";
 import { mountOpenApi } from "@idos/tee-common/openapi.ts";
 import { requestContextMiddleware } from "@idos/tee-common/request-context.ts";
@@ -5,6 +6,7 @@ import { tracingMiddleware } from "@idos/tee-common/telemetry.ts";
 import cors from "cors";
 import express, { type Express, type NextFunction, type Request, type Response } from "express";
 import promBundle from "express-prom-bundle";
+import { rateLimit } from "express-rate-limit";
 import helmet from "helmet";
 import { armTokenMiddleware } from "./middleware/arm-token.ts";
 import { hostAuthMiddleware } from "./middleware/host-auth.ts";
@@ -12,7 +14,7 @@ import { validatorMiddleware } from "./middleware/validator.ts";
 import { type Armed, deleteArmed, storeArmed } from "./providers/db.ts";
 import { forward, isAllowed, resolveUpstreamUrl } from "./providers/proxy.ts";
 import { vendors } from "./providers/vendors/index.ts";
-import { type ArmRequest, ArmRequestSchema } from "./utils/dto.ts";
+import { type ArmRequest, ArmRequestSchema, AttestationQuerySchema } from "./utils/dto.ts";
 import { writeLog } from "./utils/logger-context.ts";
 
 const app: Express = express();
@@ -39,6 +41,29 @@ app.get("/health", async (_req, res) => {
 });
 
 mountOpenApi(app);
+
+// Every document is a synchronous NSM call signed by the hypervisor, open to anyone:
+// keep one client from holding the event loop with it.
+const attestationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minute
+  limit: 100, // Limit each IP to 100 requests per `window` (here, per 15 minute).
+  legacyHeaders: false,
+  standardHeaders: false,
+  ipv6Subnet: 56,
+});
+
+// The EIF's PCRs over the caller's nonce. No public_key: the proxy has no key of its own to bind.
+app.get("/attestation", attestationLimiter, (req, res) => {
+  const parsed = AttestationQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Invalid nonce" });
+  }
+
+  const attestation = getAttestationDocument({
+    nonce: Buffer.from(parsed.data.nonce ?? "", "base64url"),
+  });
+  return res.status(200).json({ attestation: attestation.toString("base64") });
+});
 
 app.post(
   "/arm",
