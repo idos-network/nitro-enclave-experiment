@@ -43,7 +43,7 @@ export function startTelemetry(defaultService: string, env: NodeJS.ProcessEnv = 
     trace.setGlobalTracerProvider(
       new TracerProvider({
         resource: resourceFromAttributes({
-          "service.name": service,
+          "service.name": `${service}-${environment}`,
           "deployment.environment.name": environment,
         }),
         sampler: new ParentBasedSampler({ root: new TraceIdRatioBasedSampler(sampleRate) }),
