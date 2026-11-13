@@ -2,6 +2,7 @@ import type { RequestHandler } from "express";
 import nacl from "tweetnacl";
 import { SKIP_AUDIENCE_VERIFICATION } from "../env.ts";
 import { AudienceError, extractAudience, verifyAudience } from "../providers/audience.ts";
+import { box } from "../providers/box.ts";
 import { getSession } from "../providers/db.ts";
 import { getEncryptionKeyPair } from "../providers/keys.ts";
 import type { CommonRequest, DecryptRequest } from "../utils/dto.ts";
@@ -66,7 +67,7 @@ export function sessionKeyMiddleware(): RequestHandler {
       // Random box to encrypt
       const nonce = nacl.randomBytes(nacl.box.nonceLength);
 
-      const payload = nacl.box(
+      const payload = box(
         Buffer.from(JSON.stringify(body), "utf8"),
         nonce,
         audiencePublicKey,

@@ -1,6 +1,7 @@
 import { traced } from "@idos/tee-common/telemetry.ts";
 import { createRemoteJWKSet, decodeJwt, decodeProtectedHeader, errors, jwtVerify } from "jose";
 import { writeLog } from "../utils/logger-context.ts";
+import { isUsablePublicKey } from "./box.ts";
 
 const SUPPORTED_ALGORITHMS = ["EdDSA"];
 
@@ -99,14 +100,14 @@ export function extractAudience(jwtChain: string): Buffer {
   return recipientPublicKey(payload.recipientPublicKeyX);
 }
 
-// nacl.box needs exactly 32 bytes; reject here so a bad key is a 400, not a failure at response encryption.
+// box() needs 32 bytes of a non-low-order point; reject here so a bad key is a 400, not a failure at response encryption.
 function recipientPublicKey(claim: unknown): Buffer {
   if (typeof claim !== "string") {
     throw new AudienceError('Audience JWT is missing the "recipientPublicKeyX" claim.');
   }
 
   const key = Buffer.from(claim, "base64url");
-  if (key.length !== 32) {
+  if (!isUsablePublicKey(key)) {
     throw new AudienceError(
       'Audience JWT "recipientPublicKeyX" claim is not a 32-byte X25519 key.',
     );

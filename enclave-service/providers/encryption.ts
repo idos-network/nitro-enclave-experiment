@@ -1,5 +1,6 @@
 import { traced } from "@idos/tee-common/telemetry.ts";
 import nacl from "tweetnacl";
+import { box, boxOpen, keyPair } from "./box.ts";
 
 export const encrypt = traced(
   "box.encrypt",
@@ -8,9 +9,9 @@ export const encrypt = traced(
     recipientEncryptionPublicKeyBase64Url: string,
   ): { nonce: string; encrypted: string; publicKey: string } => {
     const nonce = nacl.randomBytes(nacl.box.nonceLength);
-    const ephemeralKeyPair = nacl.box.keyPair();
+    const ephemeralKeyPair = keyPair();
 
-    const encrypted = nacl.box(
+    const encrypted = box(
       Buffer.from(messageBase64Url, "base64url"),
       nonce,
       Buffer.from(recipientEncryptionPublicKeyBase64Url, "base64url"),
@@ -45,7 +46,7 @@ export const decrypt = traced(
     senderEncryptionPublicKeyBase64Url: string,
     sessionEncryptionPrivateKey: Uint8Array,
   ): string => {
-    const decrypted = nacl.box.open(
+    const decrypted = boxOpen(
       Buffer.from(messageBase64Url, "base64url"),
       Buffer.from(nonceBase64Url, "base64url"),
       Buffer.from(senderEncryptionPublicKeyBase64Url, "base64url"),

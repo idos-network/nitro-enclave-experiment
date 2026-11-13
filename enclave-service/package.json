@@ -32,6 +32,7 @@
     "pino": "^10.3.1",
     "pino-http": "^11.0.0",
     "prom-client": "npm:@prometheus-io/client@^0.16.1",
+    "sodium-native": "^5.2.0",
     "tweetnacl": "^1.0.3",
     "zod": "^4.6.6"
   },
@@ -44,6 +45,7 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^25.9.5",
+    "@types/sodium-native": "^2.3.9",
     "@types/supertest": "^7.2.1",
     "@vitest/coverage-v8": "4.1.12",
     "audit-ci": "^7.1.0",

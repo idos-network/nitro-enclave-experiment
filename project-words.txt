@@ -11,6 +11,7 @@ chrony
 chronyc
 chronyd
 ciphertext
+ciphertexts
 cmdport
 cooldown
 COSE
@@ -56,6 +57,7 @@ libnbd
 libsodium
 LOGDIR
 luks
+MACBYTES
 makestep
 Multibase
 nacl
@@ -74,6 +76,7 @@ pkey
 pkeyopt
 Plinux
 prebuilds
+PUBLICKEYBYTES
 pubout
 pyroscope
 rdparty
@@ -83,6 +86,7 @@ refclock
 respawn
 RSAES
 RSASSA
+scalarmult
 SCANDIR
 scure
 sdkutils
