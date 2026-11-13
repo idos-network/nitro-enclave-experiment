@@ -2,7 +2,7 @@
 FROM timberio/vector@sha256:32fd554fdd6dc3c17b5ec8e983e9889f37b0c87fa3c8cc28aa318d69cf34d392 AS vector
 
 # NSM addon of @idos/nitro-nsm (packages/nitro-nsm/src/lib.rs): the attestation document from
-# /dev/nsm, for KMS Decrypt with a Recipient (shared/kms.ash) and GET /attestation.
+# /dev/nsm, for KMS Decrypt with a Recipient (shared/aws.ash) and GET /attestation.
 # Crates are pinned with checksums by Cargo.lock.
 FROM rust:1.92-slim-bookworm@sha256:f1f73538ebe623fd3673a35aff3df358ae1084c64c55646516e5b17b321b6c9b AS nsm
 
@@ -32,20 +32,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends --no-install-su
     s6 \
     socat \
     && update-ca-certificates \
-    && rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
-
-# Install AWS CLI v2 (pinned + SHA-256 verified)
-ARG AWS_CLI_VERSION=2.36.20
-ARG AWS_CLI_SHA256=59bdfab4035b0251a0c8de801abe01928861a89e27433bb80fc3fcf6dfe32352
-RUN apt-get update && apt-get install -y --no-install-recommends --no-install-suggests \
-    unzip \
-    && curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64-${AWS_CLI_VERSION}.zip" -o "/tmp/awscliv2.zip" \
-    && echo "${AWS_CLI_SHA256}  /tmp/awscliv2.zip" | sha256sum -c - \
-    && unzip /tmp/awscliv2.zip -d /tmp \
-    && /tmp/aws/install \
-    && rm -rf /tmp/aws /tmp/awscliv2.zip \
-    && apt-get purge -y --auto-remove unzip \
-    && apt-get clean \
     && rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
 
 # Install Caddy (pinned + SHA-256 verified)

@@ -56,14 +56,3 @@ export async function kmsDecrypt(ciphertext: Uint8Array): Promise<Buffer> {
 
   return unwrapEnvelope(CiphertextForRecipient, privateKey);
 }
-
-// CLI for the boot scripts (shared/kms.ash): base64 ciphertext in, base64 plaintext out,
-// the same contract as `aws kms decrypt --query Plaintext`.
-if (import.meta.main) {
-  const ciphertext = process.argv[2];
-  if (!ciphertext) {
-    throw new Error("usage: node kms-decrypt.ts <base64 ciphertext>");
-  }
-
-  console.log((await kmsDecrypt(Buffer.from(ciphertext, "base64"))).toString("base64"));
-}
