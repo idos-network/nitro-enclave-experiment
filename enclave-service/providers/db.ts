@@ -1,7 +1,7 @@
-import { defaultProvider } from "@aws-sdk/credential-provider-node";
-import { createFle } from "@idos/tee-common/fle.ts";
+import { DecryptCommand, KMSClient } from "@aws-sdk/client-kms";
+import { createFleCrypto, KEY_VAULT_COLLECTION } from "@idos/tee-common/fle-crypto.ts";
 import { getLogger } from "@idos/tee-common/logger.ts";
-import { type Binary, ClientEncryption, type Db, MongoClient } from "mongodb";
+import { Binary, type Db, MongoClient } from "mongodb";
 import type { BoxKeyPair } from "tweetnacl";
 import {
   DB_ENCLAVE_COLLECTION,
@@ -19,15 +19,24 @@ const client = new MongoClient(MONGO_URI, {
   wtimeoutMS: 2500,
 });
 
-const fle = createFle({
-  client,
-  ClientEncryption,
-  // only for the one-off rewrap of data keys still wrapped by KMS
-  credentialsProvider: defaultProvider(),
-  keyDb: "enclaveEncryption",
+const fle = createFleCrypto({
+  keyVault: client.db("enclaveEncryption").collection(KEY_VAULT_COLLECTION),
+  Binary,
   keyAlias: FLE_KEY_ALIAS,
-  // decrypted with attestation by scripts/run.ash, see localMasterKey in tee-common/fle.ts
+  // decrypted with attestation by scripts/run.ash, see localMasterKey in tee-common/fle-crypto.ts
   localMasterKey: Buffer.from(FLE_MASTER_KEY, "base64"),
+  // only for the one-off rewrap of a data key still wrapped by KMS, with the host role
+  kms: {
+    decrypt: async (keyMaterial) => {
+      const { Plaintext } = await new KMSClient().send(
+        new DecryptCommand({ CiphertextBlob: keyMaterial }),
+      );
+      if (!Plaintext) {
+        throw new Error("KMS returned no Plaintext");
+      }
+      return Plaintext;
+    },
+  },
 });
 
 export async function connectDB() {
@@ -122,7 +131,7 @@ export async function getSession(sessionId: string): Promise<Session | null> {
   }
 
   const [sessionServerPrivateKey, allowedAudienceRoots, sessionServerJwtChain] = await Promise.all([
-    decrypt<Binary>(session.sessionServerPrivateKeyEnc),
+    decrypt<Buffer>(session.sessionServerPrivateKeyEnc),
     decrypt<string>(session.allowedAudienceRootsEnc),
     decrypt<string>(session.sessionServerJwtChainEnc),
   ]);
@@ -131,7 +140,7 @@ export async function getSession(sessionId: string): Promise<Session | null> {
     id: sessionId,
     allowedAudienceRoots: JSON.parse(allowedAudienceRoots),
     sessionClientPublicKey: Buffer.from(session.sessionClientPublicKeyB64, "base64url"),
-    sessionServerPrivateKey: sessionServerPrivateKey.buffer,
+    sessionServerPrivateKey,
     sessionServerPublicKey: Buffer.from(session.sessionServerPublicKeyB64, "base64url"),
     sessionServerJwtChain,
   };

@@ -1,38 +1,47 @@
 import { describe, expect, it, vi } from "vitest";
 
 const h = vi.hoisted(() => {
-  const docs = new Map<string, { faceSignUserId: string; entropy: Buffer }>();
+  const docs = new Map<string, { faceSignUserId: string; entropy: unknown }>();
   const usedTokens = new Set<string>();
+  const keys: { keyAltNames: string[] }[] = [];
 
   return {
     docs,
     usedTokens,
     // Set to make the next findOneAndUpdate throw. `insert`, when given, is
     // written first, standing in for the racing writer that caused the clash.
-    nextUpsertThrows: null as { error: Error; insert?: Buffer } | null,
+    nextUpsertThrows: null as { error: Error; insert?: unknown } | null,
     createIndex: vi.fn(async () => {}),
-    listCollections: vi.fn(() => ({ toArray: async () => [{ name: "__keyVault" }] })),
-    credentialsProvider: vi.fn(async () => ({
-      accessKeyId: "a",
-      secretAccessKey: "b",
-      sessionToken: "c",
-    })),
+    keyVault: {
+      createIndex: async () => {},
+      findOne: async ({ keyAltNames }: { keyAltNames: string }) =>
+        keys.find((key) => key.keyAltNames.includes(keyAltNames)) ?? null,
+      insertOne: async (key: { keyAltNames: string[] }) => {
+        keys.push(key);
+      },
+      updateOne: async () => {},
+    },
   };
 });
 
-vi.mock("@aws-sdk/credential-provider-node", () => ({
-  defaultProvider: () => h.credentialsProvider,
+// Stand-in for KMS: the "ciphertext" of a data key is the data key
+vi.mock("@aws-sdk/client-kms", () => ({
+  KMSClient: class {
+    send = async (command: { input: { Plaintext?: Uint8Array; CiphertextBlob?: Uint8Array } }) => ({
+      CiphertextBlob: command.input.Plaintext,
+      Plaintext: command.input.CiphertextBlob,
+    });
+  },
+  EncryptCommand: class {
+    constructor(readonly input: object) {}
+  },
+  DecryptCommand: class {
+    constructor(readonly input: object) {}
+  },
 }));
 
-vi.mock("mongodb", () => {
-  class Binary {
-    buffer: Buffer;
-    sub_type: number;
-    constructor(buf: Buffer, subType: number) {
-      this.buffer = buf;
-      this.sub_type = subType;
-    }
-  }
+vi.mock("mongodb", async (importOriginal) => {
+  const { Binary } = await importOriginal<typeof import("mongodb")>();
 
   class MongoServerError extends Error {
     code: number;
@@ -49,11 +58,7 @@ vi.mock("mongodb", () => {
       connect = async () => {};
       db = (name: string) => {
         if (name === "encryption") {
-          return {
-            listCollections: h.listCollections,
-            createCollection: async () => {},
-            collection: () => ({ createIndex: async () => {} }),
-          };
+          return { collection: () => h.keyVault };
         }
 
         return {
@@ -74,7 +79,7 @@ vi.mock("mongodb", () => {
               h.docs.get(faceSignUserId) ?? null,
             findOneAndUpdate: async (
               { faceSignUserId }: { faceSignUserId: string },
-              update: { $setOnInsert: { entropy: Buffer } },
+              update: { $setOnInsert: { entropy: unknown } },
             ) => {
               const failure = h.nextUpsertThrows;
               if (failure) {
@@ -99,12 +104,6 @@ vi.mock("mongodb", () => {
           }),
         };
       };
-    },
-    ClientEncryption: class {
-      getKeyByAltName = async () => ({ _id: "data-key-id" });
-      createDataKey = async () => "data-key-id";
-      encrypt = async (value: string) => Buffer.from(value);
-      decrypt = async (value: { buffer: Buffer }) => value.buffer;
     },
   };
 });
@@ -160,7 +159,8 @@ describe("fetchOrCreateFaceSignEntropy", () => {
 
     expect(a.entropy).toBe(b.entropy);
     expect([a.insert, b.insert].filter(Boolean)).toHaveLength(1);
-    expect(h.docs.get(userId)?.entropy.toString()).toBe(a.entropy);
+    const { decrypt } = await connectDB();
+    expect(await decrypt(h.docs.get(userId)?.entropy)).toBe(a.entropy);
   });
 
   // Against real Mongo the racing insert lands between our findOne and the
@@ -169,16 +169,17 @@ describe("fetchOrCreateFaceSignEntropy", () => {
   it("returns the stored entropy when the upsert loses on a duplicate key", async () => {
     const userId = "duplicate-key-user";
     const winner = "winner mnemonic";
+    const { encrypt, decrypt } = await connectDB();
 
     h.nextUpsertThrows = {
       error: new MongoServerError("E11000 duplicate key error", 11000),
-      insert: Buffer.from(winner),
+      insert: await encrypt(winner),
     };
 
     const result = await fetchOrCreateFaceSignEntropy(userId);
 
     expect(result).toEqual({ insert: false, entropy: winner });
-    expect(h.docs.get(userId)?.entropy.toString()).toBe(winner);
+    expect(await decrypt(h.docs.get(userId)?.entropy)).toBe(winner);
   });
 
   it("rethrows an upsert failure that is not a duplicate key", async () => {
@@ -190,22 +191,24 @@ describe("fetchOrCreateFaceSignEntropy", () => {
 });
 
 describe("decrypt", () => {
-  const ciphertext = Buffer.from("ciphertext");
-
   // The stored shape depends on how the document round-tripped through the
   // driver, so decrypt() has to take all of them.
   it.each([
-    ["Binary", () => new Binary(ciphertext, 6)],
-    ["Buffer", () => ciphertext],
-    ["base64 string", () => ciphertext.toString("base64")],
+    ["Binary", (ciphertext: Buffer) => new Binary(ciphertext, 6)],
+    ["Buffer", (ciphertext: Buffer) => ciphertext],
+    ["base64 string", (ciphertext: Buffer) => ciphertext.toString("base64")],
     [
       "extended JSON",
-      () => ({ $binary: { base64: ciphertext.toString("base64"), subType: "06" } }),
+      (ciphertext: Buffer) => ({
+        $binary: { base64: ciphertext.toString("base64"), subType: "06" },
+      }),
     ],
+    ["serialized Binary", (ciphertext: Buffer) => ({ type: 6, data: [...ciphertext] })],
   ])("accepts %s", async (_shape, build) => {
-    const { decrypt } = await connectDB();
+    const { encrypt, decrypt } = await connectDB();
+    const ciphertext = Buffer.from((await encrypt("plaintext")).buffer);
 
-    expect((await decrypt<Buffer>(build())).toString()).toBe("ciphertext");
+    expect((await decrypt<Buffer>(build(ciphertext))).toString()).toBe("plaintext");
   });
 
   it("rejects a shape it cannot read", async () => {

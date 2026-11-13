@@ -131,9 +131,15 @@ What decrypts this way (`kms_decrypt` in `shared/aws.ash`, which runs `packages/
   `aws kms decrypt` in `kms_decrypt`. Their keys live in other infra modules
   (`lib/entropy-tee`, `lib/facesign-tee`) and aren't PCR-restricted.
 
-On boot, `createFle` (`packages/tee-common/fle.ts`, `localMasterKey`) checks the data key
+Field-level encryption in enclave, entropy and proxy runs on `node:crypto`
+(`createFleCrypto`, `packages/tee-common/fle-crypto.ts`), not libmongocrypt: the same
+`__keyVault` documents and `AEAD_AES_256_CBC_HMAC_SHA_512-Random` ciphertext as
+mongodb-client-encryption (checked against its output in `enclave-service/tests/fle-crypto.test.ts`),
+so stored data and rollbacks keep working. facesign still uses `fle.ts` with libmongocrypt.
+
+On boot, `createFleCrypto` (`localMasterKey`) checks the data key
 (`enclave-enclave-key`). If it's still wrapped
-by `aws`, it calls `rewrapManyDataKey({"masterKey.provider": "aws"}, {provider: "local"})`
+by `aws`, it decrypts it with a plain KMS Decrypt and stores it wrapped by the local master key,
 once. That needs the old plain decrypt, so it must run before the PCR condition exists. The
 key `_id` stays the same, so existing encrypted session fields keep decrypting. After the
 rewrap, an older EIF (with only the `aws` provider) can't read the data keys anymore.

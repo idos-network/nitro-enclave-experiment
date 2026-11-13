@@ -1,12 +1,22 @@
 import { describe, expect, it, vi } from "vitest";
 import { armBody } from "./helpers.ts";
 
-// In-memory Mongo + a ClientEncryption whose "ciphertext" is a tagged JSON wrapper,
-// so a test can tell encrypted fields from plaintext ones and swap blobs between records.
+// In-memory Mongo with the real FLE (tee-common/fle-crypto.ts) on top, so a test can tell
+// encrypted fields from plaintext ones and swap blobs between records.
 const h = vi.hoisted(() => {
   const docs = new Map<string, Record<string, unknown>>();
+  const keys: { keyAltNames: string[] }[] = [];
   return {
     docs,
+    keyVault: {
+      createIndex: async () => {},
+      findOne: async ({ keyAltNames }: { keyAltNames: string }) =>
+        keys.find((key) => key.keyAltNames.includes(keyAltNames)) ?? null,
+      insertOne: async (key: { keyAltNames: string[] }) => {
+        keys.push(key);
+      },
+      updateOne: async () => {},
+    },
     collection: {
       createIndex: async () => {},
       insertOne: async (doc: Record<string, unknown>) => {
@@ -20,22 +30,13 @@ const h = vi.hoisted(() => {
   };
 });
 
-vi.mock("@aws-sdk/credential-provider-node", () => ({ defaultProvider: () => async () => ({}) }));
-
-vi.mock("mongodb", () => ({
+vi.mock("mongodb", async (importOriginal) => ({
+  Binary: (await importOriginal<typeof import("mongodb")>()).Binary,
   MongoClient: class {
     connect = async () => {};
     db = () => ({
-      listCollections: () => ({ toArray: async () => [{ name: "__keyVault" }] }),
-      createCollection: async () => {},
-      collection: () => h.collection,
+      collection: (name: string) => (name === "__keyVault" ? h.keyVault : h.collection),
     });
-  },
-  ClientEncryption: class {
-    getKeyByAltName = async () => ({ _id: "data-key-id" });
-    createDataKey = async () => "data-key-id";
-    encrypt = async (value: string) => ({ enc: value });
-    decrypt = async (value: { enc: string }) => value.enc;
   },
 }));
 
