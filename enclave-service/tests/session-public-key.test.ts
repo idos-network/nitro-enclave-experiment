@@ -128,6 +128,16 @@ describe("POST /session/public-key", () => {
     });
   });
 
+  it("returns 400 when the recipient key is a low-order point", async () => {
+    const session = await createSession();
+    const lowOrderAudience = await createAudience(new Uint8Array(32));
+
+    await request(app)
+      .post("/session/public-key")
+      .send(sessionBody(session, nacl.randomBytes(32), lowOrderAudience))
+      .expect(400);
+  });
+
   it("returns 400 with a clear message for an unsupported algorithm", async () => {
     const session = await createSession();
     const jwtChain = await new SignJWT({ recipientPublicKeyX: audience.recipient.x })

@@ -1,4 +1,5 @@
-import tweetnacl, { type BoxKeyPair } from "tweetnacl";
+import type { BoxKeyPair } from "tweetnacl";
+import { boxOpen, keyPairFromSecretKey } from "./box.ts";
 
 export function getEncryptionKeyPair(
   encryptedKeyB64: string,
@@ -6,7 +7,7 @@ export function getEncryptionKeyPair(
   sessionClientPublicKey: Uint8Array,
   sessionServerPrivateKey: Uint8Array,
 ): BoxKeyPair | null {
-  const secretKey = tweetnacl.box.open(
+  const secretKey = boxOpen(
     Buffer.from(encryptedKeyB64, "base64url"),
     Buffer.from(nonceB64, "base64url"),
     sessionClientPublicKey,
@@ -17,5 +18,5 @@ export function getEncryptionKeyPair(
     return null;
   }
 
-  return tweetnacl.box.keyPair.fromSecretKey(secretKey);
+  return keyPairFromSecretKey(secretKey);
 }

@@ -44,6 +44,14 @@ describe("POST /encrypt", () => {
       .expect(200);
   });
 
+  it("returns 400 for a low-order recipient key", async () => {
+    // all-zero point: the shared secret would be all zeros, readable by anyone
+    await request(app)
+      .post("/encrypt")
+      .send({ arguments: { payload: b64(Buffer.from("x")), publicKey: b64(new Uint8Array(32)) } })
+      .expect(400);
+  });
+
   it("returns 400 for invalid body", async () => {
     const res = await request(app).post("/encrypt").send({ sessionId: "not-a-uuid" }).expect(400);
 

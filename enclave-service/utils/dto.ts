@@ -1,5 +1,13 @@
 import { z } from "zod";
 import { SKIP_AUDIENCE_VERIFICATION } from "../env.ts";
+import { isUsablePublicKey } from "../providers/box.ts";
+
+// base64url-encoded 32-byte X25519 public key; low-order keys are a 400 here, not a 500 in box()
+const x25519PublicKey = z
+  .base64url()
+  .min(43)
+  .max(44)
+  .refine((key) => isUsablePublicKey(Buffer.from(key, "base64url")), "Not a usable X25519 key");
 
 export const CommonRequestSchema = z.object({
   session: z.object({
@@ -33,7 +41,7 @@ export const EncryptRequestSchema = z.object({
   arguments: z.object({
     payload: z.base64url(), // base64url encoded string (encrypted for decryption and vice-versa)
     nonce: z.base64url().length(32).optional(), // base64url encoded string (nonce for decryption)
-    publicKey: z.base64url().min(43).max(44), // base64url-encoded 32-byte public key (encryptor for decryption, decryptor for encryption)
+    publicKey: x25519PublicKey, // encryptor for decryption, decryptor for encryption
   }),
 });
 
@@ -43,7 +51,7 @@ export const DecryptRequestSchema = EncryptRequestSchema.extend(CommonRequestSch
 export type DecryptRequest = z.infer<typeof DecryptRequestSchema>;
 
 export const CreateSessionRequestSchema = z.object({
-  sessionClientPublicKey: z.base64url().min(43).max(44), // base64url-encoded 32-byte NaCl box public key
+  sessionClientPublicKey: x25519PublicKey,
   allowedAudienceRoots: z
     .array(
       // TEMPORARY (staging only): roots are never checked when audience verification is skipped.

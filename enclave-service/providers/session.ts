@@ -1,7 +1,7 @@
 import { traced } from "@idos/tee-common/telemetry.ts";
-import tweetnacl from "tweetnacl";
 import { BASE_URL } from "../env.ts";
 import type { CreateSessionRequest } from "../utils/dto.ts";
+import { keyPair } from "./box.ts";
 import { storeSession } from "./db.ts";
 import { SIGNING_KID, sign } from "./signing.ts";
 
@@ -10,7 +10,7 @@ export const createSession = traced("session.create", async (data: CreateSession
   const sessionId = crypto.randomUUID();
 
   // 2. Generate Ephemeral X25519 Encryption Keys
-  const sessionServerKeyPair = tweetnacl.box.keyPair();
+  const sessionServerKeyPair = keyPair();
   const sessionServerPublicKey = {
     kty: "OKP",
     crv: "X25519",

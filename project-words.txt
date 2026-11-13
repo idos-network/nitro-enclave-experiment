@@ -11,6 +11,7 @@ chrony
 chronyc
 chronyd
 ciphertext
+ciphertexts
 cmdport
 cooldown
 COSE
@@ -38,6 +39,7 @@ genpkey
 groff
 healthcheck
 HMAC
+hsalsa
 idos
 idphoto
 IMDS
@@ -55,6 +57,7 @@ libnacl
 libnbd
 libsodium
 LOGDIR
+lowlevel
 luks
 makestep
 Multibase
@@ -83,6 +86,7 @@ refclock
 respawn
 RSAES
 RSASSA
+scalarmult
 SCANDIR
 scure
 sdkutils
