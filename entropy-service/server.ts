@@ -19,7 +19,8 @@ app.use(requestContextMiddleware);
 app.use(tracingMiddleware);
 app.use(loggerMiddleware);
 app.set("trust proxy", "loopback");
-app.use(promBundle({ includeMethod: true }));
+// default metrics: event loop lag and utilization, GC, heap
+app.use(promBundle({ includeMethod: true, promClient: { collectDefaultMetrics: {} } }));
 app.use(helmet());
 app.use(cors());
 app.use(express.json({ limit: "5mb" }));
