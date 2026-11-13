@@ -151,7 +151,9 @@ Rotate a vendor key by arming again and disarming the old id.
 
 ```bash
 pnpm install
-MONGO_URI=… AWS_REGION=… FLE_MASTER_KEY=$(openssl rand -base64 96 | tr -d "\n") ARM_TOKENS=dev-token pnpm start
+# Once: the data key in proxyEncryption.__keyVault stays wrapped by this master key, so reuse it
+openssl rand -base64 96 | tr -d "\n" > .fle_master_key
+MONGO_URI=… AWS_REGION=… FLE_MASTER_KEY=$(cat .fle_master_key) ARM_TOKENS=dev-token pnpm start
 ```
 
 `pnpm test` runs without Mongo or KMS (both mocked).

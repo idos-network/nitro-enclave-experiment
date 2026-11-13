@@ -93,7 +93,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ValidationError"
+                $ref: "#/components/schemas/Error"
         "429":
           description: More than 100 requests from one client address in 15 minutes
 
