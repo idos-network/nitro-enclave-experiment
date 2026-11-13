@@ -1,5 +1,6 @@
 import { defaultProvider } from "@aws-sdk/credential-provider-node";
 import { createFle } from "@idos/tee-common/fle.ts";
+import { traced } from "@idos/tee-common/telemetry.ts";
 import { type Binary, ClientEncryption, type Db, MongoClient } from "mongodb";
 import {
   AWS_REGION,
@@ -51,7 +52,7 @@ export interface ArmedRecordDocument {
 
 export type Armed = ArmRequest & { id: string };
 
-export async function storeArmed(armedId: string, data: ArmRequest) {
+export const storeArmed = traced("db.storeArmed", async (armedId: string, data: ArmRequest) => {
   const { db, encrypt } = await connectDB();
 
   const record: ArmedRecordDocument = {
@@ -61,9 +62,9 @@ export async function storeArmed(armedId: string, data: ArmRequest) {
   };
 
   await db.collection(DB_ARMED_COLLECTION).insertOne(record);
-}
+});
 
-export async function getArmed(armedId: string): Promise<Armed | null> {
+export const getArmed = traced("db.getArmed", async (armedId: string): Promise<Armed | null> => {
   const { db, decrypt } = await connectDB();
 
   const record = await db.collection<ArmedRecordDocument>(DB_ARMED_COLLECTION).findOne({ armedId });
@@ -81,11 +82,11 @@ export async function getArmed(armedId: string): Promise<Armed | null> {
   }
 
   return { id: armedId, ...data };
-}
+});
 
 /** True when a record was deleted, false when there was none. */
-export async function deleteArmed(armedId: string): Promise<boolean> {
+export const deleteArmed = traced("db.deleteArmed", async (armedId: string): Promise<boolean> => {
   const { db } = await connectDB();
   const { deletedCount } = await db.collection(DB_ARMED_COLLECTION).deleteOne({ armedId });
   return deletedCount === 1;
-}
+});

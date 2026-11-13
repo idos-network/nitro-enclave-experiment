@@ -1,4 +1,5 @@
 import { setTimeout as sleep } from "node:timers/promises";
+import { traced } from "@idos/tee-common/telemetry.ts";
 import type { Request } from "express";
 import { match } from "path-to-regexp";
 import { UPSTREAM_TIMEOUT_MS } from "../env.ts";
@@ -42,53 +43,55 @@ export function isAllowed(allow: ArmRequest["allow"], method: string, pathname: 
   );
 }
 
-export async function forward(
-  armed: Armed,
-  req: Request,
-  url: URL,
-): Promise<{ status: number; contentType: string | null; body: Buffer }> {
-  const headers = new Headers();
-  // Headers named by Connection are hop-by-hop too (RFC 9110 §7.6.1).
-  const nominated = new Set(
-    String(req.headers.connection ?? "")
-      .split(",")
-      .map((h) => h.trim().toLowerCase())
-      .filter(Boolean),
-  );
-  for (const [name, value] of Object.entries(req.headers)) {
-    if (DROPPED_REQUEST_HEADERS.has(name) || nominated.has(name) || value === undefined) continue;
-    headers.set(name, Array.isArray(value) ? value.join(", ") : value);
-  }
+type Upstream = { status: number; contentType: string | null; body: Buffer };
 
-  const body = Buffer.isBuffer(req.body) && req.body.length > 0 ? req.body : undefined;
+// annotated: the inferred type would reference express' internal Request generics
+export const forward: (armed: Armed, req: Request, url: URL) => Promise<Upstream> = traced(
+  "upstream.forward",
+  async (armed: Armed, req: Request, url: URL): Promise<Upstream> => {
+    const headers = new Headers();
+    // Headers named by Connection are hop-by-hop too (RFC 9110 §7.6.1).
+    const nominated = new Set(
+      String(req.headers.connection ?? "")
+        .split(",")
+        .map((h) => h.trim().toLowerCase())
+        .filter(Boolean),
+    );
+    for (const [name, value] of Object.entries(req.headers)) {
+      if (DROPPED_REQUEST_HEADERS.has(name) || nominated.has(name) || value === undefined) continue;
+      headers.set(name, Array.isArray(value) ? value.join(", ") : value);
+    }
 
-  // Vendor auth headers win over anything the host sent under the same name.
-  const authHeaders = await authorize(armed, { method: req.method, url, body });
-  for (const [name, value] of Object.entries(authHeaders)) {
-    headers.set(name, value);
-  }
+    const body = Buffer.isBuffer(req.body) && req.body.length > 0 ? req.body : undefined;
 
-  if (armed.api === "mock") {
-    await sleep(armed.auth.delayMs);
-    const echo = { method: req.method, path: `${url.pathname}${url.search}`, ...authHeaders };
+    // Vendor auth headers win over anything the host sent under the same name.
+    const authHeaders = await authorize(armed, { method: req.method, url, body });
+    for (const [name, value] of Object.entries(authHeaders)) {
+      headers.set(name, value);
+    }
+
+    if (armed.api === "mock") {
+      await sleep(armed.auth.delayMs);
+      const echo = { method: req.method, path: `${url.pathname}${url.search}`, ...authHeaders };
+      return {
+        status: 200,
+        contentType: "application/json",
+        body: Buffer.from(JSON.stringify(echo)),
+      };
+    }
+
+    const response = await fetch(url.toString(), {
+      method: req.method,
+      headers,
+      ...(body ? { body } : {}),
+      redirect: "manual",
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+    });
+
     return {
-      status: 200,
-      contentType: "application/json",
-      body: Buffer.from(JSON.stringify(echo)),
+      status: response.status,
+      contentType: response.headers.get("content-type"),
+      body: Buffer.from(await response.arrayBuffer()),
     };
-  }
-
-  const response = await fetch(url.toString(), {
-    method: req.method,
-    headers,
-    ...(body ? { body } : {}),
-    redirect: "manual",
-    signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
-  });
-
-  return {
-    status: response.status,
-    contentType: response.headers.get("content-type"),
-    body: Buffer.from(await response.arrayBuffer()),
-  };
-}
+  },
+);

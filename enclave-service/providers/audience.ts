@@ -1,3 +1,4 @@
+import { traced } from "@idos/tee-common/telemetry.ts";
 import { createRemoteJWKSet, decodeJwt, decodeProtectedHeader, errors, jwtVerify } from "jose";
 import { writeLog } from "../utils/logger-context.ts";
 
@@ -23,63 +24,65 @@ export class AudienceError extends Error {
  * Verify the audience JWT against the JWKS of each allowed root and return
  * the recipient X25519 public key. Throws AudienceError on any failure.
  */
-export async function verifyAudience(
-  allowedAudienceRoots: string[],
-  jwtChain: string,
-): Promise<Buffer> {
-  assertSupportedAlgorithm(jwtChain);
+export const verifyAudience = traced(
+  "audience.verify",
+  async (allowedAudienceRoots: string[], jwtChain: string): Promise<Buffer> => {
+    assertSupportedAlgorithm(jwtChain);
 
-  const unreachableRoots: string[] = [];
+    const unreachableRoots: string[] = [];
 
-  for (const root of allowedAudienceRoots) {
-    let payload: Awaited<ReturnType<typeof jwtVerify>>["payload"];
+    for (const root of allowedAudienceRoots) {
+      let payload: Awaited<ReturnType<typeof jwtVerify>>["payload"];
 
-    try {
-      ({ payload } = await jwtVerify(jwtChain, remoteJwks(jwksUrl(root)), {
-        algorithms: SUPPORTED_ALGORITHMS,
-      }));
-    } catch (error) {
-      if (error instanceof AudienceError) throw error;
+      try {
+        ({ payload } = await jwtVerify(jwtChain, remoteJwks(jwksUrl(root)), {
+          algorithms: SUPPORTED_ALGORITHMS,
+        }));
+      } catch (error) {
+        if (error instanceof AudienceError) throw error;
 
-      // Not signed by this root, try the next one.
-      if (
-        error instanceof errors.JWKSNoMatchingKey ||
-        error instanceof errors.JWSSignatureVerificationFailed
-      ) {
+        // Not signed by this root, try the next one.
+        if (
+          error instanceof errors.JWKSNoMatchingKey ||
+          error instanceof errors.JWSSignatureVerificationFailed
+        ) {
+          continue;
+        }
+
+        // Signature is fine (or the token is broken), but claims are not — no other root will help.
+        if (error instanceof errors.JWTExpired) {
+          throw new AudienceError("Audience JWT has expired.");
+        }
+        if (error instanceof errors.JWTClaimValidationFailed) {
+          throw new AudienceError(
+            `Audience JWT claim "${error.claim}" is invalid: ${error.reason}.`,
+          );
+        }
+        if (error instanceof errors.JWSInvalid || error instanceof errors.JWTInvalid) {
+          throw new AudienceError("Audience jwtChain is not a valid compact JWS/JWT.");
+        }
+
+        // Anything else (timeout, network, invalid JWKS document) is an infra problem on the root side.
+        writeLog("audience_jwks_unavailable", { root, error: String(error) });
+        unreachableRoots.push(root);
         continue;
       }
 
-      // Signature is fine (or the token is broken), but claims are not — no other root will help.
-      if (error instanceof errors.JWTExpired) {
-        throw new AudienceError("Audience JWT has expired.");
-      }
-      if (error instanceof errors.JWTClaimValidationFailed) {
-        throw new AudienceError(`Audience JWT claim "${error.claim}" is invalid: ${error.reason}.`);
-      }
-      if (error instanceof errors.JWSInvalid || error instanceof errors.JWTInvalid) {
-        throw new AudienceError("Audience jwtChain is not a valid compact JWS/JWT.");
-      }
-
-      // Anything else (timeout, network, invalid JWKS document) is an infra problem on the root side.
-      writeLog("audience_jwks_unavailable", { root, error: String(error) });
-      unreachableRoots.push(root);
-      continue;
+      return recipientPublicKey(payload.recipientPublicKeyX);
     }
 
-    return recipientPublicKey(payload.recipientPublicKeyX);
-  }
+    if (unreachableRoots.length > 0) {
+      throw new AudienceError(
+        `Could not fetch JWKS for audience root(s): ${unreachableRoots.join(", ")}.`,
+        502,
+      );
+    }
 
-  if (unreachableRoots.length > 0) {
     throw new AudienceError(
-      `Could not fetch JWKS for audience root(s): ${unreachableRoots.join(", ")}.`,
-      502,
+      `Audience JWT is not signed by any allowed audience root (${allowedAudienceRoots.join(", ")}).`,
     );
-  }
-
-  throw new AudienceError(
-    `Audience JWT is not signed by any allowed audience root (${allowedAudienceRoots.join(", ")}).`,
-  );
-}
+  },
+);
 
 /**
  * TEMPORARY (staging only): read the recipient X25519 public key from the audience JWT

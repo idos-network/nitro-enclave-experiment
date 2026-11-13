@@ -1,5 +1,6 @@
 import { defaultProvider } from "@aws-sdk/credential-provider-node";
 import { createFle } from "@idos/tee-common/fle.ts";
+import { traced } from "@idos/tee-common/telemetry.ts";
 import * as bip39 from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
 import {
@@ -61,7 +62,7 @@ let usedTokensIndexes: Promise<unknown> | null = null;
  * Marks token `jti` as used. Returns false when it was already used (replay).
  * TTL only needs to outlive the token max age (60s), the unique index does the work.
  */
-export async function consumeTokenId(jti: string): Promise<boolean> {
+export const consumeTokenId = traced("db.consumeTokenId", async (jti: string): Promise<boolean> => {
   await client.connect();
   const collection = client
     .db(DB_NAME)
@@ -83,64 +84,65 @@ export async function consumeTokenId(jti: string): Promise<boolean> {
     if (err instanceof MongoServerError && err.code === 11000) return false;
     throw err;
   }
-}
+});
 
 /**
  * Undoes consumeTokenId when the request failed after reserving the token,
  * so the client can retry with the same token while it is still valid.
  */
-export async function releaseTokenId(jti: string): Promise<void> {
+export const releaseTokenId = traced("db.releaseTokenId", async (jti: string): Promise<void> => {
   await client
     .db(DB_NAME)
     .collection<{ _id: string; createdAt: Date }>(USED_TOKENS_COLLECTION)
     .deleteOne({ _id: jti });
-}
+});
 
-export async function fetchOrCreateFaceSignEntropy(
-  faceSignUserId: string,
-): Promise<{ insert: boolean; entropy: string }> {
-  const { db, encrypt, decrypt } = await connectDB();
-  const collection = db.collection(FACE_SIGN_ENTROPY_COLLECTION);
+export const fetchOrCreateFaceSignEntropy = traced(
+  "db.fetchOrCreateFaceSignEntropy",
+  async (faceSignUserId: string): Promise<{ insert: boolean; entropy: string }> => {
+    const { db, encrypt, decrypt } = await connectDB();
+    const collection = db.collection(FACE_SIGN_ENTROPY_COLLECTION);
 
-  // try to find existing encrypted record
-  const existing = await collection.findOne({ faceSignUserId });
+    // try to find existing encrypted record
+    const existing = await collection.findOne({ faceSignUserId });
 
-  if (existing?.entropy) {
-    const decrypted = await decrypt<Buffer>(existing.entropy);
-    return { insert: false, entropy: decrypted.toString() };
-  }
-
-  // create new entropy and encrypt
-  const mnemonic = bip39.generateMnemonic(wordlist, 256);
-  const encryptedEntropy = await encrypt(mnemonic);
-
-  // $setOnInsert + upsert leaves exactly one entropy per user, but the caller
-  // that loses the race must return the *stored* one, not the mnemonic it just
-  // generated and threw away.
-  let stored: WithId<Document> | null;
-
-  try {
-    stored = await collection.findOneAndUpdate(
-      { faceSignUserId },
-      { $setOnInsert: { entropy: encryptedEntropy } },
-      { upsert: true, returnDocument: "after" },
-    );
-  } catch (error) {
-    // A racing insert that landed between our findOne and the upsert surfaces
-    // against the unique index as E11000; the winner's document is now there.
-    if (!(error instanceof MongoServerError) || error.code !== 11000) {
-      throw error;
+    if (existing?.entropy) {
+      const decrypted = await decrypt<Buffer>(existing.entropy);
+      return { insert: false, entropy: decrypted.toString() };
     }
 
-    stored = await collection.findOne({ faceSignUserId });
-  }
+    // create new entropy and encrypt
+    const mnemonic = bip39.generateMnemonic(wordlist, 256);
+    const encryptedEntropy = await encrypt(mnemonic);
 
-  if (!stored?.entropy) {
-    throw new Error("Entropy upsert stored no document");
-  }
+    // $setOnInsert + upsert leaves exactly one entropy per user, but the caller
+    // that loses the race must return the *stored* one, not the mnemonic it just
+    // generated and threw away.
+    let stored: WithId<Document> | null;
 
-  const entropy = (await decrypt<Buffer>(stored.entropy)).toString();
+    try {
+      stored = await collection.findOneAndUpdate(
+        { faceSignUserId },
+        { $setOnInsert: { entropy: encryptedEntropy } },
+        { upsert: true, returnDocument: "after" },
+      );
+    } catch (error) {
+      // A racing insert that landed between our findOne and the upsert surfaces
+      // against the unique index as E11000; the winner's document is now there.
+      if (!(error instanceof MongoServerError) || error.code !== 11000) {
+        throw error;
+      }
 
-  // We created it only if what is stored is the mnemonic we generated.
-  return { insert: entropy === mnemonic, entropy };
-}
+      stored = await collection.findOne({ faceSignUserId });
+    }
+
+    if (!stored?.entropy) {
+      throw new Error("Entropy upsert stored no document");
+    }
+
+    const entropy = (await decrypt<Buffer>(stored.entropy)).toString();
+
+    // We created it only if what is stored is the mnemonic we generated.
+    return { insert: entropy === mnemonic, entropy };
+  },
+);

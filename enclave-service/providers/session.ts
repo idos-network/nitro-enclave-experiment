@@ -1,10 +1,11 @@
+import { traced } from "@idos/tee-common/telemetry.ts";
 import tweetnacl from "tweetnacl";
 import { BASE_URL } from "../env.ts";
 import type { CreateSessionRequest } from "../utils/dto.ts";
 import { storeSession } from "./db.ts";
 import { SIGNING_KID, sign } from "./signing.ts";
 
-export async function createSession(data: CreateSessionRequest) {
+export const createSession = traced("session.create", async (data: CreateSessionRequest) => {
   // 1. Generate unique Session ID
   const sessionId = crypto.randomUUID();
 
@@ -56,4 +57,4 @@ export async function createSession(data: CreateSessionRequest) {
     jwtChain,
     sessionServerPublicKey,
   };
-}
+});
