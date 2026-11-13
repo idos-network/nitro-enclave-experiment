@@ -1,6 +1,5 @@
-import { defaultProvider } from "@aws-sdk/credential-provider-node";
-import { createFle } from "@idos/tee-common/fle.ts";
-import { type Binary, ClientEncryption, type Db, MongoClient } from "mongodb";
+import { createFleCrypto, KEY_VAULT_COLLECTION } from "@idos/tee-common/fle-crypto.ts";
+import { Binary, type Db, MongoClient } from "mongodb";
 import { DB_ARMED_COLLECTION, DB_NAME, FLE_KEY_ALIAS, FLE_MASTER_KEY, MONGO_URI } from "../env.ts";
 import type { ArmRequest } from "../utils/dto.ts";
 
@@ -11,14 +10,11 @@ const client = new MongoClient(MONGO_URI, {
   wtimeoutMS: 2500,
 });
 
-const fle = createFle({
-  client,
-  ClientEncryption,
-  // unused: the vault only ever holds `local` data keys, nothing to rewrap from `aws`
-  credentialsProvider: defaultProvider(),
-  keyDb: "proxyEncryption",
+const fle = createFleCrypto({
+  keyVault: client.db("proxyEncryption").collection(KEY_VAULT_COLLECTION),
+  Binary,
   keyAlias: FLE_KEY_ALIAS,
-  // decrypted with attestation by scripts/run.ash, see localMasterKey in tee-common/fle.ts
+  // decrypted with attestation by scripts/run.ash, see localMasterKey in tee-common/fle-crypto.ts
   localMasterKey: Buffer.from(FLE_MASTER_KEY, "base64"),
 });
 

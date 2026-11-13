@@ -1,10 +1,9 @@
-import { defaultProvider } from "@aws-sdk/credential-provider-node";
-import { createFle } from "@idos/tee-common/fle.ts";
+import { DecryptCommand, EncryptCommand, KMSClient } from "@aws-sdk/client-kms";
+import { createFleCrypto, KEY_VAULT_COLLECTION } from "@idos/tee-common/fle-crypto.ts";
 import * as bip39 from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
 import {
   Binary,
-  ClientEncryption,
   type Db,
   type Document,
   MongoClient,
@@ -28,14 +27,32 @@ const client = new MongoClient(MONGO_URI, {
   wtimeoutMS: 2500,
 });
 
-const fle = createFle({
-  client,
-  ClientEncryption,
+const kms = new KMSClient({ region: AWS_REGION });
+
+// Data keys are wrapped by KMS (the `aws` provider) with the host role
+const fle = createFleCrypto({
+  keyVault: client.db("encryption").collection(KEY_VAULT_COLLECTION),
   Binary,
-  credentialsProvider: defaultProvider(),
-  keyDb: "encryption",
   keyAlias: FLE_KEY_ALIAS,
-  masterKey: { key: FLE_KMS_KEY_ID, region: AWS_REGION },
+  kms: {
+    masterKey: { key: FLE_KMS_KEY_ID, region: AWS_REGION },
+    encrypt: async (dataKey) => {
+      const { CiphertextBlob } = await kms.send(
+        new EncryptCommand({ KeyId: FLE_KMS_KEY_ID, Plaintext: dataKey }),
+      );
+      if (!CiphertextBlob) {
+        throw new Error("KMS returned no CiphertextBlob");
+      }
+      return CiphertextBlob;
+    },
+    decrypt: async (keyMaterial) => {
+      const { Plaintext } = await kms.send(new DecryptCommand({ CiphertextBlob: keyMaterial }));
+      if (!Plaintext) {
+        throw new Error("KMS returned no Plaintext");
+      }
+      return Plaintext;
+    },
+  },
 });
 
 export async function connectDB() {
